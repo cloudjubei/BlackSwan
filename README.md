@@ -2,18 +2,20 @@
 
 ## TODOs:
 
+1. Make Trello
+2. Server - Kamil C
+3. RL - Kamil C
+4. Backtesting - Kamil M
+5. Prompt Engineering - Mateusz
+6. Frontend Svelte - Paweł 
+
+
 ### Reinforcement Learning
 - Work out how we can teach models to play on the market
 - visualisations
 
-### Impact Data
-- Data gathering from a specified source
-- Preprocessing
-- Tokenization
-
 ### Impact Prediction
-- Matching impact data with coin data -> finding correlations
-- Trying to predict if a certain piece of news will have impact
+- Create a prompt for ChatGPT to analyse a specific piece of news
 
 ### Backtesting
 - Add backtesting functionality so that a strategy can be tested across all of available data to see how good it is
