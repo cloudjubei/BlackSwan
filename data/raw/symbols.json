@@ -1,8 +1,26 @@
 {
-    "BTCUSDT" : {
-        "startTime": 1502942400000,
+    "BTCUSDT": {
+        "startTime": 1502942428000,
         "trendChangeAmount1Min": 50,
         "trendChangeAmount1Hour": 500,
         "trendChangeAmount1Day": 2000
+    },
+    "ETHUSDT": {
+        "startTime": 1502942429000
+    },
+    "BNBUSDT": {
+        "startTime": 1509940463000
+    },
+    "XRPUSDT": {
+        "startTime": 1525421491000
+    },
+    "DOGEUSDT": {
+        "startTime": 1562328001000
+    },
+    "SOLUSDT": {
+        "startTime": 1597125600000
+    },
+    "TRXUSDT": {
+        "startTime": 1528716605000
     }
 }

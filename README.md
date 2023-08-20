@@ -1,5 +1,10 @@
 # BlackSwan
 
+## start backend
+```
+python3 -m uvicorn main:app --reload
+```
+
 ## TODOs:
 
 1. Make Trello
