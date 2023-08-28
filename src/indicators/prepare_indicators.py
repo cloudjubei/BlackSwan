@@ -1,7 +1,7 @@
 
 import pandas as pd
 
-from indicators.indicators_common import caclulateAroon, calculateADL, calculateADX, calculateBollingerBands, calculateCCI, calculateEMA, calculateIchimoku, calculateMACD, calculateOBV, calculateRSI, calculateSAR, calculateSO, calculateTrendDirection, calculateWilliams
+from src.indicators.indicators_common import caclulateAroon, calculateADL, calculateADX, calculateBollingerBands, calculateCCI, calculateEMA, calculateIchimoku, calculateMACD, calculateOBV, calculateRSI, calculateSAR, calculateSO, calculateTrendDirection, calculateWilliams
 
 def prepareIndicators(df: pd.DataFrame, trend_change_amount: float):
     calculateTrendDirection(df, 'price_open', 'price_close', 'price_low', 'price_high', 'trend_direction', trend_change_amount)
@@ -29,4 +29,6 @@ def prepareAllIndicators(df: pd.DataFrame, trend_change_amount: float):
     calculateBollingerBands(df, 'price_close', 'boll_up', 'boll_down')
     calculateIchimoku(df, 'price_close', 'price_low', 'price_high', 'ichi')
 
-    df[['trend_direction', 'trend_direction_change', 'trend_direction_consecutive', 'rsi', '24h_price_diff', 'cci', 'williams', 'sar', 'ma', 'ema', 'obv', 'adl', 'adx', 'aroon', 'macd', 'so', 'boll_up', 'boll_down']] = df[['trend_direction', 'trend_direction_change', 'trend_direction_consecutive', 'rsi', '24h_price_diff', 'cci', 'williams', 'sar', 'ma', 'ema', 'obv', 'adl', 'adx', 'aroon', 'macd', 'so', 'boll_up', 'boll_down']].fillna(0)
+    cols = ['trend_direction', 'trend_direction_change', 'trend_direction_consecutive', 'rsi', '24h_price_diff', 'cci', 'williams', 'sar', 'ma', 'ema', 'obv', 'adl', 'adx', 'aroon', 'macd', 'so', 'boll_up', 'boll_down']
+    df[cols] = df[cols].fillna(0)
+    return df
