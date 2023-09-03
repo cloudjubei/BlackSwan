@@ -13,13 +13,13 @@ INTERVALS = {
 def getIntervalTime(interval: str, multiplier: int = 1):
     return INTERVALS[interval] * multiplier
 
-def getTimeSeriesData(symbol: str, interval: str, start_time: int, end_time: int):
+def getTimeSeriesData(symbol: str, interval: str, start_time: int, end_time: int, limit: int = 1000):
     params = {
         "symbol": symbol,
         "interval": interval,
         "startTime": start_time,
         "endTime": end_time,
-        "limit": 1000
+        "limit": limit
     }
     json = requests.get(API_URL, params=params).json()
     klines = processKlines(json)
