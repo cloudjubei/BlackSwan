@@ -194,7 +194,7 @@ class ModelConfigSearch:
 @dataclass
 class ModelConfig:
     model_type: str # possible ["hodl", "rl", "lstm", "mlp", "technical", "time"]
-    iterations_to_pick_best: int = 10
+    iterations_to_pick_best: int = 1
     model_rl: ModelRLConfig | None = None
     model_lstm: ModelLSTMConfig | None = None
     model_mlp: ModelMLPConfig | None = None
@@ -362,7 +362,7 @@ model_rl_h = ModelConfigSearch(
 
 # [MIN] ["duel-dqn"] x lr[0.0001] x day_of_week x rewards 1/10
 # [MIN] ["duel-dqn"] x lr[0.0000001] x day_of_week x rewards 1/10
-# [MIN] ["duel-dqn"] x lr[0.0001] x [1m_1h_1d vs 1m_1h vs 1m] x combo_all2 1/6
+# [MIN] ["duel-dqn"] x lr[0.0001] x [1m_1h_1d vs 1m_1h vs 1m] x combo_all2 3/6
 
 # TODO:
 # [MIN] ["duel-dqn"] x lr[0.0000001] x rewards_chosen -> day_of_week vs non 1/10
@@ -373,7 +373,8 @@ model_rl_min = ModelConfigSearch(
     model_rl= ModelRLConfigSearch(
         # model_name= ["ppo", "a2c", "dqn", "qrdqn", "dqn-sbx"],
         # model_name= ["duel-dqn", "dqn-sbx", "dqn"],
-        model_name= ["duel-dqn"],
+        # model_name= ["duel-dqn"],
+        model_name= ["duel-dqn", "dqn-sbx", "rainbow-dqn", "iqn"],
         # model_name= ["dqn"],
         # model_name= ["dqn-sbx"],
 

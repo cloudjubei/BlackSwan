@@ -67,13 +67,15 @@ def get_model_configs_count(config: Config) -> int:
         count += len(model_config_combinations)
     return count
 
+# 11th Gen Core™ i5-11400F vs AMD Ryzen 5 5600X 6-core
+
 # @hydra.main(version_base=None, config_name="config_simple")
-@hydra.main(version_base=None, config_name="config_simple_rl_vlong")
+# @hydra.main(version_base=None, config_name="config_simple_rl_vlong") #490 it/s vs 385 it/s vs 250 it/s MAC
 # @hydra.main(version_base=None, config_name="config_simple_short_rl_min")
 # @hydra.main(version_base=None, config_name="config_simple_rl_min")
 # @hydra.main(version_base=None, config_name="config_simple_long_rl_min")
 # @hydra.main(version_base=None, config_name="config_simple_vlong_rl_min")
-# @hydra.main(version_base=None, config_name="config_simple_min_hour")
+@hydra.main(version_base=None, config_name="config_simple_min_hour")
 def main(config: Config) -> None:
     pd.options.display.float_format = '{:.3f}'.format
     np.set_printoptions(formatter={'float_kind':'{:.4f}'.format})
