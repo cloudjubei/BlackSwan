@@ -1,5 +1,9 @@
 # BlackSwan
 
+# source .venv/bin/activate
+# set -a
+# source  .env
+
 ## TODOs:
 # write a new combo reward that combines all the ideas, so that using multipliers each component can be added
 # Make Ulcer index as an observation

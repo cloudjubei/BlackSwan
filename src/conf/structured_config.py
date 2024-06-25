@@ -8,15 +8,15 @@ from src.conf.env_config import EnvConfig, get_envs_all, get_envs_simple, get_en
 
 @dataclass
 class Repo:
-    repo_owner: str = "hamsterkmak"
-    repo_name: str = "black-swan-experiments"
+    repo_owner: str = "cloudjubei"
+    repo_name: str = "black-swan"
 
 @dataclass
 class Config:
     user: str = "cloudjubei"
     experiment_name: str = "hiperparams"
     run_name: str = "test"
-    device: str = "cpu" #"mps"
+    device: str = "auto" #"mps"
 
     data_configs: List[DataConfig] = field(default_factory=List)
     env_configs: List[EnvConfig] = field(default_factory=List)

@@ -68,12 +68,12 @@ def get_model_configs_count(config: Config) -> int:
     return count
 
 # @hydra.main(version_base=None, config_name="config_simple")
-# @hydra.main(version_base=None, config_name="config_simple_rl_vlong")
+@hydra.main(version_base=None, config_name="config_simple_rl_vlong")
 # @hydra.main(version_base=None, config_name="config_simple_short_rl_min")
 # @hydra.main(version_base=None, config_name="config_simple_rl_min")
 # @hydra.main(version_base=None, config_name="config_simple_long_rl_min")
 # @hydra.main(version_base=None, config_name="config_simple_vlong_rl_min")
-@hydra.main(version_base=None, config_name="config_simple_min_hour")
+# @hydra.main(version_base=None, config_name="config_simple_min_hour")
 def main(config: Config) -> None:
     pd.options.display.float_format = '{:.3f}'.format
     np.set_printoptions(formatter={'float_kind':'{:.4f}'.format})
