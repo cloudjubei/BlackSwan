@@ -1,34 +1,44 @@
 # BlackSwan
 
 ## TODOs:
-
-1. Make Trello
-2. Server - Kamil C
-3. RL - Kamil C
-4. Backtesting - Kamil M
-5. Prompt Engineering - Mateusz
-6. Frontend Svelte - Paweł 
+# write a new combo reward that combines all the ideas, so that using multipliers each component can be added
+# Make Ulcer index as an observation
+# Make std as an observation
+# Make choppines index as an observation
 
 
-### Reinforcement Learning
-- Work out how we can teach models to play on the market
-- visualisations
+ULCER:
 
-### Impact Prediction
-- Create a prompt for ChatGPT to analyse a specific piece of news
-
-### Backtesting
-- Add backtesting functionality so that a strategy can be tested across all of available data to see how good it is
-- Allow backtesting to work on certain pre-identified periods (like bear market/bull market)
-- visualisations
-
-### Price/Trend predictions
-- fix LSTMLinear outputting NaNs
-- create a portfolio of models
-- better visualisation
+Percentage Drawdown = [(Close - 14-period High Close)/14-period High Close] x 100
+Squared Average = (14-period Sum of Percentage Drawdown Squared)/14 
+Ulcer Index = Square Root of Squared Average
 
 
-### SAAS
-- creating a frontend to interact with the various services
-- hosting a server that runs and processes data in real time
-- user data to customise their strategies etc.
+Fib 
+Williams Alligator
+KVO
+MACD
+TD Sequential
+
+On Balance Volume (OBV): This is one of the best indicators for day trading bitcoin. It is used to basically analyze the total money flow in and out of an instrument. The OVB uses a combination of volume and price activity. This tells you the total amount of money going in and out of the market.
+
+
+-------------------
+
+## different data levels -> other setup
+
+## [Other Deep RL libs]
+implement
+
+
+## [Try multiple assets? ETH, XRP, GOLD etc]
+
+
+
+## add extra knowledge as data/indicators -> include strategies (for instance, analyse periodic events - daily, weekly, monthly -> infer knowledge)
+## include sentiment as data
+## include news/fundamental data
+
+# add indicator:
+	BOLLINGER BUY/SELL past 1.0 SELL, below 1.0 BUY (variations for 0 around 1.2 <-> 0.8)
+# add new indicators from TradingView

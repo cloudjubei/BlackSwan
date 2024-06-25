@@ -1,8 +1,0 @@
-{
-    "BTCUSDT" : {
-        "startTime": 1502942400000,
-        "trendChangeAmount1Min": 50,
-        "trendChangeAmount1Hour": 500,
-        "trendChangeAmount1Day": 2000
-    }
-}
