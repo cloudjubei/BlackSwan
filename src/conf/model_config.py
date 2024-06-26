@@ -373,8 +373,7 @@ model_rl_min = ModelConfigSearch(
     model_rl= ModelRLConfigSearch(
         # model_name= ["ppo", "a2c", "dqn", "qrdqn", "dqn-sbx"],
         # model_name= ["duel-dqn", "dqn-sbx", "dqn"],
-        # model_name= ["duel-dqn"],
-        model_name= ["iqn"],
+        model_name= ["duel-dqn"],
         # model_name= ["dqn"],
         # model_name= ["dqn-sbx"],
 
