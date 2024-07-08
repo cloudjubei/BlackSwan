@@ -87,3 +87,40 @@ class LSTMLinear(nn.Module):
         if len(out.size()) > 1: 
             out = torch.squeeze(out, 1)
         return out
+    
+class PPO_LSTM(nn.Module):
+    def __init__(self, input_size: int, hidden_size: int, device: str = "auto", batch_first: bool=True):
+        super(PPO_LSTM, self).__init__()
+        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=batch_first, device=device)
+        self.fc_actor = nn.Linear(64, 2)
+        self.fc_critic = nn.Linear(64, 1)
+
+    def forward(self, x, hidden):
+        x, hidden = self.lstm(x, hidden)
+        x = x[:, -1, :]  # Take the output of the last LSTM cell
+        policy = self.fc_actor(x)
+        value = self.fc_critic(x)
+        return policy, value, hidden
+
+    def init_hidden(self):
+        return (torch.zeros(1, 1, 64), torch.zeros(1, 1, 64))
+    
+
+# def main():
+#     env = gym.make('CartPole-v1')
+#     model = PPO_LSTM()
+#     optimizer = optim.Adam(model.parameters(), lr=0.001)
+#     gamma = 0.99
+
+#     for episode in range(1000):
+#         state = env.reset()
+#         hidden = model.init_hidden()
+#         done = False
+#         while not done:
+#             state = torch.tensor(state, dtype=torch.float).unsqueeze(0).unsqueeze(0)
+#             policy, value, hidden = model(state, hidden)
+#             action_dist = Categorical(logits=policy)
+#             action = action_dist.sample().item()
+#             next_state, reward, done, _ = env.step(action)
+#             # Store transition and optimize model
+#             state = next_state

@@ -320,7 +320,6 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
         # rl_model = A2C(env=env, policy= RecurrentActorCriticPolicy, device= device, learning_rate= config.model_rl.learning_rate, n_steps=1) #, n_steps= is like a batch size
     elif config.model_rl.model_name == "a2c":
         print(f"Loading A2C - Asynchronous Advantage Actor-Critic Algorithm model")
-        # rl_model = A2C(env=env, policy= RecurrentActorCriticPolicy, device= device, learning_rate= config.model_rl.learning_rate, n_steps=1) #, n_steps= is like a batch size
         rl_model = A2C(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=1) #, n_steps= is like a batch size
         # n_steps: int = 5,
         # gamma: float = 0.99,

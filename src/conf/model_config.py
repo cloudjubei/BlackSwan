@@ -194,7 +194,7 @@ class ModelConfigSearch:
 @dataclass
 class ModelConfig:
     model_type: str # possible ["hodl", "rl", "lstm", "mlp", "technical", "time"]
-    iterations_to_pick_best: int = 1
+    iterations_to_pick_best: int = 10
     model_rl: ModelRLConfig | None = None
     model_lstm: ModelLSTMConfig | None = None
     model_mlp: ModelMLPConfig | None = None
@@ -243,6 +243,18 @@ class ModelConfig:
 # profit_percentage2 + profit_percentage3 + profit_percentage4 -> are all ok indicators, the model learns from them
 # buy_sell_signal + buy_sell_signal2 -> are ok
 
+# indicators1 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi5", "rsi10", "rsi15"]
+# indicators2 - ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"]
+# indicators3 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"]
+
+# indicators4 - ["kallman15", "kallman30", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"]
+# indicators5 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi5", "rsi10", "rsi15", "choppiness30"]
+
+# BAD -> ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "rsi15", "choppiness30"]
+# BAD -> ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10"]
+
+# lots of indicators 44/62
+# indicators4+5 1/4
 
 model_rl_h = ModelConfigSearch(
     model_type= "rl",
@@ -252,20 +264,9 @@ model_rl_h = ModelConfigSearch(
         # model_name= ["rainbow-dqn", "dqn-lstm", "iqn", "dqn"], # very slow, but can work very well
         model_name= ["duel-dqn"],
 
-        # 5.3.1
-        # model_name= ["ppo", "a2c", "qrdqn", "dqn"],
-
         # reward_model= ["combo_all", "combo_actions", "buy_sell_signal", "drawdown", "profit_percentage", "profit_percentage3"],
-        # reward_model= ["combo_all"],
-        reward_model= ["buy_sell_signal2"],
-        # reward_model= ["buy_sell_signal2"],
-        # reward_model= ["buy_sell_signal", "buy_sell_signal2", "buy_sell_signal3", "buy_sell_signal4"],
-        # reward_model= ["drawdown"],
-        # reward_model= ["profit_percentage"],
-        # reward_model= ["profit_percentage3"],
-        # reward_model= ["profit_percentage", "profit_percentage2", "profit_percentage3", "profit_percentag4"],
-        # reward_model= ["combo_all", "combo_all2", "buy_sell_signal", "buy_sell_signal2", "buy_sell_signal3", "buy_sell_signal4", "combo_actions", "combo_actions2", "combo_actions3"],
-        
+        reward_model= ["combo_actions2"],
+
         # learning_rate= [0.0001, 0.05],
         learning_rate= [0.0001],
         # batch_size= [4, 256],
@@ -290,9 +291,6 @@ model_rl_h = ModelConfigSearch(
         # max_grad_norm= [1, 1000],
         max_grad_norm= [1000],
 
-        # 5.3.2
-        # optimizer_class = ['Adam', 'Adagrad', 'Adamax', 'RMSprop', 'SGD', 'LBFGS'],
-
         # optimizer_class = ['Adamax', 'RMSprop'],
         optimizer_class = ['Adamax'],
         # optimizer_eps = [0.000001, 0.1, 0.2, 0.5],
@@ -304,9 +302,6 @@ model_rl_h = ModelConfigSearch(
         optimizer_alpha = [0.9],
         # optimizer_momentum = [0.0001, 0.1, 0.000001],
         optimizer_momentum = [0.0001], 
-
-        # 5.3.3
-        # activation_fn = ['ReLU', 'LeakyReLU', 'CELU', 'Softsign', 'Sigmoid', 'Tanh'],
 
         # activation_fn = ['LogSigmoid', 'CELU', 'PReLU', 'ReLU6', 'Softsign'],
         # activation_fn = ['PReLU', 'ReLU6'],
@@ -360,35 +355,26 @@ model_rl_h = ModelConfigSearch(
     )
 )
 
-# [MIN] ["duel-dqn"] x lr[0.0001] x day_of_week x rewards 1/10
-# [MIN] ["duel-dqn"] x lr[0.0000001] x day_of_week x rewards 1/10
-# [MIN] ["duel-dqn"] x lr[0.0001] x [1m_1h_1d vs 1m_1h vs 1m] x combo_all2 3/6
+# combo_actions, combo_actions2, combo_actions3
 
-# TODO:
-# [MIN] ["duel-dqn"] x lr[0.0000001] x rewards_chosen -> day_of_week vs non 1/10
+# [MIN 2017] ["duel-dqn"] x lr[0.0000001] x combo_actions2 x [32lookback] -> non vs day_of_week 1/4
+# [MIN 2022] ["duel-dqn"] x lr[0.00000001, 0.000001] x combo_actions2 x [32lookback] -> 2/3
 
-# day_of_week + lookback [7,64]
 model_rl_min = ModelConfigSearch(
     model_type= "rl",
     model_rl= ModelRLConfigSearch(
         # model_name= ["ppo", "a2c", "dqn", "qrdqn", "dqn-sbx"],
         # model_name= ["duel-dqn", "dqn-sbx", "dqn"],
         model_name= ["duel-dqn"],
-        # model_name= ["dqn"],
         # model_name= ["dqn-sbx"],
+        # model_name= ["rainbow-dqn", "dqn-lstm"],
 
         # reward_model= ["profit_percentage2", "profit_percentage4", "combo_all", "combo_all2", "combo_actions", "combo_actions2", "combo_actions3", "buy_sell_signal2", "buy_sell_signal4"],
-        reward_model= ["combo_all2"],
-        # reward_model= ["combo_all"],
-        # reward_model= ["combo_actions"],
-        # reward_model= ["buy_sell_signal"],
-        # reward_model= ["drawdown"],
-        # reward_model= ["profit_percentage"],
-        # reward_model= ["profit_percentage2"],
-        # reward_model= ["profit_percentage4"],
+        # reward_model= ["combo_actions", "combo_actions2", "combo_actions3"],
+        reward_model= ["combo_actions2"],
 
-        # learning_rate= [0.0000001, 0.0001],
-        learning_rate= [0.0001],
+        learning_rate= [0.00000001, 0.000001],
+        # learning_rate= [0.0000001],
         batch_size= [256],
         buffer_size = [1_000_000],
         gamma = [0.9],

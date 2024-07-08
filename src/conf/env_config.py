@@ -116,12 +116,11 @@ env_trade_amount_1 = EnvConfig(
 
 def get_envs_simple():
     return [env_trade_all_sl]
+    # return [env_trade_all, env_trade_all_sl_005]
+    
     # return [env_trade_all_no_fee, env_trade_all, env_trade_all_fee_002, env_trade_all_fee_003, env_trade_all_fee_004, env_trade_all_fee_005, env_trade_all_fee_01]
     # return [env_trade_all, env_trade_all_sl_0005, env_trade_all_sl_001, env_trade_all_sl_002, env_trade_all_sl_003, env_trade_all_sl_004, env_trade_all_sl_005, env_trade_all_sl_010]
-    # return [env_trade_all_sl, env_trade_all_sl2, env_trade_all_sl3, env_trade_all_sl4, env_trade_all_sl5, env_trade_all_sl6]
-    # return [env_trade_all_withobservations2, env_trade_all_withobservations2_and_reset, env_trade_all_lookback24_withobservations2, env_trade_all_lookback24_withobservations2_and_reset]
-    # return [env_trade_all_flat, env_trade_all_lookback60, env_trade_all_lookback240, env_trade_all_withobservations, env_trade_all_withobservations2, env_trade_all_tpsl]
-
+    
 def get_envs_simple2():
     return [env_trade_all_tpsl]
 

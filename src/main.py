@@ -67,10 +67,14 @@ def get_model_configs_count(config: Config) -> int:
         count += len(model_config_combinations)
     return count
 
-# 11th Gen Core™ i5-11400F vs AMD Ryzen 5 5600X 6-core
+# MAC                                                   -> 170 it/s + 245 it/s SBX + 24 it/s rainbow + 12 it/s iqn
+# AMD Ryzen 5 5600X 6-core + RTX 3060                   -> 385 it/s
+# 11th Gen Core™ i5-11400F + RTX 3080 Ti                -> 480 it/s + 358 it/s SBX + 90 it/s rainbow + 207 it/s iqn
+# AMD Ryzen Threadripper PRO 5995WX 16-core + RTX 4090  -> 440 it/s + 235 it/s SBX + 74 it/s rainbow + 224 it/s iqn
+# 490 it/s vs 385 it/s vs 250 it/s MAC
 
 # @hydra.main(version_base=None, config_name="config_simple")
-@hydra.main(version_base=None, config_name="config_simple_rl_vlong") #490 it/s vs 385 it/s vs 250 it/s MAC
+@hydra.main(version_base=None, config_name="config_simple_rl_vlong") 
 # @hydra.main(version_base=None, config_name="config_simple_short_rl_min")
 # @hydra.main(version_base=None, config_name="config_simple_rl_min")
 # @hydra.main(version_base=None, config_name="config_simple_long_rl_min")

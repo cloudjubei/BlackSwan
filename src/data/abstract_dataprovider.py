@@ -48,18 +48,6 @@ class AbstractDataProvider(ABC):
 
     def get_start_index(self):
         return 0
-
-    def get_normalized_indicators(self):
-        return ["lwti8", "lwti13", "lwti30", 
-                "kandleCount2_30_green", "kandleCount2_30_red", "kandleCount2_30_high", "kandleCount2_30_mid", "kandleCount2_30_low", 
-                "kandleCount3_30_green", "kandleCount3_30_red", "kandleCount3_30_high", "kandleCount3_30_mid", "kandleCount3_30_low", 
-                "kandleCount5_90_green", "kandleCount5_90_red", "kandleCount5_90_high", "kandleCount5_90_mid", "kandleCount5_90_low", 
-                "kandleCount2_10_green", "kandleCount2_10_red", "kandleCount2_10_high", "kandleCount2_10_mid", "kandleCount2_10_low", 
-                "kandleCount3_90_green", "kandleCount3_90_red", "kandleCount3_90_high", "kandleCount3_90_mid", "kandleCount3_90_low", 
-                "kandleCount5_300_green", "kandleCount5_300_red", "kandleCount5_300_high", "kandleCount5_300_mid", "kandleCount5_300_low", 
-                "pump_dump10", "pump_dump90", "pump_dump300", 
-                "candle_color", "candle_height10", "candle_height30", "candle_height90", "candle_height300", 
-                "lwStrategyUp", "lwStrategyDown", "williams14","williams30"]
     
     def get_buy_sell(self, df):
         prices = df['price'].values
@@ -146,52 +134,43 @@ class AbstractDataProvider(ABC):
         buy_sells = self.get_buy_sell(result_df)
         rewards_hold, rewards_buy = self.get_rewards_action(result_df, percent_buysell)
 
-        # rsi, williams, pump_dump just needs to be divided by 100
-        # lwti just needs to be divided by 10
-        # kandleCount_x_low, kandleCount_x_green, kandleCount_x_red, kandleCount_x_high, kandleCount_x_mid, candle_color, lwStrategyUp, lwStrategyDown - already [-1 : 1]
-        # candle_height divided by 2
         if type != "standard" and type != "solo_price" and type != "only_price":
-            exploded_df = result_df['indicators'].apply(pd.Series)
-
             result_df['price_percent'] = pd.to_numeric(result_df['price'], errors='coerce').astype(float).pct_change()
             
             if type != "solo_price_percent":
-                result_df['price_high_percent'] = pd.to_numeric(result_df['price_high'], errors='coerce').astype(float).pct_change()
-                result_df['price_low_percent'] = pd.to_numeric(result_df['price_low'], errors='coerce').astype(float).pct_change()
+                result_df['price_high_percent'] = pd.to_numeric(result_df['price_high']/result_df['price'] - 1, errors='coerce').astype(float)
+                result_df['price_low_percent'] = pd.to_numeric(result_df['price_low']/result_df['price'] - 1, errors='coerce').astype(float)
 
                 if type != 'only_price_percent_sin_volume':
                     result_df['volume_percent'] = pd.to_numeric(result_df['volume'], errors='coerce').astype(float).pct_change()
 
 
-        if type == "standard" or type == "all_percents" or type == "all_percents_without_candles":
+        if type == "standard" or type == "all_percents":
             exploded_df = result_df['indicators'].apply(pd.Series)
 
-            if type == "all_percents" or type == "all_percents_without_candles":
-                normalized_indicators = self.get_normalized_indicators()
+            if type == "all_percents":
                 for col in exploded_df.keys():
-                    if type != "all_percents_without_candles" or (not col in normalized_indicators):
-                        exploded_df[col] = pd.to_numeric(exploded_df[col], errors='coerce').astype(float)
-                        exploded_df[col] = exploded_df[col].pct_change()
+                    exploded_df[col] = pd.to_numeric(exploded_df[col], errors='coerce').astype(float)
+                    exploded_df[col] = exploded_df[col].pct_change()
 
             result_df = pd.concat([result_df, exploded_df], axis=1)
+        elif indicator == "indicators4":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["kallman15", "kallman30", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators5":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi5", "rsi10", "rsi15", "choppiness30"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
         elif indicator != "none":
             exploded_df = result_df['indicators'].apply(pd.Series)
+            result_df[indicator] = pd.to_numeric(exploded_df[indicator], errors='coerce').astype(float)
 
-            indicators = ["rsi30", "sma8", "williams30"]
-            if indicator == "rsi9":
-                indicators = ["rsi9", "sma30", "williams30"]
-
-            for i in range(3):
-                ind = indicators[i]
-
-                exploded_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
-                exploded_df[ind] = exploded_df[ind].pct_change()
-                result_df[ind] = exploded_df[ind]
-
-
-        if type == "solo_price" or type == "all_percents" or type == "solo_price_percent" or type == "only_price_percent" or type == "only_price_percent_sin_volume":
+        if type == "solo_price" or type == "all_percents" or type == "solo_price_percent" or type == "only_price_percent" or type == "only_price_percent_change" or type == "only_price_percent_sin_volume":
             result_df = result_df.drop(columns=['price', 'price_high', 'price_low', 'volume'])
-        if type == "solo_price" or type == "all_percents" or type == "solo_price_percent" or type == "only_price_percent" or type == "only_price" or type == "only_price_percent_sin_volume":
+        if type == "solo_price" or type == "all_percents" or type == "solo_price_percent" or type == "only_price_percent" or type == "only_price_percent_change" or type == "only_price" or type == "only_price_percent_sin_volume":
             result_df = result_df.drop(columns=['timestamp_close'])
 
         if timestamp == "expanded":
