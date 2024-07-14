@@ -73,13 +73,8 @@ def get_model_configs_count(config: Config) -> int:
 # AMD Ryzen Threadripper PRO 5995WX 16-core + RTX 4090  -> 440 it/s + 235 it/s SBX + 74 it/s rainbow + 224 it/s iqn
 # 490 it/s vs 385 it/s vs 250 it/s MAC
 
-# @hydra.main(version_base=None, config_name="config_simple")
-@hydra.main(version_base=None, config_name="config_simple_rl_vlong") 
-# @hydra.main(version_base=None, config_name="config_simple_short_rl_min")
-# @hydra.main(version_base=None, config_name="config_simple_rl_min")
-# @hydra.main(version_base=None, config_name="config_simple_long_rl_min")
-# @hydra.main(version_base=None, config_name="config_simple_vlong_rl_min")
-# @hydra.main(version_base=None, config_name="config_simple_min_hour")
+@hydra.main(version_base=None, config_name="config_simple_1h_1d")
+# @hydra.main(version_base=None, config_name="config_simple_1m_1h_1d")
 def main(config: Config) -> None:
     pd.options.display.float_format = '{:.3f}'.format
     np.set_printoptions(formatter={'float_kind':'{:.4f}'.format})

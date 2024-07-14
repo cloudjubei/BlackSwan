@@ -10,47 +10,14 @@ class DataConfig:
     flat_lookback: bool = True
     type: str = "only_price_percent" # possible ["standard", "solo_price_percent", "only_price_percent", "all_percents"]
     indicator: str = "none"
-    timestamp: str = "none" # possible ["none",  "expanded", "day_of_week"]
+    timestamp: str = "day_of_week" # possible ["none",  "expanded", "day_of_week"]
     percent_buysell: float = 0.004
     fidelity: str = "1h" # possible ["1m", "1h", "1d"]
     layers: List[str] = field(default_factory=[])  # possible ["1h"], ["1h", "4h", "1d", "7d"], ["1m", "15m", "1h", "4h", "1d", "7d"]
     flat_layers: bool = True
     train_data_paths_extra: List[List[str]] | None = None
     test_data_paths_extra: List[List[str]] | None = None
-    
-data_1_to_1 = DataConfig(
-    id= "1_to_1",
-    train_data_paths= ["binance/BTCUSDT-1h-2023-1.json"],
-    test_data_paths= ["binance/BTCUSDT-1h-2023-2.json"],
-    layers= ["1h"]
-)
-data_1_to_1_solo_price_percent = DataConfig(id=data_1_to_1.id, train_data_paths=data_1_to_1.train_data_paths, test_data_paths=data_1_to_1.test_data_paths, layers=data_1_to_1.layers, type="solo_price_percent")
-data_1_to_1_only_price_percent = DataConfig(id=data_1_to_1.id, train_data_paths=data_1_to_1.train_data_paths, test_data_paths=data_1_to_1.test_data_paths, layers=data_1_to_1.layers, type="only_price_percent")
-data_1_to_1_all_percents = DataConfig(id=data_1_to_1.id, train_data_paths=data_1_to_1.train_data_paths, test_data_paths=data_1_to_1.test_data_paths, layers=data_1_to_1.layers, type="all_percents")
-data_1_to_1_all_percents_60 = DataConfig(id=data_1_to_1.id, train_data_paths=data_1_to_1.train_data_paths, test_data_paths=data_1_to_1.test_data_paths, layers=data_1_to_1.layers, type="all_percents", lookback_window_size=60)
-data_1_to_1_only_price_multi = DataConfig(id=data_1_to_1.id, train_data_paths=data_1_to_1.train_data_paths, test_data_paths=data_1_to_1.test_data_paths, layers= ["1h", "1d"], type="only_price")
-
-data_3_to_1 = DataConfig(
-    id= "2023_1-3vs4_1h",
-    train_data_paths= ["binance/BTCUSDT-1h-2023-1.json", "binance/BTCUSDT-1h-2023-2.json", "binance/BTCUSDT-1h-2023-3.json"],
-    test_data_paths= ["binance/BTCUSDT-1h-2023-4.json"],
-    layers=["1h"]
-)
-data_3_to_1_solo_price_percent = DataConfig(id=data_3_to_1.id, train_data_paths=data_3_to_1.train_data_paths, test_data_paths=data_3_to_1.test_data_paths, layers=data_3_to_1.layers, type="solo_price_percent")
-data_3_to_1_only_price_percent = DataConfig(id=data_3_to_1.id, train_data_paths=data_3_to_1.train_data_paths, test_data_paths=data_3_to_1.test_data_paths, layers=data_3_to_1.layers, type="only_price_percent")
-data_3_to_1_all_percents = DataConfig(id=data_3_to_1.id, train_data_paths=data_3_to_1.train_data_paths, test_data_paths=data_3_to_1.test_data_paths, layers=data_3_to_1.layers, type="all_percents")
-
-data_2023vs2024_1h = DataConfig(
-    id= "2023vs2024_1h",
-    train_data_paths= ["binance/BTCUSDT-1h-2023-1.json", "binance/BTCUSDT-1h-2023-2.json", "binance/BTCUSDT-1h-2023-3.json", "binance/BTCUSDT-1h-2023-4.json", "binance/BTCUSDT-1h-2023-5.json", "binance/BTCUSDT-1h-2023-6.json", "binance/BTCUSDT-1h-2023-7.json", "binance/BTCUSDT-1h-2023-8.json", "binance/BTCUSDT-1h-2023-9.json", "binance/BTCUSDT-1h-2023-10.json", "binance/BTCUSDT-1h-2023-11.json", "binance/BTCUSDT-1h-2023-12.json"],
-    test_data_paths= ["binance/BTCUSDT-1h-2024-1.json", "binance/BTCUSDT-1h-2024-2.json", "binance/BTCUSDT-1h-2024-3.json", "binance/BTCUSDT-1h-2024-4.json"],
-    layers=["1h"]
-)
-data_2023vs2024_1h_solo_price_percent = DataConfig(id=data_2023vs2024_1h.id, train_data_paths=data_2023vs2024_1h.train_data_paths, test_data_paths=data_2023vs2024_1h.test_data_paths, layers=data_2023vs2024_1h.layers, type="solo_price_percent")
-data_2023vs2024_1h_only_price_percent = DataConfig(id=data_2023vs2024_1h.id, train_data_paths=data_2023vs2024_1h.train_data_paths, test_data_paths=data_2023vs2024_1h.test_data_paths, layers=data_2023vs2024_1h.layers, type="only_price_percent")
-data_2023vs2024_1h_all_percents = DataConfig(id=data_2023vs2024_1h.id, train_data_paths=data_2023vs2024_1h.train_data_paths, test_data_paths=data_2023vs2024_1h.test_data_paths, layers=data_2023vs2024_1h.layers, type="all_percents")
-data_2023vs2024_1h_all_percents_without_candles = DataConfig(id=data_2023vs2024_1h.id, train_data_paths=data_2023vs2024_1h.train_data_paths, test_data_paths=data_2023vs2024_1h.test_data_paths, layers=data_2023vs2024_1h.layers, type="all_percents_without_candles")
-
+   
 data_2017_to_2023vs2024_1h = DataConfig(
     id= "2017_to_2023vs2024_1h",
     train_data_paths= ["binance/BTCUSDT-1h-2017-8.json", "binance/BTCUSDT-1h-2017-9.json", "binance/BTCUSDT-1h-2017-10.json", "binance/BTCUSDT-1h-2017-11.json", "binance/BTCUSDT-1h-2017-12.json",
@@ -63,18 +30,6 @@ data_2017_to_2023vs2024_1h = DataConfig(
     test_data_paths= ["binance/BTCUSDT-1h-2024-1.json", "binance/BTCUSDT-1h-2024-2.json", "binance/BTCUSDT-1h-2024-3.json", "binance/BTCUSDT-1h-2024-4.json"],
     layers=["1h"]
 )
-data_2017_to_2023vs2024_1h_solo_price_percent = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="solo_price_percent")
-data_2017_to_2023vs2024_1h_only_price_percent = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="only_price_percent")
-data_2017_to_2023vs2024_1h_only_price_percent_sin_volume = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="only_price_percent_sin_volume")
-data_2017_to_2023vs2024_1h_only_price_percent_expanded = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="only_price_percent", timestamp="expanded")
-data_2017_to_2023vs2024_1h_only_price_percent_day_of_week = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="only_price_percent", timestamp="day_of_week")
-data_2017_to_2023vs2024_1h_only_price_percent_expanded_32= DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="only_price_percent", timestamp="expanded", lookback_window_size=32)
-data_2017_to_2023vs2024_1h_only_price_percent_32 = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="only_price_percent", lookback_window_size=32)
-data_2017_to_2023vs2024_1h_all_percents = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="all_percents")
-data_2017_to_2023vs2024_1h_all_percents_32 = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="all_percents", lookback_window_size=32)
-data_2017_to_2023vs2024_1h_all_percents_without_candles = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="all_percents_without_candles")
-data_2017_to_2023vs2024_1h_all_percents_without_candles_32 = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers=data_2017_to_2023vs2024_1h.layers, type="all_percents_without_candles", lookback_window_size=32)
-data_2017_to_2023vs2024_1h_only_price_percent_multi = DataConfig(id=data_2017_to_2023vs2024_1h.id, train_data_paths=data_2017_to_2023vs2024_1h.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1h.test_data_paths, layers= ["1h", "1d"], type="only_price_percent")
 
 data_downtrend_2021dec_2022dec_to_3 = DataConfig(
     id= "downtrend_2021dec_2022dec_to_3_1h",
@@ -83,27 +38,6 @@ data_downtrend_2021dec_2022dec_to_3 = DataConfig(
     layers=["1h"]
 )
 
-data_1_to_1_min = DataConfig(
-    id= "1_to_1_1m",
-    train_data_paths= ["binance/BTCUSDT-1m-2023-1.json"],
-    test_data_paths= ["binance/BTCUSDT-1m-2023-2.json"],
-    fidelity = "1m",
-    layers = ["1m"]
-)
-data_3_to_1_m = DataConfig(
-    id= "3_to_1_1m",
-    train_data_paths= ["binance/BTCUSDT-1m-2023-1.json", "binance/BTCUSDT-1m-2023-2.json", "binance/BTCUSDT-1m-2023-3.json"],
-    test_data_paths= ["binance/BTCUSDT-1m-2023-4.json"],
-    fidelity = "1m",
-    layers = ["1m"]
-)
-data_3_to_1_m_solo_price = DataConfig(id=data_3_to_1_m.id, train_data_paths=data_3_to_1_m.train_data_paths, test_data_paths=data_3_to_1_m.test_data_paths, layers=data_3_to_1_m.layers, type="solo_price")
-data_3_to_1_m_only_price = DataConfig(id=data_3_to_1_m.id, train_data_paths=data_3_to_1_m.train_data_paths, test_data_paths=data_3_to_1_m.test_data_paths, layers=data_3_to_1_m.layers, type="only_price")
-data_3_to_1_m_solo_price_percent = DataConfig(id=data_3_to_1_m.id, train_data_paths=data_3_to_1_m.train_data_paths, test_data_paths=data_3_to_1_m.test_data_paths, layers=data_3_to_1_m.layers, type="solo_price_percent")
-data_3_to_1_m_only_price_percent = DataConfig(id=data_3_to_1_m.id, train_data_paths=data_3_to_1_m.train_data_paths, test_data_paths=data_3_to_1_m.test_data_paths, layers=data_3_to_1_m.layers, type="only_price_percent")
-data_3_to_1_m_all_percents = DataConfig(id=data_3_to_1_m.id, train_data_paths=data_3_to_1_m.train_data_paths, test_data_paths=data_3_to_1_m.test_data_paths, layers=data_3_to_1_m.layers, type="all_percents")
-data_3_to_1_m_all_percents_without_candles = DataConfig(id=data_3_to_1_m.id, train_data_paths=data_3_to_1_m.train_data_paths, test_data_paths=data_3_to_1_m.test_data_paths, layers=data_3_to_1_m.layers, type="all_percents_without_candles")
-
 data_2023vs2024_1m = DataConfig(
     id= "2023vs2024_1m",
     train_data_paths= ["binance/BTCUSDT-1m-2023-1.json", "binance/BTCUSDT-1m-2023-2.json", "binance/BTCUSDT-1m-2023-3.json", "binance/BTCUSDT-1m-2023-4.json", "binance/BTCUSDT-1m-2023-5.json", "binance/BTCUSDT-1m-2023-6.json", "binance/BTCUSDT-1m-2023-7.json", "binance/BTCUSDT-1m-2023-8.json", "binance/BTCUSDT-1m-2023-9.json", "binance/BTCUSDT-1m-2023-10.json", "binance/BTCUSDT-1m-2023-11.json", "binance/BTCUSDT-1m-2023-12.json"],
@@ -111,14 +45,6 @@ data_2023vs2024_1m = DataConfig(
     fidelity = "1m",
     layers = ["1m"]
 )
-data_2023vs2024_1m_solo_price = DataConfig(id=data_2023vs2024_1m.id, train_data_paths=data_2023vs2024_1m.train_data_paths, test_data_paths=data_2023vs2024_1m.test_data_paths, layers=data_2023vs2024_1m.layers, fidelity=data_2023vs2024_1m.fidelity, type="solo_price")
-data_2023vs2024_1m_only_price = DataConfig(id=data_2023vs2024_1m.id, train_data_paths=data_2023vs2024_1m.train_data_paths, test_data_paths=data_2023vs2024_1m.test_data_paths, layers=data_2023vs2024_1m.layers, fidelity=data_2023vs2024_1m.fidelity, type="only_price")
-data_2023vs2024_1m_solo_price_percent = DataConfig(id=data_2023vs2024_1m.id, train_data_paths=data_2023vs2024_1m.train_data_paths, test_data_paths=data_2023vs2024_1m.test_data_paths, layers=data_2023vs2024_1m.layers, fidelity=data_2023vs2024_1m.fidelity, type="solo_price_percent")
-data_2023vs2024_1m_only_price_percent = DataConfig(id=data_2023vs2024_1m.id, train_data_paths=data_2023vs2024_1m.train_data_paths, test_data_paths=data_2023vs2024_1m.test_data_paths, layers=data_2023vs2024_1m.layers, fidelity=data_2023vs2024_1m.fidelity, type="only_price_percent")
-data_2023vs2024_1m_only_price_percent_60 = DataConfig(id=data_2023vs2024_1m.id, train_data_paths=data_2023vs2024_1m.train_data_paths, test_data_paths=data_2023vs2024_1m.test_data_paths, layers=data_2023vs2024_1m.layers, fidelity=data_2023vs2024_1m.fidelity, type="only_price_percent", lookback_window_size=60)
-data_2023vs2024_1m_all_percents = DataConfig(id=data_2023vs2024_1m.id, train_data_paths=data_2023vs2024_1m.train_data_paths, test_data_paths=data_2023vs2024_1m.test_data_paths, layers=data_2023vs2024_1m.layers, fidelity=data_2023vs2024_1m.fidelity, type="all_percents")
-data_2023vs2024_1m_all_percents_without_candles = DataConfig(id=data_2023vs2024_1m.id, train_data_paths=data_2023vs2024_1m.train_data_paths, test_data_paths=data_2023vs2024_1m.test_data_paths, layers=data_2023vs2024_1m.layers, fidelity=data_2023vs2024_1m.fidelity, type="all_percents_without_candles")
-
 data_2020_to_2023vs2024_1m = DataConfig(
     id= "data_2020_to_2023vs2024_1m",
     train_data_paths= [
@@ -130,12 +56,6 @@ data_2020_to_2023vs2024_1m = DataConfig(
     fidelity = "1m",
     layers = ["1m"]
 )
-data_2020_to_2023vs2024_1m_only_price_percent = DataConfig(id=data_2020_to_2023vs2024_1m.id, train_data_paths=data_2020_to_2023vs2024_1m.train_data_paths, test_data_paths=data_2020_to_2023vs2024_1m.test_data_paths, layers=data_2020_to_2023vs2024_1m.layers, fidelity=data_2020_to_2023vs2024_1m.fidelity, type="only_price_percent")
-data_2020_to_2023vs2024_1m_only_price_percent_expanded = DataConfig(id=data_2020_to_2023vs2024_1m.id, train_data_paths=data_2020_to_2023vs2024_1m.train_data_paths, test_data_paths=data_2020_to_2023vs2024_1m.test_data_paths, layers=data_2020_to_2023vs2024_1m.layers, fidelity=data_2020_to_2023vs2024_1m.fidelity, type="only_price_percent", timestamp= "expanded")
-data_2020_to_2023vs2024_1m_only_price_percent_day_of_week = DataConfig(id=data_2020_to_2023vs2024_1m.id, train_data_paths=data_2020_to_2023vs2024_1m.train_data_paths, test_data_paths=data_2020_to_2023vs2024_1m.test_data_paths, layers=data_2020_to_2023vs2024_1m.layers, fidelity=data_2020_to_2023vs2024_1m.fidelity, type="only_price_percent", timestamp= "day_of_week")
-data_2020_to_2023vs2024_1m_only_price_percent_60 = DataConfig(id=data_2020_to_2023vs2024_1m.id, train_data_paths=data_2020_to_2023vs2024_1m.train_data_paths, test_data_paths=data_2020_to_2023vs2024_1m.test_data_paths, layers=data_2020_to_2023vs2024_1m.layers, fidelity=data_2020_to_2023vs2024_1m.fidelity, type="only_price_percent", lookback_window_size=60)
-data_2020_to_2023vs2024_1m_only_price_percent_multi = DataConfig(id=data_2020_to_2023vs2024_1m.id, train_data_paths=data_2020_to_2023vs2024_1m.train_data_paths, test_data_paths=data_2020_to_2023vs2024_1m.test_data_paths, layers= ["1m", "1h"], fidelity=data_2020_to_2023vs2024_1m.fidelity, type="only_price_percent")
-
 
 data_2017_to_2023vs2024_1m = DataConfig(
     id= "data_2017_to_2023vs2024_1m",
@@ -151,85 +71,6 @@ data_2017_to_2023vs2024_1m = DataConfig(
     fidelity = "1m",
     layers = ["1m"]
 )
-data_2017_to_2023vs2024_1m_only_price_percent = DataConfig(id=data_2017_to_2023vs2024_1m.id, train_data_paths=data_2017_to_2023vs2024_1m.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1m.test_data_paths, layers=data_2017_to_2023vs2024_1m.layers, fidelity=data_2017_to_2023vs2024_1m.fidelity, type="only_price_percent")
-data_2017_to_2023vs2024_1m_only_price_percent_expanded = DataConfig(id=data_2017_to_2023vs2024_1m.id, train_data_paths=data_2017_to_2023vs2024_1m.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1m.test_data_paths, layers=data_2017_to_2023vs2024_1m.layers, fidelity=data_2017_to_2023vs2024_1m.fidelity, type="only_price_percent", timestamp= "expanded")
-data_2017_to_2023vs2024_1m_only_price_percent_day_of_week = DataConfig(id=data_2017_to_2023vs2024_1m.id, train_data_paths=data_2017_to_2023vs2024_1m.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1m.test_data_paths, layers=data_2017_to_2023vs2024_1m.layers, fidelity=data_2017_to_2023vs2024_1m.fidelity, type="only_price_percent", timestamp= "day_of_week")
-data_2017_to_2023vs2024_1m_only_price_percent_60 = DataConfig(id=data_2017_to_2023vs2024_1m.id, train_data_paths=data_2017_to_2023vs2024_1m.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1m.test_data_paths, layers=data_2017_to_2023vs2024_1m.layers, fidelity=data_2017_to_2023vs2024_1m.fidelity, type="only_price_percent", lookback_window_size=60)
-data_2017_to_2023vs2024_1m_only_price_percent_multi = DataConfig(id=data_2017_to_2023vs2024_1m.id, train_data_paths=data_2017_to_2023vs2024_1m.train_data_paths, test_data_paths=data_2017_to_2023vs2024_1m.test_data_paths, layers= ["1m", "1h"], fidelity=data_2017_to_2023vs2024_1m.fidelity, type="only_price_percent")
-
-data_3_to_1_m_h = DataConfig(
-    id= "3_to_1_1m1h",
-    type="only_price_percent",
-    train_data_paths= [],
-    train_data_paths_extra= [
-        ["binance/BTCUSDT-1m-2023-1.json", "binance/BTCUSDT-1m-2023-2.json", "binance/BTCUSDT-1m-2023-3.json"]
-    ],
-    test_data_paths= [],
-    test_data_paths_extra= [
-        ["binance/BTCUSDT-1m-2023-4.json"]
-    ],
-    fidelity = "1m",
-    layers = ["1m", "1h"]
-)
-data_2023vs2024_1m_1h_only_price_percent = DataConfig(
-    id= "2023vs2024_1m_1h_only_price_percent",
-    type="only_price_percent",
-    train_data_paths= [],
-    train_data_paths_extra= [
-        ["binance/BTCUSDT-1m-2023-1.json", "binance/BTCUSDT-1m-2023-2.json", "binance/BTCUSDT-1m-2023-3.json", "binance/BTCUSDT-1m-2023-4.json", "binance/BTCUSDT-1m-2023-5.json", "binance/BTCUSDT-1m-2023-6.json", "binance/BTCUSDT-1m-2023-7.json", "binance/BTCUSDT-1m-2023-8.json", "binance/BTCUSDT-1m-2023-9.json", "binance/BTCUSDT-1m-2023-10.json", "binance/BTCUSDT-1m-2023-11.json", "binance/BTCUSDT-1m-2023-12.json"],
-        ["binance/BTCUSDT-1h-2023-1.json", "binance/BTCUSDT-1h-2023-2.json", "binance/BTCUSDT-1h-2023-3.json", "binance/BTCUSDT-1h-2023-4.json", "binance/BTCUSDT-1h-2023-5.json", "binance/BTCUSDT-1h-2023-6.json", "binance/BTCUSDT-1h-2023-7.json", "binance/BTCUSDT-1h-2023-8.json", "binance/BTCUSDT-1h-2023-9.json", "binance/BTCUSDT-1h-2023-10.json", "binance/BTCUSDT-1h-2023-11.json", "binance/BTCUSDT-1h-2023-12.json"]
-    ],
-    test_data_paths= [],
-    test_data_paths_extra= [
-        ["binance/BTCUSDT-1m-2024-1.json", "binance/BTCUSDT-1m-2024-2.json", "binance/BTCUSDT-1m-2024-3.json", "binance/BTCUSDT-1m-2024-4.json"],
-        ["binance/BTCUSDT-1h-2024-1.json", "binance/BTCUSDT-1h-2024-2.json", "binance/BTCUSDT-1h-2024-3.json", "binance/BTCUSDT-1h-2024-4.json"],
-      ],
-    fidelity = "1m",
-    layers = ["1m", "1h"]
-)
-data_2023vs2024_1m_1h_only_price_percent_lookback32 = DataConfig(id=data_2023vs2024_1m_1h_only_price_percent.id, train_data_paths=data_2023vs2024_1m_1h_only_price_percent.train_data_paths, train_data_paths_extra=data_2023vs2024_1m_1h_only_price_percent.train_data_paths_extra, test_data_paths=data_2023vs2024_1m_1h_only_price_percent.test_data_paths, test_data_paths_extra=data_2023vs2024_1m_1h_only_price_percent.test_data_paths_extra, layers=data_2023vs2024_1m_1h_only_price_percent.layers, fidelity=data_2023vs2024_1m_1h_only_price_percent.fidelity, type=data_2023vs2024_1m_1h_only_price_percent.type, lookback_window_size=32)
-data_2023vs2024_1m_1h_only_price_percent_lookback32_day_of_week = DataConfig(id=data_2023vs2024_1m_1h_only_price_percent.id, train_data_paths=data_2023vs2024_1m_1h_only_price_percent.train_data_paths, train_data_paths_extra=data_2023vs2024_1m_1h_only_price_percent.train_data_paths_extra, test_data_paths=data_2023vs2024_1m_1h_only_price_percent.test_data_paths, test_data_paths_extra=data_2023vs2024_1m_1h_only_price_percent.test_data_paths_extra, layers=data_2023vs2024_1m_1h_only_price_percent.layers, fidelity=data_2023vs2024_1m_1h_only_price_percent.fidelity, type=data_2023vs2024_1m_1h_only_price_percent.type, lookback_window_size=32, timestamp="day_of_week")
-
-data_2022vs2024_1m_only_price_percent = DataConfig(
-    id= "2022vs2024_1m_1h_only_price_percent",
-    type="only_price_percent",
-    train_data_paths= [
-            "binance/BTCUSDT-1m-2022-1.json", "binance/BTCUSDT-1m-2022-2.json", "binance/BTCUSDT-1m-2022-3.json", "binance/BTCUSDT-1m-2022-4.json", "binance/BTCUSDT-1m-2022-5.json", "binance/BTCUSDT-1m-2022-6.json", "binance/BTCUSDT-1m-2022-7.json", "binance/BTCUSDT-1m-2022-8.json", "binance/BTCUSDT-1m-2022-9.json", "binance/BTCUSDT-1m-2022-10.json", "binance/BTCUSDT-1m-2022-11.json", "binance/BTCUSDT-1m-2022-12.json",
-            "binance/BTCUSDT-1m-2023-1.json", "binance/BTCUSDT-1m-2023-2.json", "binance/BTCUSDT-1m-2023-3.json", "binance/BTCUSDT-1m-2023-4.json", "binance/BTCUSDT-1m-2023-5.json", "binance/BTCUSDT-1m-2023-6.json", "binance/BTCUSDT-1m-2023-7.json", "binance/BTCUSDT-1m-2023-8.json", "binance/BTCUSDT-1m-2023-9.json", "binance/BTCUSDT-1m-2023-10.json", "binance/BTCUSDT-1m-2023-11.json", "binance/BTCUSDT-1m-2023-12.json"
-    ],
-    train_data_paths_extra= [],
-    test_data_paths= [
-        "binance/BTCUSDT-1m-2024-1.json", "binance/BTCUSDT-1m-2024-2.json", "binance/BTCUSDT-1m-2024-3.json", "binance/BTCUSDT-1m-2024-4.json"
-    ],
-    test_data_paths_extra= [],
-    fidelity = "1m",
-    layers = ["1m"]
-)
-data_2022vs2024_1m_only_price_percent_32 = DataConfig(id=data_2022vs2024_1m_only_price_percent.id, train_data_paths=data_2022vs2024_1m_only_price_percent.train_data_paths, train_data_paths_extra=data_2022vs2024_1m_only_price_percent.train_data_paths_extra, test_data_paths=data_2022vs2024_1m_only_price_percent.test_data_paths, test_data_paths_extra=data_2022vs2024_1m_only_price_percent.test_data_paths_extra, layers=data_2022vs2024_1m_only_price_percent.layers, fidelity=data_2022vs2024_1m_only_price_percent.fidelity, type=data_2022vs2024_1m_only_price_percent.type, lookback_window_size=32)
-
-data_2022vs2024_1m_1h_only_price_percent = DataConfig(
-    id= "2022vs2024_1m_1h_only_price_percent",
-    type="only_price_percent",
-    train_data_paths= [],
-    train_data_paths_extra= [
-       [
-            "binance/BTCUSDT-1m-2022-1.json", "binance/BTCUSDT-1m-2022-2.json", "binance/BTCUSDT-1m-2022-3.json", "binance/BTCUSDT-1m-2022-4.json", "binance/BTCUSDT-1m-2022-5.json", "binance/BTCUSDT-1m-2022-6.json", "binance/BTCUSDT-1m-2022-7.json", "binance/BTCUSDT-1m-2022-8.json", "binance/BTCUSDT-1m-2022-9.json", "binance/BTCUSDT-1m-2022-10.json", "binance/BTCUSDT-1m-2022-11.json", "binance/BTCUSDT-1m-2022-12.json",
-            "binance/BTCUSDT-1m-2023-1.json", "binance/BTCUSDT-1m-2023-2.json", "binance/BTCUSDT-1m-2023-3.json", "binance/BTCUSDT-1m-2023-4.json", "binance/BTCUSDT-1m-2023-5.json", "binance/BTCUSDT-1m-2023-6.json", "binance/BTCUSDT-1m-2023-7.json", "binance/BTCUSDT-1m-2023-8.json", "binance/BTCUSDT-1m-2023-9.json", "binance/BTCUSDT-1m-2023-10.json", "binance/BTCUSDT-1m-2023-11.json", "binance/BTCUSDT-1m-2023-12.json"
-        ],
-        [
-            "binance/BTCUSDT-1h-2022-1.json", "binance/BTCUSDT-1h-2022-2.json", "binance/BTCUSDT-1h-2022-3.json", "binance/BTCUSDT-1h-2022-4.json", "binance/BTCUSDT-1h-2022-5.json", "binance/BTCUSDT-1h-2022-6.json", "binance/BTCUSDT-1h-2022-7.json", "binance/BTCUSDT-1h-2022-8.json", "binance/BTCUSDT-1h-2022-9.json", "binance/BTCUSDT-1h-2022-10.json", "binance/BTCUSDT-1h-2022-11.json", "binance/BTCUSDT-1h-2022-12.json",
-            "binance/BTCUSDT-1h-2023-1.json", "binance/BTCUSDT-1h-2023-2.json", "binance/BTCUSDT-1h-2023-3.json", "binance/BTCUSDT-1h-2023-4.json", "binance/BTCUSDT-1h-2023-5.json", "binance/BTCUSDT-1h-2023-6.json", "binance/BTCUSDT-1h-2023-7.json", "binance/BTCUSDT-1h-2023-8.json", "binance/BTCUSDT-1h-2023-9.json", "binance/BTCUSDT-1h-2023-10.json", "binance/BTCUSDT-1h-2023-11.json", "binance/BTCUSDT-1h-2023-12.json"
-        ]
-    ],
-    test_data_paths= [],
-    test_data_paths_extra= [
-        ["binance/BTCUSDT-1m-2024-1.json", "binance/BTCUSDT-1m-2024-2.json", "binance/BTCUSDT-1m-2024-3.json", "binance/BTCUSDT-1m-2024-4.json"],
-        ["binance/BTCUSDT-1h-2024-1.json", "binance/BTCUSDT-1h-2024-2.json", "binance/BTCUSDT-1h-2024-3.json", "binance/BTCUSDT-1h-2024-4.json"],
-      ],
-    fidelity = "1m",
-    layers = ["1m", "1h"]
-)
-data_2022vs2024_1m_1h_only_price_percent_32 = DataConfig(id=data_2022vs2024_1m_1h_only_price_percent.id, train_data_paths=data_2022vs2024_1m_1h_only_price_percent.train_data_paths, train_data_paths_extra=data_2022vs2024_1m_1h_only_price_percent.train_data_paths_extra, test_data_paths=data_2022vs2024_1m_1h_only_price_percent.test_data_paths, test_data_paths_extra=data_2022vs2024_1m_1h_only_price_percent.test_data_paths_extra, layers=data_2022vs2024_1m_1h_only_price_percent.layers, fidelity=data_2022vs2024_1m_1h_only_price_percent.fidelity, type=data_2022vs2024_1m_1h_only_price_percent.type, lookback_window_size=32)
 
 data_2023vs2024_1m_1h_1d_only_price_percent = DataConfig(
     id= "2023vs2024_1m_1h_1d_only_price_percent",
@@ -276,14 +117,9 @@ data_2022vs2024_1m_1h_1d_only_price_percent = DataConfig(
     fidelity = "1m",
     layers = ["1m", "1h", "1d"]
 )
-data_2022vs2024_1m_1h_1d_only_price_percent_day_of_week = DataConfig(id=data_2022vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2022vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2022vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2022vs2024_1m_1h_1d_only_price_percent.type, timestamp="day_of_week")
-data_2022vs2024_1m_1h_1d_only_price_percent_expanded = DataConfig(id=data_2022vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2022vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2022vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2022vs2024_1m_1h_1d_only_price_percent.type, timestamp="expanded")
 data_2022vs2024_1m_1h_1d_only_price_percent_32 = DataConfig(id=data_2022vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2022vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2022vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2022vs2024_1m_1h_1d_only_price_percent.type, lookback_window_size=32)
-data_2022vs2024_1m_1h_1d_only_price_percent_32_day_of_week = DataConfig(id=data_2022vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2022vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2022vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2022vs2024_1m_1h_1d_only_price_percent.type, timestamp="day_of_week", lookback_window_size=32)
-data_2022vs2024_1m_1h_1d_only_price_percent_32_expanded = DataConfig(id=data_2022vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2022vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2022vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2022vs2024_1m_1h_1d_only_price_percent.type, timestamp="expanded", lookback_window_size=32)
+data_2022vs2024_1m_1h_1d_only_price_percent_32_none = DataConfig(id=data_2022vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2022vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2022vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2022vs2024_1m_1h_1d_only_price_percent.type, timestamp="none", lookback_window_size=32)
 
-data_2022vs2024_1m_1h_1d_only_price_percent_7_day_of_week = DataConfig(id=data_2022vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2022vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2022vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2022vs2024_1m_1h_1d_only_price_percent.type, timestamp="day_of_week", lookback_window_size=7)
-data_2022vs2024_1m_1h_1d_only_price_percent_64_day_of_week = DataConfig(id=data_2022vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2022vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2022vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2022vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2022vs2024_1m_1h_1d_only_price_percent.type, timestamp="day_of_week", lookback_window_size=64)
 
 data_2021vs2024_1m_1h_1d_only_price_percent = DataConfig(
     id= "2021vs2024_1m_1h_1d_only_price_percent",
@@ -316,8 +152,6 @@ data_2021vs2024_1m_1h_1d_only_price_percent = DataConfig(
     layers = ["1m", "1h", "1d"]
 )
 data_2021vs2024_1m_1h_1d_only_price_percent_32 = DataConfig(id=data_2021vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2021vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2021vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2021vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2021vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2021vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2021vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2021vs2024_1m_1h_1d_only_price_percent.type, lookback_window_size=32)
-data_2021vs2024_1m_1h_1d_only_price_percent_32_day_of_week = DataConfig(id=data_2021vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2021vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2021vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2021vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2021vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2021vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2021vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2021vs2024_1m_1h_1d_only_price_percent.type, timestamp="day_of_week", lookback_window_size=32)
-
 
 data_2020vs2024_1m_1h_1d_only_price_percent = DataConfig(
     id= "2020vs2024_1m_1h_1d_only_price_percent",
@@ -353,7 +187,6 @@ data_2020vs2024_1m_1h_1d_only_price_percent = DataConfig(
     layers = ["1m", "1h", "1d"]
 )
 data_2020vs2024_1m_1h_1d_only_price_percent_32 = DataConfig(id=data_2020vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2020vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2020vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2020vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2020vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2020vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2020vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2020vs2024_1m_1h_1d_only_price_percent.type, lookback_window_size=32)
-data_2020vs2024_1m_1h_1d_only_price_percent_32_day_of_week = DataConfig(id=data_2020vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2020vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2020vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2020vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2020vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2020vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2020vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2020vs2024_1m_1h_1d_only_price_percent.type, timestamp="day_of_week", lookback_window_size=32)
 
 data_2017vs2024_1m_1h_1d_only_price_percent = DataConfig(
     id= "2017vs2024_1m_1h_1d_only_price_percent",
@@ -398,7 +231,7 @@ data_2017vs2024_1m_1h_1d_only_price_percent = DataConfig(
     layers = ["1m", "1h", "1d"]
 )
 data_2017vs2024_1m_1h_1d_only_price_percent_32 = DataConfig(id=data_2017vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2017vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2017vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2017vs2024_1m_1h_1d_only_price_percent.type, lookback_window_size=32)
-data_2017vs2024_1m_1h_1d_only_price_percent_32_day_of_week = DataConfig(id=data_2017vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2017vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2017vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2017vs2024_1m_1h_1d_only_price_percent.type, timestamp="day_of_week", lookback_window_size=32)
+data_2017vs2024_1m_1h_1d_only_price_percent_32_none = DataConfig(id=data_2017vs2024_1m_1h_1d_only_price_percent.id, train_data_paths=data_2017vs2024_1m_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017vs2024_1m_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017vs2024_1m_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017vs2024_1m_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017vs2024_1m_1h_1d_only_price_percent.layers, fidelity=data_2017vs2024_1m_1h_1d_only_price_percent.fidelity, type=data_2017vs2024_1m_1h_1d_only_price_percent.type, lookback_window_size=32, timestamp="none")
 
 
 data_2017_to_2023vs2024_1h_1d_only_price_percent = DataConfig(
@@ -440,11 +273,16 @@ data_2017_to_2023vs2024_1h_1d_only_price_percent = DataConfig(
     layers = ["1h", "1d"]
 )
 data_2017_to_2023vs2024_1h_1d_only_price_percent_32 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, lookback_window_size=32)
-data_2017_to_2023vs2024_1h_1d_only_price_percent_32_only_price_percent_change = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type="only_price_percent_change", lookback_window_size=32)
-data_2017_to_2023vs2024_1h_1d_only_price_percent_day_of_week_32 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, timestamp="day_of_week", lookback_window_size=32)
+data_2017_to_2023vs2024_1h_1d_only_price_percent_sin_volume_32 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type="only_price_percent_sin_volume", lookback_window_size=32)
 
-data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators5 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, lookback_window_size=32, timestamp="day_of_week", indicator='indicators5')
+data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators1 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, lookback_window_size=32, timestamp="day_of_week", indicator='indicators1')
+data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators2 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, lookback_window_size=32, timestamp="day_of_week", indicator='indicators2')
+data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators3 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, lookback_window_size=32, timestamp="day_of_week", indicator='indicators3')
 data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators4 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, lookback_window_size=32, timestamp="day_of_week", indicator='indicators4')
+data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators5 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, lookback_window_size=32, timestamp="day_of_week", indicator='indicators5')
+data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators6 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, lookback_window_size=32, timestamp="day_of_week", indicator='indicators6')
+data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators7 = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, lookback_window_size=32, timestamp="day_of_week", indicator='indicators7')
+
 
 data_2017_to_2023vs2024_1h_1d_only_price_percent_32_ETH = DataConfig(id=data_2017_to_2023vs2024_1h_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths, train_data_paths_extra=[[item.replace("BTC", "ETH") for item in row] for row in data_2017_to_2023vs2024_1h_1d_only_price_percent.train_data_paths_extra], test_data_paths=data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths, test_data_paths_extra=[[item.replace("BTC", "ETH") for item in row] for row in data_2017_to_2023vs2024_1h_1d_only_price_percent.test_data_paths_extra], layers=data_2017_to_2023vs2024_1h_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1h_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1h_1d_only_price_percent.type, lookback_window_size=32)
 
@@ -544,37 +382,18 @@ data_2017_to_2023vs2024_1d_only_price_percent = DataConfig(
 )
 data_2017_to_2023vs2024_1d_only_price_percent_32 = DataConfig(id=data_2017_to_2023vs2024_1d_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_1d_only_price_percent.train_data_paths, train_data_paths_extra=data_2017_to_2023vs2024_1d_only_price_percent.train_data_paths_extra, test_data_paths=data_2017_to_2023vs2024_1d_only_price_percent.test_data_paths, test_data_paths_extra=data_2017_to_2023vs2024_1d_only_price_percent.test_data_paths_extra, layers=data_2017_to_2023vs2024_1d_only_price_percent.layers, fidelity=data_2017_to_2023vs2024_1d_only_price_percent.fidelity, type=data_2017_to_2023vs2024_1d_only_price_percent.type, lookback_window_size=32)
 
-
-def get_datas_simple():
-    return [data_1_to_1_only_price_percent, data_1_to_1_only_price_multi]
-
-def get_datas_short_min():
-    return [data_1_to_1_min]
-
-def get_datas_min():
-    return [data_2023vs2024_1m_only_price_percent]
-
-def get_datas_long_min():
-    return [data_2020_to_2023vs2024_1m_only_price_percent]
-
-def get_datas_vlong_min():
-    return [data_2017_to_2023vs2024_1m_only_price_percent]
-
-def get_datas_long():
-    return [data_2023vs2024_1h_only_price_percent]
-
 # check if getting price_high/price_low as a percent difference from price not its previous step makes a difference
 # check check price + vol, 
-def get_datas_vlong():
-    # return [data_2017_to_2023vs2024_1h_1d_only_price_percent, data_2017_to_2023vs2024_1h_1d_only_price_percent_7, data_2017_to_2023vs2024_1h_1d_only_price_percent_14, data_2017_to_2023vs2024_1h_1d_only_price_percent_32]
+def get_datas_1h_1d():
+    # return [data_2017_to_2023vs2024_1h_1d_only_price_percent] 
     # return [data_2017_to_2023vs2024_1h_1d_only_price_percent_32]
-    return [data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators4, data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators5]
-    
+    return [data_2017_to_2023vs2024_1h_1d_only_price_percent_32, data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators1, data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators2, data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators3, data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators4, data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators5, data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators6, data_2017_to_2023vs2024_1h_1d_only_price_percent_32_indicators7]
 def get_datas_downtrend():
     return [data_downtrend_2021dec_2022dec_to_3]
 
-def get_datas_min_hour():
-    return [data_2022vs2024_1m_1h_1d_only_price_percent_32_day_of_week]
+def get_datas_1m_1h_1d():
+    # return [data_2017vs2024_1m_1h_1d_only_price_percent_32, data_2017vs2024_1m_1h_1d_only_price_percent_32_none]
+    return [data_2022vs2024_1m_1h_1d_only_price_percent_32]
     # return [data_2022vs2024_1m_only_price_percent_32, data_2022vs2024_1m_1h_only_price_percent_32, data_2022vs2024_1m_1h_1d_only_price_percent_32]
 
     

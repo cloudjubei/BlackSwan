@@ -76,8 +76,6 @@ model_config = ModelConfig(
         reward_multiplier_combo_positionprofitpercentage= 0.001,
         reward_multiplier_combo_buy= 1,
         reward_multiplier_combo_sell= 100,
-        reward_multiplier_buy_sell_sold= 1,
-        reward_multiplier_buy_sell_bought= 0,
 
         checkpoints_folder='trials/',
         checkpoint_to_load='rl_dqn_combo_all_0.01_0.995_Adamax_CELU_[64, 64]_1_1716187086.833314'

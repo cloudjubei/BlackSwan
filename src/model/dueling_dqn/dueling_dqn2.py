@@ -7,10 +7,10 @@ from stable_baselines3.dqn.dqn import DQN
 
 from src.model.dueling_dqn.policies import DuelingDQNPolicy
 
-SelfDuelingDQN = TypeVar("SelfDuelingDQN", bound="DuelingDQN")
+SelfDuelingDQN2 = TypeVar("SelfDuelingDQN2", bound="DuelingDQN2")
 
 
-class DuelingDQN(DQN):
+class DuelingDQN2(DQN):
     """
     Dueling Deep Q-Network (Dueling DQN)
 
@@ -54,8 +54,8 @@ class DuelingDQN(DQN):
 
     def __init__(
         self,
+        policy: Union[str, Type[DuelingDQNPolicy]],
         env: Union[GymEnv, str],
-        policy: Type[DuelingDQNPolicy] = DuelingDQNPolicy,
         learning_rate: Union[float, Schedule] = 0.0001,
         buffer_size: int = 1000000,
         learning_starts: int = 50000,
@@ -74,47 +74,47 @@ class DuelingDQN(DQN):
         max_grad_norm: float = 10,
         tensorboard_log: Optional[str] = None,
         policy_kwargs: Optional[Dict[str, Any]] = None,
-        verbose: int = 0,
+        # verbose: int = 0,
         seed: Optional[int] = None,
-        device: Union[th.device, str] = "auto",
+        # device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
     ):
-        super(DuelingDQN, self).__init__(
-            env=env,
-            policy=policy,
-            learning_rate=learning_rate,
-            buffer_size=buffer_size,
-            learning_starts=learning_starts,
-            batch_size=batch_size,
-            tau=tau,
-            gamma=gamma,
-            train_freq=train_freq,
-            gradient_steps=gradient_steps,
-            replay_buffer_class=replay_buffer_class,
-            replay_buffer_kwargs=replay_buffer_kwargs,
-            optimize_memory_usage=optimize_memory_usage,
-            target_update_interval=target_update_interval,
-            exploration_fraction=exploration_fraction,
-            exploration_initial_eps=exploration_initial_eps,
-            exploration_final_eps=exploration_final_eps,
-            max_grad_norm=max_grad_norm,
-            verbose=verbose,
-            tensorboard_log=tensorboard_log,
-            policy_kwargs=policy_kwargs,
-            seed=seed,
-            device=device,
-            _init_setup_model=_init_setup_model
+        super().__init__(
+            policy,
+            env,
+            learning_rate,
+            buffer_size,
+            learning_starts,
+            batch_size,
+            tau,
+            gamma,
+            train_freq,
+            gradient_steps,
+            replay_buffer_class,
+            replay_buffer_kwargs,
+            optimize_memory_usage,
+            target_update_interval,
+            exploration_fraction,
+            exploration_initial_eps,
+            exploration_final_eps,
+            max_grad_norm,
+            tensorboard_log,
+            policy_kwargs,
+            # verbose,
+            seed,
+            # device,
+            _init_setup_model,
         )
 
     def learn(
-        self: SelfDuelingDQN,
+        self: SelfDuelingDQN2,
         total_timesteps: int,
         callback: MaybeCallback = None,
         log_interval: int = 4,
-        tb_log_name: str = "DuelingDQN",
+        tb_log_name: str = "DuelingDQN2",
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
-    ) -> SelfDuelingDQN:
+    ) -> SelfDuelingDQN2:
         return super().learn(
             total_timesteps,
             callback,

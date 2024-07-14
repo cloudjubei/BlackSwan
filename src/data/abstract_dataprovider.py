@@ -16,7 +16,7 @@ class AbstractDataProvider(ABC):
         self.id = self.get_id(config)
    
     def get_id(self, config: DataConfig):
-        return f'{config.id}_{config.type}_{config.timestamp}_{config.indicator}_{config.fidelity}_{config.layers}_{config.lookback_window_size}_{1 if config.flat_lookback else 0}_{1 if config.flat_layers else 0}_{config.percent_buysell}'
+        return f'{config.id}_{config.type}_{config.timestamp}_{config.indicator}_{config.fidelity}_{"|".join(config.layers)}_{config.lookback_window_size}_{1 if config.flat_lookback else 0}_{1 if config.flat_layers else 0}_{config.percent_buysell}'
     
     def is_multilayered(self) -> bool:
         return len(self.config.layers) > 1
@@ -154,14 +154,39 @@ class AbstractDataProvider(ABC):
                     exploded_df[col] = exploded_df[col].pct_change()
 
             result_df = pd.concat([result_df, exploded_df], axis=1)
+        elif indicator == "indicators1":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi5", "rsi10", "rsi15"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators2":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators3":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
         elif indicator == "indicators4":
             exploded_df = result_df['indicators'].apply(pd.Series)
-            indicators = ["kallman15", "kallman30", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"]
+            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger15Low"]
             for ind in indicators:
                 result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
         elif indicator == "indicators5":
             exploded_df = result_df['indicators'].apply(pd.Series)
-            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi5", "rsi10", "rsi15", "choppiness30"]
+            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30", "bollinger10Mid"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators6":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger10Mid"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators7":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger10Mid", "bollinger15Low"]
             for ind in indicators:
                 result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
         elif indicator != "none":

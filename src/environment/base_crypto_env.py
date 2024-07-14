@@ -387,11 +387,11 @@ class BaseCryptoEnv(AbstractEnv):
                     sell_net_worth = self.sells[-1]
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
                     if signal < 0: # perfect sell
-                        profit_percentage = profit_percentage * 1.1 # TODO: parameterize
-                    return profit_percentage * self.reward_multipliers["buy_sell_sold"]
+                        profit_percentage = profit_percentage * 1.1
+                    return profit_percentage * 100
                 else:
                     if signal > 0: # perfect buy
-                        return self.reward_multipliers["buy_sell_bought"]
+                        return 1
                     
             if self.reward_model == "buy_sell_signal2" or self.reward_model == "buy_sell_signal3" or self.reward_model == "buy_sell_signal4":
                 price = self.current_price
@@ -405,40 +405,37 @@ class BaseCryptoEnv(AbstractEnv):
                     return (profit_percentage + self.drawdowns[-1]) * self.reward_multipliers["combo_positionprofitpercentage"]
                 return profit_percentage * self.reward_multipliers["combo_positionprofitpercentage"]
             return 0
-        elif self.reward_model == "combo_actions" or self.reward_model == "combo_actions2" or self.reward_model == "combo_actions3":
+        elif self.reward_model == "combo_actions" or self.reward_model == "combo_actions2":
+
             if self.actions_made[-1]: # just made an action
                 if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
                     sell_net_worth = self.sells[-1]
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
-                    # print(f'REWARD combo_actions_sell_hit step: {self.current_step} profit_percentage: {profit_percentage} price: {self.get_price(self.current_step)} prev: {self.get_price(self.current_step-1)}')
-                    return profit_percentage * self.reward_multipliers["combo_actions_sell_hit"]
+                    return profit_percentage * 10
                 
-                buy_signal = self.data_provider.get_buy_signal(self.current_step) # =10
+                buy_signal = self.data_provider.get_buy_signal(self.current_step)
 
-                multiplier = buy_signal - self.reward_multipliers["combo_actions_buy_threshold"] # =5
+                multiplier = buy_signal - 2
 
                 if multiplier <= 0:
-                    out = self.reward_multipliers["combo_actions_buy_hit"] * ((1-multiplier)/(self.reward_multipliers["combo_actions_buy_threshold"] + 1))
-                    # print(f'REWARD combo_actions_buy_hit step: {self.current_step} buy_signal: {buy_signal} out: {out} price: {self.get_price(self.current_step)} prev: {self.get_price(self.current_step-1)}')
+                    out = 0.01 * ((1-multiplier)/(2 + 1))
                     return out
 
-                out = self.reward_multipliers["combo_actions_buy_miss"] * multiplier #= -0.0001 * 5
-                # print(f'REWARD combo_actions_buy_miss step: {self.current_step} buy_signal: {buy_signal} out: {out} price: {self.get_price(self.current_step)} prev: {self.get_price(self.current_step-1)}')
+                out = -0.0001 * multiplier 
                 return out
                 
             # signal = self.data_provider.get_hold_signal(self.current_step)
             if self.current_step > 0:
                 if self.reward_model == "combo_actions2":
-                    return self.drawdowns[-1] * self.reward_multipliers["combo_actions_hold_cash_hit"]
+                    return self.drawdowns[-1] * 0.1
 
                 multiplier = -1 if self.positions[-1] == 0 else 1
                 price_prev = self.get_price(self.current_step-1)
                 price = self.get_price(self.current_step)
                 price_diff = price/price_prev - 1
-                # print(f'REWARD combo_actions_hold_cash_hit step: {self.current_step} price: {price} prev: {price_prev}')
                 if self.reward_model == "combo_actions3":
-                    return (multiplier * price_diff + self.drawdowns[-1]) * self.reward_multipliers["combo_actions_hold_cash_hit"]
-                return multiplier * price_diff * self.reward_multipliers["combo_actions_hold_cash_hit"]
+                    return (multiplier * price_diff + self.drawdowns[-1]) * 0.1
+                return multiplier * price_diff * 0.1
             # print(f'REWARD NOTHING step: {self.current_step} price: {self.get_price(self.current_step)}')
             return 0
         elif self.reward_model == "drawdown":

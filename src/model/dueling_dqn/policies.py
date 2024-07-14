@@ -56,7 +56,7 @@ class DuelingQNetwork(QNetwork):
         :param obs: Observation
         :return: The estimated Q-Value for each action.
         """
-        features = self.extract_features(obs)
+        features = self.extract_features(obs, self.features_extractor)
         values = self.value_stream(features)
         advantages = self.advantage_stream(features)
         qvals = values + (advantages - advantages.mean())

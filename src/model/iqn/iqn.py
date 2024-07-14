@@ -59,16 +59,10 @@ class IQN(OffPolicyAlgorithm):
     :param _init_setup_model: Whether or not to build the network at the creation of the instance
     """
 
-    policy_aliases: Dict[str, Type[BasePolicy]] = {
-        "MlpPolicy": MlpPolicy,
-        "CnnPolicy": CnnPolicy,
-        "MultiInputPolicy": MultiInputPolicy,
-    }
-
     def __init__(
         self,
-        policy: Union[str, Type[IQNPolicy]],
         env: Union[GymEnv, str],
+        policy: Type[IQNPolicy] = IQNPolicy,
         learning_rate: Union[float, Schedule] = 5e-5,
         buffer_size: int = 1000000,  # 1e6
         learning_starts: int = 50000,
