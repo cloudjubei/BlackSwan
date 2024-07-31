@@ -1,13 +1,43 @@
+from typing import Any, Dict, Optional, Tuple, Type, TypeVar, Union
 import torch as th
 import torch.nn.functional as F
 from stable_baselines3 import DQN
+from stable_baselines3.common.buffers import ReplayBuffer
+from stable_baselines3.common.type_aliases import GymEnv, Schedule
+from stable_baselines3.dqn.policies import DQNPolicy
 import numpy as np
 
 class MunchausenDQN(DQN):
-    def __init__(self, env, policy, learning_rate=1e-4, buffer_size=100000, learning_starts=1000,
-                 batch_size=32, tau=1.0, gamma=0.99, train_freq=1, gradient_steps=1, target_update_interval=1000,
-                 exploration_fraction=0.1, exploration_initial_eps=1.0, exploration_final_eps=0.02, max_grad_norm=10,
-                 munchausen_scale=0.9, munchausen_tau=0.03, verbose=0, tensorboard_log="", device="auto", **kwargs):
+
+    def __init__(
+        self,
+        env: Union[GymEnv, str],
+        policy: Union[str, Type[DQNPolicy]],
+        learning_rate: Union[float, Schedule] = 0.0001,
+        buffer_size: int = 1000000,
+        learning_starts: int = 50000,
+        batch_size: int = 32,
+        tau: float = 1,
+        gamma: float = 0.99,
+        train_freq: Union[int, Tuple[int, str]] = 1,
+        gradient_steps: int = 1,
+        replay_buffer_class: Optional[Type[ReplayBuffer]] = None,
+        replay_buffer_kwargs: Optional[Dict[str, Any]] = None,
+        optimize_memory_usage: bool = False,
+        target_update_interval: int = 10000,
+        exploration_fraction: float = 0.1,
+        exploration_initial_eps: float = 1,
+        exploration_final_eps: float = 0.05,
+        max_grad_norm: float = 10,
+        tensorboard_log: Optional[str] = None,
+        policy_kwargs: Optional[Dict[str, Any]] = None,
+        verbose: int = 0,
+        seed: Optional[int] = None,
+        device: Union[th.device, str] = "auto",
+        _init_setup_model: bool = True,
+        munchausen_scale: float = 0.9, 
+        munchausen_tau: float = 0.03
+    ):
         super(MunchausenDQN, self).__init__(
             env=env,
             policy=policy,
@@ -19,6 +49,9 @@ class MunchausenDQN(DQN):
             gamma=gamma,
             train_freq=train_freq,
             gradient_steps=gradient_steps,
+            replay_buffer_class=replay_buffer_class,
+            replay_buffer_kwargs=replay_buffer_kwargs,
+            optimize_memory_usage=optimize_memory_usage,
             target_update_interval=target_update_interval,
             exploration_fraction=exploration_fraction,
             exploration_initial_eps=exploration_initial_eps,
@@ -26,8 +59,10 @@ class MunchausenDQN(DQN):
             max_grad_norm=max_grad_norm,
             verbose=verbose,
             tensorboard_log=tensorboard_log,
+            policy_kwargs=policy_kwargs,
+            seed=seed,
             device=device,
-            **kwargs
+            _init_setup_model=_init_setup_model
         )
         self.munchausen_scale = munchausen_scale
         self.munchausen_tau = munchausen_tau

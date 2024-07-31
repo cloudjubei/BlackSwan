@@ -34,6 +34,18 @@ class ModelRLConfigSearch:
     reward_multiplier_combo_buy: List[float] = field(default_factory=[])
     reward_multiplier_combo_sell: List[float] = field(default_factory=[])
 
+    reward_multiplier_combo_sell_profit: List[float] = field(default_factory=[])
+    reward_multiplier_combo_sell_profit_prev: List[float] = field(default_factory=[])
+    reward_multiplier_combo_sell_perfect: List[float] = field(default_factory=[])
+    reward_multiplier_combo_sell_drawdown: List[float] = field(default_factory=[])
+    reward_multiplier_combo_buy_profit: List[float] = field(default_factory=[])
+    reward_multiplier_combo_buy_perfect: List[float] = field(default_factory=[])
+    reward_multiplier_combo_buy_profitable_offset: List[int] = field(default_factory=[])
+    reward_multiplier_combo_buy_profitable: List[float] = field(default_factory=[])
+    reward_multiplier_combo_buy_drawdown: List[float] = field(default_factory=[])
+    reward_multiplier_combo_hold_profit: List[float] = field(default_factory=[])
+    reward_multiplier_combo_hold_drawdown: List[float] = field(default_factory=[])
+
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints/'
     checkpoint_to_load: str | None = None
@@ -69,6 +81,18 @@ class ModelRLConfig:
     reward_multiplier_combo_positionprofitpercentage: float = 0
     reward_multiplier_combo_buy: float = 0
     reward_multiplier_combo_sell: float = 0
+    
+    reward_multiplier_combo_sell_profit: float = 0,
+    reward_multiplier_combo_sell_profit_prev: float = 0,
+    reward_multiplier_combo_sell_perfect: float = 0,
+    reward_multiplier_combo_sell_drawdown: float = 0,
+    reward_multiplier_combo_buy_profit: float = 0,
+    reward_multiplier_combo_buy_perfect: float = 0,
+    reward_multiplier_combo_buy_profitable_offset: int = 0,
+    reward_multiplier_combo_buy_profitable: float = 0,
+    reward_multiplier_combo_buy_drawdown: float = 0,
+    reward_multiplier_combo_hold_profit: float = 0,
+    reward_multiplier_combo_hold_drawdown: float = 0,
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints/'
@@ -163,7 +187,7 @@ class ModelTechnicalConfig:
     sell_is_up_check: bool = True
 @dataclass
 class ModelConfigSearch:
-    model_type: str # possible ["hodl", "rl", "lstm", "mlp", "technical", "time"]
+    model_type: str # possible ["hodl", "rl", "technical", "time"]
     model_rl: ModelRLConfigSearch | None = None
     model_lstm: ModelLSTMConfigSearch | None = None
     model_mlp: ModelMLPConfigSearch | None = None
@@ -171,7 +195,7 @@ class ModelConfigSearch:
     model_time: ModelTimeConfigSearch | None = None
 @dataclass
 class ModelConfig:
-    model_type: str # possible ["hodl", "rl", "lstm", "mlp", "technical", "time"]
+    model_type: str # possible ["hodl", "rl", "technical", "time"]
     iterations_to_pick_best: int = 10
     model_rl: ModelRLConfig | None = None
     model_lstm: ModelLSTMConfig | None = None
@@ -180,7 +204,7 @@ class ModelConfig:
     model_time: ModelTimeConfig | None = None
     
     def is_deep(self) -> bool:
-        return self.model_type == "rl" or self.model_type == "lstm" or self.model_type == "mlp"
+        return self.model_type == "rl"
     def is_hodl(self) -> bool:
         return self.model_type == "hodl"
     
@@ -191,21 +215,37 @@ class ModelConfig:
 
 # indicators1 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi5", "rsi10", "rsi15"]
 # indicators2 - ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"]
-# indicators3 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"]
-# indicators4 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger15Low"]
-# indicators5 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30", "bollinger10Mid"]
-# indicators6 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger10Mid"]
-# indicators7 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger10Mid", "bollinger15Low"]
-
+# indicators3 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger15Low"]
+# indicators4 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30"]
+# indicators5 - ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30"]
+# indicators6 - ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "cci10"]
+# indicators7 - ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "disparityIndex7", "disparityIndex10"]
+# indicators8 - ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "sortinoRatio30"]
 
 # BAD -> ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi5", "rsi15", "choppiness30"] -> extra rsi5
 # BAD -> ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi5", "rsi10", "rsi15", "choppiness30"] -> extra rsi15
+# BAD -> ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi5", "rsi10", "rsi15", "bollinger15Low"] -> extra bollinger15Low
 # BAD -> ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "rsi15", "choppiness30"] -> extra rsi15
 # BAD -> ["kallman15", "kallman30", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"] -> extra kallman30
 # BAD -> ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10"] -> no choppiness30
+# BAD -> ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"] -> extra rsi10
 # BAD -> ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30", "bollinger15Low"] -> extra bollinger15Low
 # BAD -> ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30", "donchianChannels5Low"] -> extra donchianChannels5Low
 # BAD -> ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30", "donchianChannels10High"] -> extra donchianChannels10High
+# BAD -> ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30", "bollinger10Mid"] -> extra bollinger10Mid
+# BAD -> ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger10Mid"] -> extra bollinger10Mid
+# BAD -> ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger10Mid", "bollinger15Low"] -> extra bollinger15Low
+# BAD -> ad5-ad30
+# BAD -> volatility5-30
+# ALL OF cci improve results, so test later with them
+# turbulenceIndex10 improves
+# disparityIndex10,7 improves
+# volatilityVolume30+5,7 improves
+# Williams ALL improve
+# StochasticOscillator - only 30 doesn't improve
+# SortinoRatio - ALL improve
+# SharpeRatio - ALL improve
+
 
 # BatchNorm1d single with single dropout improves things a lot
 # Dropout0.5 seems too strong, but had single great results -> experiment more later
@@ -227,60 +267,78 @@ class ModelConfig:
 # BAD -> LSTFullN
 # BAD -> GRULocal2+4
 
-# ["duel-dqn", "dqn"] 1/3 -> policy='MlpPolicy', activation_fn, normalize_images?, optimizer_class (has to be good like RMSprop)
+# combo_all x max_grad_norm 2/6
+# duel_dqn x reward_models 2/10 
+# combo x combo_buy_profitable x buyreward_percent[0.004,0.005,0.006, 0.01] 7/16
+# combo_all x target_update_interval 6/7
+# combo_all x net_arch2 3/7
+# combo_all x custom_net_arch1 1/7
+# combo_all x custom_net_arch2 3/7
+# model_name x reward_model 22/55
 
-# duel-dqn x [net_arch] 10/11
-# dqn x [net_arch] 3/11
-# ["dqn"] x [indicators] 2/16
-# ["duel-dqn"] x [indicators] 7/16
+# TODO: combo_all x custom_net_arch3 READY
+# TODO: net_arch
+# TODO: custom_net_arch + indicators1-8
 
-# TODO: DGWO optim
+# and then min tests
+
+# TODO: optimizer optim
 
 model_rl_h = ModelConfigSearch(
     model_type= "rl",
     model_rl= ModelRLConfigSearch(
-        # model_name= ["ppo", "reppo", "trpo", "a2c", "ars", "ars-mlp", "qrdqn", "dqn-sbx", "dqn"],
-        # model_name= ["r-dqn", "dqn-lstm", "iqn", "dqn"], # very slow (12it/s, 30it/s, 10it/s), but can work very well
-        # model_name= ["dqn-custom", "duel-dqn-custom"],
+        # model_name= ["dqn"], 
+        # model_name= ["qrdqn"],
         # model_name= ["duel-dqn"],
-        # model_name= ["duel-dqn-custom"],
-        # model_name= ["duel-dqn2", "duel-dqn"],
-        # model_name= ["dqn-sbx", "duel-dqn", "dqn"],
-        model_name= ["dqn"],
+        # model_name= ["ppo", "reppo", "trpo", "a2c", "ars", "ars-mlp"], 
+
+        # model_name= ["ars", "ars-mlp", "qrdqn", "ppo", "reppo", "trpo", "a2c", "dqn", "duel-dqn"], 
+        # model_name= ["ppo", "reppo", "trpo", "a2c", "ars", "ars-mlp", "qrdqn"], 
+        # model_name= ["rainbow-dqn", "dqn-lstm", "iqn"], # very slow (12it/s, 30it/s, 10it/s), but can work very well
+        # model_name= ["dqn-lstm"], # TODO: with different hidden_size
         # model_name= ["duel-dqn"],
+        model_name= ["duel-dqn-custom"],
 
-        # model_name= ["dqn-lstm"],
+        # model_name= ["iqn", "rainbow-dqn", "munchausen-dqn"],
 
-        # reward_model= ["combo_all", "combo_actions", "combo_old"],
-        reward_model= ["combo_actions2"],
+        # reward_model= ["combo_all", "combo_all2", "buy_sell_signal", "buy_sell_signal2", "combo_actions", "combo_actions2", "combo_actions3", "profit_percentage2", "profit_percentage3", "profit_percentage4"],
+        # reward_model= ["combo_actions2"],
+        reward_model= ["combo_all"],
+        # reward_model= ["combo"],
+        # reward_model= ["combo_actions", "combo_actions2", "combo_all", "combo_all2", "profit_percentage3", "profit_percentage4", "profit_all", "profit_all2", "combo"],
 
-        # learning_rate= [0.0001, 0.05],
         learning_rate= [0.0001],
-        # batch_size= [4, 256],
-        batch_size= [256],
+        # batch_size= [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096],
+        # batch_size= [512, 8, 1024],
+        batch_size= [512],
         # buffer_size = [10, 100_000, 1_000_000],
         buffer_size = [1_000_000],
-        # gamma = [0.9, 0.95],
-        gamma = [0.9],
-        # tau = [0, 0.9],
-        tau = [0.9],
-        # exploration_fraction = [0.05, 0.9],
-        exploration_fraction = [0.05],
-        # exploration_final_eps = [0.01, 0.05, 0.1],
-        exploration_final_eps = [0.1],
-        # learning_starts= [1, 1_000, 10_000, 20_000, 40_000, 50_000],
-        learning_starts= [10_000],
-        # train_freq= [2, 4, 8],
-        train_freq= [8],
-        # gradient_steps= [-1, 1, 2],
+        # gamma = [0.99, 0.95, 0.85],
+        gamma = [0.99],
+        # tau = [0.99, 0.9, 0.7, 0],
+        tau = [0.99],
+        # exploration_fraction = [0.1, 0.05, 0.99],
+        exploration_fraction = [0.1],
+        # exploration_final_eps = [0.01, 0.2, 0.25],
+        exploration_final_eps = [0.2],
+        # learning_starts= [15_000, 20_000, 25_000],
+        learning_starts= [20_000],
+        # train_freq= [16, 64, 2],
+        train_freq= [16],
+        # gradient_steps= [-1, 2],
         gradient_steps= [-1],
+        # target_update_interval= [5_000, 7_000, 10_000, 12_000, 15_000, 20_000],
         target_update_interval= [10_000],
-        # max_grad_norm= [1, 1000],
-        max_grad_norm= [1000],
+        # max_grad_norm= [0.01, 10000],
+        # max_grad_norm= [0.0001, 0.001, 0.005, 0.015, 0.02],
+        max_grad_norm= [0.01],
 
         # optimizer_class = ['AdamW', 'NAdam', 'RMSprop'], # TODO check with finetuning 
         optimizer_class = ['RMSprop'],
+        # optimizer_class = ['NAdam'],
+        # optimizer_class = ['AdamW'],
         # optimizer_class = ['default'],
+        # TODO: 'DGWO' + 'LBFGS' -> both require closure passed to them
         # optimizer_eps = [0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 0.2],
         optimizer_eps = [0.5],
         # optimizer_weight_decay = [0, 0.00000001, 0.0000001, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1],
@@ -294,30 +352,100 @@ model_rl_h = ModelConfigSearch(
 
         # activation_fn = ['LogSigmoid', 'CELU', 'PReLU', 'ReLU6', 'Softsign'],
         activation_fn= ['CELU'],
-        net_arch= [[256,256]], # worth it
-        # net_arch= [[512,256,64,256,512]], # worth it
-        # net_arch= [[64,64], [256,256], [256, 64, 32, 16], [256, 64, 32, 16, 8], [512, 256, 64, 32], [512, 256, 64, 32, 16], [64,64,64], [256,256,256], [64,64,64,64], [256,256,256,256]], #<--- these are promising
+        net_arch= [[1024,1024]],
+        # net_arch= [[2048,512,64]],
 
-        # net_arch= [[64,64,64,64]],
-        custom_net_arch= [[""]],
+        # net_arch= [[2048,512,64], [1024,1024], [512,256,64,32], [256,256,256,256], [256,256,256,256,256], [256,256,256,256,256,256]],
+        
+        # DOING: 
+        # net_arch= [[10240,1024,64], [4096,1024,256,64], [8192,1024,196,32], [1024,64], [2048,512,64,512,2048], [3000, 300, 30]],
 
-        # custom_net_arch= [
-        #     ["LSTMLocalN", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        # custom_net_arch= [[""]],
+        
+        # custom_net_arch1= [
+        #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "BatchNorm1d", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "Dropout1", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "BatchNorm1d", "Dropout1", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "BatchNorm1d", "Dropout2", "activation_fn", "Linear", "activation_fn", "Linear"],
         # ],
 
-        # episodes= [1, 3, 5],
+        # custom_net_arch2= [
+        #     ["DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "activation_fn", "Linear", "activation_fn", "DropConnectLinear"],
+        #     ["Linear", "LayerNorm", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "LayerNorm", "Dropout1", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "LayerNorm", "Dropout2", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "ResidualBlock", "activation_fn", "Linear", "activation_fn", "Linear"],
+        # ],
+
+        custom_net_arch= [
+            ["GRUFull"],
+            ["GRULocal", "activation_fn", "Linear", "activation_fn", "Linear"],
+            ["GRULocal", "BatchNorm1d", "activation_fn", "Linear", "activation_fn", "Linear"],
+            ["GRULocal", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear"],
+            ["GRULocal", "Dropout1", "activation_fn", "Linear", "activation_fn", "Linear"],
+            ["GRULocal", "BatchNorm1d", "Dropout1", "activation_fn", "Linear", "activation_fn", "Linear"],
+            ["GRULocal", "BatchNorm1d", "Dropout2", "activation_fn", "Linear", "activation_fn", "Linear"],
+        ],
+
+        # custom_net_arch= [
+        #     ["LSTFull"],
+        #     ["LSTMLocalN", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["LSTMLocalN", "BatchNorm1d", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["LSTMLocalN", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["LSTMLocalN", "Dropout1", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["LSTMLocalN", "BatchNorm1d", "Dropout1", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["LSTMLocalN", "BatchNorm1d", "Dropout2", "activation_fn", "Linear", "activation_fn", "Linear"],
+        # ],
+
+        # custom_net_arch= [
+        #     ["Linear", "BatchNorm1d", "ScaledDotProductAttention", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "ScaledDotProductAttention", "BatchNorm1d", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "Dropout1", "ScaledDotProductAttention", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "ScaledDotProductAttention", "Dropout1", "activation_fn", "Linear", "activation_fn", "Linear"],
+        # ],
+
+        # custom_net_arch= [
+        #     ["Linear", "BatchNorm1d", "AdditiveAttention", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "AdditiveAttention", "BatchNorm1d", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "Dropout1", "AdditiveAttention", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "AdditiveAttention", "Dropout1", "activation_fn", "Linear", "activation_fn", "Linear"],
+        # ],
+
+        # episodes= [1, 2, 3],
         episodes= [1],
 
-        # reward_multiplier_combo_noaction= [-1, -10, -100],
         reward_multiplier_combo_noaction= [-1],
-        # reward_multiplier_combo_positionprofitpercentage= [0.001, 0.01, 10],
-        # reward_multiplier_combo_positionprofitpercentage= [0.01, 10], <--- profit_percentage3
         reward_multiplier_combo_positionprofitpercentage= [10],
-        # reward_multiplier_combo_buy= [0.0001, 0.001, 0.01, 0.1, 1, 10, 100],
-        # reward_multiplier_combo_buy= [0.01, 0.1, 1, 10, 100],
         reward_multiplier_combo_buy= [0.1],
-        # reward_multiplier_combo_sell= [0.1, 1, 10, 100, 1000, 10000],
         reward_multiplier_combo_sell= [1000],
+
+        # reward_multiplier_combo_sell_profit= [1000, 100, 10], #
+        reward_multiplier_combo_sell_profit= [1000],
+        # reward_multiplier_combo_sell_profit_prev= [100, 10, 1, 0], #
+        reward_multiplier_combo_sell_profit_prev= [100],
+        # reward_multiplier_combo_sell_perfect= [0.001, 0, 0.0001], #
+        reward_multiplier_combo_sell_perfect= [0.001],
+        # reward_multiplier_combo_sell_drawdown= [0, 0.1, 0.001], #
+        reward_multiplier_combo_sell_drawdown= [0],
+        # reward_multiplier_combo_buy_profit= [1, 0.1, 1000],
+        reward_multiplier_combo_buy_profit= [1],
+        # reward_multiplier_combo_buy_perfect= [0.001, 0.1],
+        reward_multiplier_combo_buy_perfect= [0.001],
+        
+        # reward_multiplier_combo_buy_profitable_offset= [5, 10],
+        reward_multiplier_combo_buy_profitable_offset= [5],
+        # reward_multiplier_combo_buy_profitable= [0.1, 0.01, 0.001],
+        reward_multiplier_combo_buy_profitable= [0.1],
+
+        # reward_multiplier_combo_buy_drawdown= [0.001, 0.1, 10], #
+        reward_multiplier_combo_buy_drawdown= [0.001],
+        # reward_multiplier_combo_hold_profit= [10, 1, 100], #
+        reward_multiplier_combo_hold_profit= [10],
+        # reward_multiplier_combo_hold_drawdown= [0.0001, 0.01, 0.001, 1], #
+        reward_multiplier_combo_hold_drawdown= [0.0001],
 
 
         # checkpoints_folder='checkpoints/',
@@ -327,22 +455,20 @@ model_rl_h = ModelConfigSearch(
 
 # combo_actions, combo_actions2, combo_actions3
 
-# [MIN 2022] ["duel-dqn"] x lr[0.00000001, 0.000001] x combo_actions2 x [32lookback] -> 1/3
-# [MIN 2017] ["duel-dqn"] x lr[0.0000001] x combo_actions2 x [32lookback] -> none
+# [min2023] [rmsprop]
+# [min2023] [nadam]
+
+# adamax -> duel 1/2 1:30h x 10 ? 1:26:38 85 it/s 1:25:59 84 it/s 1:30:38 80 it/s 2:10:24 56 it/s 2:01:22 61 it/s
 
 model_rl_min = ModelConfigSearch(
     model_type= "rl",
     model_rl= ModelRLConfigSearch(
-        # model_name= ["ppo", "a2c", "dqn", "qrdqn", "dqn-sbx"],
-        # model_name= ["duel-dqn", "dqn-sbx", "dqn"],
         model_name= ["duel-dqn"],
-        # model_name= ["dqn-sbx"],
-        # model_name= ["rainbow-dqn", "dqn-lstm"],
 
         # reward_model= ["combo_all", "combo_actions2", "combo_old"],
         reward_model= ["combo_actions2"],
 
-        # learning_rate= [0.00000001, 0.000001],
+        # learning_rate= [0.00000001, 0.000001, 0.0001],
         learning_rate= [0.0000001],
         batch_size= [256],
         buffer_size = [1_000_000],
@@ -350,19 +476,20 @@ model_rl_min = ModelConfigSearch(
         tau = [0.9],
         exploration_fraction = [0.05],
         exploration_final_eps = [0.1],
-        learning_starts= [10_000],
+        learning_starts= [50_000],
         train_freq= [8],
         gradient_steps= [-1],
         target_update_interval= [10_000],
         max_grad_norm= [1000],
-        optimizer_class = ['Adamax'],
+        optimizer_class = ['RMSprop'],
+        # optimizer_class = ['NAdam'],
         optimizer_eps = [0.5],
         optimizer_weight_decay = [0.00000001],
         optimizer_centered = [True],
         optimizer_alpha = [0.9],
         optimizer_momentum = [0.000001],
         activation_fn= ['CELU'],
-        net_arch= [[64,64,64,64]], 
+        net_arch= [[256,256,256,256]],
         custom_net_arch= [[""]],
 
         episodes= [1],
@@ -371,54 +498,18 @@ model_rl_min = ModelConfigSearch(
         reward_multiplier_combo_positionprofitpercentage= [10],
         reward_multiplier_combo_buy= [0.1],
         reward_multiplier_combo_sell= [1000],
-    )
-)
 
-
-model_lstm = ModelConfigSearch(
-    model_type= "lstm",
-    model_lstm= ModelLSTMConfigSearch(
-        # learning_rate= [0.1, 0.01, 0.001, 0.0001],
-        learning_rate= [0.001],
-        # weight_decay= [0.0001, 0.001],
-        weight_decay= [0.0001],
-        # episodes= [1, 10, 20],
-        episodes= [1],
-
-        # hidden_size= [8, 16, 32, 64, 128],
-        hidden_size= [128],
-        # hidden_size= [16],
-        # layers= [1, 2, 5, 10],
-        layers= [10],
-        # lstm_dropout= [0.0, 0.1, 0.5],
-        lstm_dropout= [0.5],
-        # extra_dropout= [0.0, 0.1, 0.5],
-        extra_dropout= [0.5],
-        # first_activation= ["relu", "lrelu", "sigmoid"],
-        first_activation= ["relu"],
-        # last_activation= ["relu", "lrelu", "sigmoid"],
-        last_activation= ["relu"]
-    )
-)
-
-model_mlp = ModelConfigSearch(
-    model_type= "mlp",
-    model_mlp= ModelMLPConfigSearch(
-        # learning_rate= [0.001, 0.0001, 0.00001],
-        learning_rate= [0.0001],
-        # weight_decay= [0.00001, 0.0001],
-        weight_decay= [0.0001],
-        episodes= [1],
-        # episodes= [1],
-
-        # hidden_dim1= [32, 64, 512],
-        hidden_dim1= [64],
-        # hidden_dim2= [32, 64, 512],
-        hidden_dim2= [64],
-        # first_activation= ["relu", "lrelu", "sigmoid"],
-        first_activation= ["relu"],
-        # last_activation= ["relu", "lrelu", "sigmoid"],
-        last_activation= ["relu"]
+        reward_multiplier_combo_sell_profit= [100],
+        reward_multiplier_combo_sell_profit_prev= [100],
+        reward_multiplier_combo_sell_perfect= [0.01],
+        reward_multiplier_combo_sell_drawdown= [0.01],
+        reward_multiplier_combo_buy_profit= [100],
+        reward_multiplier_combo_buy_perfect= [0.01],
+        reward_multiplier_combo_buy_profitable_offset= [5],
+        reward_multiplier_combo_buy_profitable= [0.01],
+        reward_multiplier_combo_buy_drawdown= [0.01],
+        reward_multiplier_combo_hold_profit= [100],
+        reward_multiplier_combo_hold_drawdown= [0.01],
     )
 )
 
@@ -510,64 +601,6 @@ model_technical_bollinger_test = ModelConfigSearch(
     )
 )
 
-model_rl_h_win = ModelConfigSearch(
-    model_type= "rl",
-    model_rl= ModelRLConfigSearch(
-        model_name= ["dqn"],
-        reward_model= ["combo_all"],
-        # learning_rate= [0.01, 0.05],
-        learning_rate= [0.01],
-        # batch_size= [4, 32, 64, 128],
-        batch_size= [128],
-        # buffer_size = [1_000, 10_000],
-        buffer_size = [10_000],
-        # gamma = [0.9, 0.95, 0.995],
-        gamma = [0.995],
-        # tau = [0, 0.25],
-        tau = [0],
-        # exploration_fraction = [0.05, 0.2],
-        exploration_fraction = [0.05],
-        # exploration_final_eps = [0, 0.1, 0.2],
-        exploration_final_eps = [0.1],
-        learning_starts= [1, 1_000, 10_000],
-        # learning_starts= [1_000],
-        # train_freq= [2, 4, 8],
-        train_freq= [8],
-        # gradient_steps= [-1, 1, 2],
-        gradient_steps= [-1],
-        target_update_interval= [10_000],
-        # max_grad_norm= [1, 1000],
-        max_grad_norm= [1000],
-        optimizer_class = ['RMSprop'],
-        # optimizer_eps = [0.001, 0.0001, 0.01, 0.0000000001],
-        optimizer_eps = [0.001],
-        # optimizer_weight_decay = [0.00001, 0.0000000001],
-        optimizer_weight_decay = [0.00001],
-        # optimizer_centered = [True, False],
-        optimizer_centered = [True],
-        optimizer_alpha = [0.9],
-        # optimizer_momentum = [0.0001, 0.1, 0.000001],
-        optimizer_momentum = [0.0001], 
-        # activation_fn = ['LogSigmoid', 'CELU', 'PReLU', 'ReLU6', 'Softsign'],
-        activation_fn= ['Softsign'],
-        # net_arch= [[64,64], [64,64,64,64]],
-        net_arch= [[64,64]],
-        custom_net_arch= [[""]],
-
-        # episodes= [1, 3],
-        episodes= [1],
-
-        reward_multiplier_combo_noaction= [0.1],
-        # reward_multiplier_combo_noaction= [0.01, 0.1],
-        reward_multiplier_combo_positionprofitpercentage= [0.001],
-        # reward_multiplier_combo_positionprofitpercentage= [0, 0.001, 0.01, 0.1, 1],
-        reward_multiplier_combo_buy= [1],
-        # reward_multiplier_combo_buy= [0.01, 0.1, 1],
-        reward_multiplier_combo_sell= [100],
-        # reward_multiplier_combo_sell= [1, 10, 100, 1000]
-    )
-)
-
 model_rl_comboall_adamax = ModelConfigSearch(
     model_type= "rl",
     model_rl= ModelRLConfigSearch(
@@ -602,88 +635,22 @@ model_rl_comboall_adamax = ModelConfigSearch(
         reward_multiplier_combo_buy= [1],
         reward_multiplier_combo_sell= [100],
 
+        reward_multiplier_combo_sell_profit= [100],
+        reward_multiplier_combo_sell_profit_prev= [100],
+        reward_multiplier_combo_sell_perfect= [0.01],
+        reward_multiplier_combo_sell_drawdown= [0.01],
+        reward_multiplier_combo_buy_profit= [100],
+        reward_multiplier_combo_buy_perfect= [0.01],
+        reward_multiplier_combo_buy_profitable_offset= [5],
+        reward_multiplier_combo_buy_profitable= [0.01],
+        reward_multiplier_combo_buy_drawdown= [0.01],
+        reward_multiplier_combo_hold_profit= [100],
+        reward_multiplier_combo_hold_drawdown= [0.01],
+
         # checkpoints_folder='trials/',
         # checkpoint_to_load='rl_dqn_combo_all_0.01_0.995_Adamax_CELU_[64, 64]_1_1716187086.833314'
         checkpoints_folder='checkpoints/',
         checkpoint_to_load='rl_dqn_combo_all_0.005_1000_4_1000000_0.995_Adamax_CELU_[64, 64, 64, 64]_1_1716768803.222076'
-    )
-)
-
-model_rl_comboall_rmsprop = ModelConfigSearch(
-    model_type= "rl",
-    model_rl= ModelRLConfigSearch(
-        model_name= ["dqn"],
-        reward_model= ["combo_all"],
-        learning_rate= [0.01],
-        batch_size= [128],
-        buffer_size = [1_000],
-        gamma = [0.995],
-        tau = [0],
-        exploration_fraction = [0.05],
-        exploration_final_eps = [0.1],
-        learning_starts= [10_000],
-        train_freq= [8],
-        gradient_steps= [-1],
-        target_update_interval= [10_000],
-        max_grad_norm= [1000],
-        optimizer_class = ['RMSprop'],
-        optimizer_eps = [0.001],
-        optimizer_weight_decay = [0.00001],
-        optimizer_centered = [True],
-        optimizer_alpha = [0.9],
-        optimizer_momentum = [0.0001], 
-        activation_fn= ['CELU'],
-        net_arch= [[64,64]],
-        custom_net_arch= [[""]],
-
-        episodes= [1],
-
-        reward_multiplier_combo_noaction= [0.1],
-        reward_multiplier_combo_positionprofitpercentage= [0.001],
-        reward_multiplier_combo_buy= [1],
-        reward_multiplier_combo_sell= [100],
-
-        checkpoints_folder='trials/',
-        checkpoint_to_load='rl_dqn_combo_all_0.01_0.995_RMSprop_CELU_[64, 64]_1_1716135233.756086'
-    )
-)
-
-model_rl_comboall_adamax_min = ModelConfigSearch(
-    model_type= "rl",
-    model_rl= ModelRLConfigSearch(
-        model_name= ["dqn"],
-        reward_model= ["combo_all"],
-        learning_rate= [0.01],
-        batch_size= [128],
-        buffer_size = [1_000],
-        gamma = [0.995],
-        tau = [0],
-        exploration_fraction = [0.05],
-        exploration_final_eps = [0.1],
-        learning_starts= [10_000],
-        train_freq= [8],
-        gradient_steps= [-1],
-        target_update_interval= [10_000],
-        max_grad_norm= [1000],
-        optimizer_class = ['Adamax'],
-        optimizer_eps = [0.001],
-        optimizer_weight_decay = [0.00001],
-        optimizer_centered = [True],
-        optimizer_alpha = [0.9],
-        optimizer_momentum = [0.0001], 
-        activation_fn= ['PReLU'],
-        net_arch= [[64,64]],
-        custom_net_arch= [[""]],
-
-        episodes= [1],
-
-        reward_multiplier_combo_noaction= [0.1],
-        reward_multiplier_combo_positionprofitpercentage= [0.001],
-        reward_multiplier_combo_buy= [1],
-        reward_multiplier_combo_sell= [100],
-
-        checkpoints_folder='trials/',
-        checkpoint_to_load='rl_dqn_combo_all_0.01_0.995_Adamax_PReLU_[64, 64]_1_1716165787.3580859'
     )
 )
 
@@ -720,6 +687,18 @@ class ModelRLConfig:
     reward_multiplier_combo_buy: float = 0
     reward_multiplier_combo_sell: float = 0
 
+    reward_multiplier_combo_sell_profit: float = 0,
+    reward_multiplier_combo_sell_profit_prev: float = 0,
+    reward_multiplier_combo_sell_perfect: float = 0,
+    reward_multiplier_combo_sell_drawdown: float = 0,
+    reward_multiplier_combo_buy_profit: float = 0,
+    reward_multiplier_combo_buy_perfect: float = 0,
+    reward_multiplier_combo_buy_profitable_offset: int = 0,
+    reward_multiplier_combo_buy_profitable: float = 0,
+    reward_multiplier_combo_buy_drawdown: float = 0,
+    reward_multiplier_combo_hold_profit: float = 0,
+    reward_multiplier_combo_hold_drawdown: float = 0,
+
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints/'
     checkpoint_to_load: str | None = None
@@ -729,12 +708,9 @@ def get_models_simple():
     return [model_hodl, model_time_test, model_technical_kallmanfilter_test, model_technical_bollinger_test]
 
 def get_models_rl_h():
-    # return [model_rl_comboall_adamax]
     return [model_hodl, model_rl_h]
 def get_models_rl_min():
     return [model_hodl, model_rl_min]
 
 def get_models_all():
-    # return [model_hodl]
-    return [model_hodl, model_lstm] # currently LSTM doesn't trade and MLP errors
-    # return [model_hodl, model_lstm, model_mlp]
+    return [model_hodl]

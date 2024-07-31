@@ -50,3 +50,10 @@ class RLModel(BaseRLModel):
         if isinstance(action, np.ndarray):
             action = action.item()
         return -1 if action == 2 else action
+    
+    def predictOnline(self, observation: np.ndarray, deterministic: bool = True):
+        (action, extra_info) = self.rl_model.predict(observation, deterministic=deterministic)
+        
+        if isinstance(action, np.ndarray):
+            action = action.item()
+        return -1 if action == 2 else action

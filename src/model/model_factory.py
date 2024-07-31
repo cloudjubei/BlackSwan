@@ -14,15 +14,14 @@ from src.model.custom_dqn.policies import CustomDQNPolicy, CustomDuelingDQNPolic
 from src.model.dqn_lstm_policy import LSTMFCE
 from src.model.dueling_dqn.dueling_dqn import DuelingDQN
 from src.model.dueling_dqn.dueling_dqn2 import DuelingDQN2
+from src.model.dueling_dqn.policies import DuelingDQNPolicy
 from src.model.hodl_model import HodlModel
 from src.model.iqn.iqn import IQN
-from src.model.mlp_model import MLPModel
 from src.model.munchhausen_dqn.munchhausen_dqn import MunchausenDQN
 from src.model.rainbow.rainbow_dqn_agent import RainbowDQNAgent
 from src.model.rainbow_dqn.prioritized_replay_buffer import PrioritizedReplayBuffer
 from src.model.rainbow_dqn.rainbow_dqn import RainbowDQN
 from src.model.rl_model import RLModel
-from src.model.lstm_model import LSTMModel
 from src.model.time_strategy_model import TimeStrategyModel
 from src.model.technical_strategy_model import TechnicalStrategyModel
 from src.environment.abstract_env import AbstractEnv
@@ -31,6 +30,7 @@ from stable_baselines3.common.logger import HumanOutputFormat, KVWriter, Logger
 from typing import Any, Dict, List, Tuple, Union, get_origin
 from stable_baselines3 import DQN, PPO, A2C, HerReplayBuffer
 from stable_baselines3.common.buffers import ReplayBuffer, RolloutBuffer
+from stable_baselines3.common.policies import ActorCriticPolicy
 
 from sb3_contrib import RecurrentPPO, ARS, QRDQN, TRPO, TQC
 from sb3_contrib.common.recurrent.policies import RecurrentActorCriticPolicy
@@ -110,20 +110,6 @@ def get_model_combinations(config: ModelConfigSearch) -> List[ModelConfig]:
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="rl", model_rl=ModelRLConfig(**get_combo(c, list_keys, non_lists))), combinations))
-    elif config.model_type == "lstm":
-        data = config.model_lstm
-        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
-        list_values = [value for value in data.values() if type(value) == ListConfig]
-        non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
-        combinations = itertools.product(*list_values)
-        return list(map(lambda c: ModelConfig(model_type="lstm", model_lstm=ModelLSTMConfig(**get_combo(c, list_keys, non_lists))), combinations))
-    elif config.model_type == "mlp":
-        data = config.model_mlp
-        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
-        list_values = [value for value in data.values() if type(value) == ListConfig]
-        non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
-        combinations = itertools.product(*list_values)
-        return list(map(lambda c: ModelConfig(model_type="mlp", model_mlp=ModelMLPConfig(**get_combo(c, list_keys, non_lists))), combinations))
     elif config.model_type == "technical":
         data = config.model_technical
         list_keys = [key for key, value in data.items() if type(value) == ListConfig]
@@ -146,10 +132,6 @@ def create_model(config: ModelConfig, env: AbstractEnv, device: str):
         return HodlModel(config)
     if config.model_type == "rl":
         return create_rl_model(config, env, device)
-    elif config.model_type == "lstm":
-        return create_lstm_model(config, env, device)
-    elif config.model_type == "mlp":
-        return create_mlp_model(config, env, device)
     elif config.model_type == "time":
         return TimeStrategyModel(config)
     elif config.model_type == "technical":
@@ -162,42 +144,69 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
 
     if config.model_rl.model_name == "ppo":
         print(f"Loading PPO - Proximal Policy Optimization model")
+        # rl_model = PPO(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=env.get_timesteps(), batch_size= config.model_rl.batch_size, 
+                    #    gamma= config.model_rl.gamma)
+        
         rl_model = PPO(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=env.get_timesteps(), batch_size= config.model_rl.batch_size, 
-                       gamma= config.model_rl.gamma)
-        # n_steps: int = 2048, <- check this
-        # n_epochs: int = 10,
+                       n_epochs=1,
+                       gamma= config.model_rl.gamma, 
 
-        # gae_lambda: float = 0.95,
-        # normalize_advantage: bool = True,
-        # ent_coef: float = 0.0,
-        # vf_coef: float = 0.5,
-        # max_grad_norm: float = 0.5,
+                        # gae_lambda: float = 0.95,
+                        # clip_range: Union[float, Schedule] = 0.2,
+                        # clip_range_vf: Union[None, float, Schedule] = None,
+                        # normalize_advantage: bool = True,
+                        # ent_coef: float = 0.0,
+                        # vf_coef: float = 0.5,
+                        # max_grad_norm: float = 0.5,
+                        # use_sde: bool = False,
+                        # sde_sample_freq: int = -1,
+                        # target_kl: Optional[float] = None,
+
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                        #    "optimizer_kwargs": {
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "alpha": config.model_rl.optimizer_alpha,
+                            #    "momentum": config.model_rl.optimizer_momentum,
+                            #    "centered": config.model_rl.optimizer_centered,
+                        #    },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch
+        # ortho_init: bool = True,
         # use_sde: bool = False,
-        # sde_sample_freq: int = -1,
-
-        # rollout_buffer_class
+        # log_std_init: float = 0.0,
+        # full_std: bool = True,
+        # use_expln: bool = False,
+        # squash_output: bool = False,
+                       })
     elif config.model_rl.model_name == "reppo":
         print(f"Loading RecurrentPPO - LSTM based PPO model")
-        rl_model = RecurrentPPO(env=env, policy= 'MlpLstmPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=env.get_timesteps())
+        # rl_model = RecurrentPPO(env=env, policy= 'MlpLstmPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=env.get_timesteps())
+    
+        rl_model = RecurrentPPO(env=env, policy= 'MlpLstmPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=env.get_timesteps(), batch_size= config.model_rl.batch_size, 
+                       n_epochs=1,
+                       gamma= config.model_rl.gamma, 
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch
+                       })
+    
     elif config.model_rl.model_name == "trpo":
         print(f"Loading TRPO - Trust Region Policy Optimization model")
-        rl_model = TRPO(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=env.get_timesteps())
-    # elif config.model_rl.model_name == "dqnlstm":
-    #     print(f"Loading DQN - Deep Q Network model")
+        # rl_model = TRPO(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=env.get_timesteps())
 
-    #     rl_model = DQN(env=env, policy= DQNLSTMPolicy, device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
-    #                    buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
-    #                    tau= config.model_rl.tau, 
-    #                    exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
-    #                    learning_starts=config.model_rl.learning_starts,
-    #                    train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
-    #                    target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
-    #                    policy_kwargs= {
-    #                        "normalize_images": False,
-    #                        "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-    #                        "activation_fn": activation_fns[config.model_rl.activation_fn],
-    #                        "net_arch": config.model_rl.net_arch,
-    #                    })
+        rl_model = TRPO(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=env.get_timesteps(), batch_size= config.model_rl.batch_size, 
+                       gamma= config.model_rl.gamma, 
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch
+                       })
  
     elif config.model_rl.model_name == "ppo-sbx":
         rl_model = sbx.ppo.PPO(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=env.get_timesteps(), batch_size= config.model_rl.batch_size, 
@@ -223,7 +232,7 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                         # #    "activation_fn": activation_fns[config.model_rl.activation_fn], # <-- doesn't yet work properly
                         # #    "net_arch": config.model_rl.net_arch, # <-- doesn't yet work properly
                        })
-    elif config.model_rl.model_name == "r-dqn":
+    elif config.model_rl.model_name == "rainbow-dqn":
         seed = 777
         rl_model = RainbowDQNAgent(env, memory_size= config.model_rl.buffer_size, batch_size= config.model_rl.batch_size, target_update=config.model_rl.target_update_interval, seed= seed)
     elif config.model_rl.model_name == "iqn":
@@ -237,13 +246,6 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                        policy_kwargs= {
                            "normalize_images": False,
                            "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                           "optimizer_kwargs": {
-                               "eps": config.model_rl.optimizer_eps,
-                               "weight_decay": config.model_rl.optimizer_weight_decay,
-                            #    "alpha": config.model_rl.optimizer_alpha,
-                            #    "momentum": config.model_rl.optimizer_momentum,
-                            #    "centered": config.model_rl.optimizer_centered,
-                           },
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
                        })
@@ -258,38 +260,17 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                        policy_kwargs= {
                            "normalize_images": False,
                            "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                        #    "optimizer_kwargs": {
+                           "optimizer_kwargs": {
                             #    "eps": config.model_rl.optimizer_eps,
                             #    "weight_decay": config.model_rl.optimizer_weight_decay,
-                            #    "alpha": config.model_rl.optimizer_alpha,
-                            #    "momentum": config.model_rl.optimizer_momentum,
-                            #    "centered": config.model_rl.optimizer_centered,
-                        #    },
-                           "activation_fn": activation_fns[config.model_rl.activation_fn],
-                           "net_arch": config.model_rl.net_arch,
-                       }
-                       )
-    elif config.model_rl.model_name == "duel-dqn2":
-        rl_model = DuelingDQN2(env=env, policy= 'MlpPolicy', learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
-                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
-                       tau= config.model_rl.tau, 
-                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
-                       learning_starts=config.model_rl.learning_starts,
-                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
-                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
-                       policy_kwargs= {
-                           "normalize_images": False,
-                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                           "optimizer_kwargs": {
-                               "eps": config.model_rl.optimizer_eps,
-                               "weight_decay": config.model_rl.optimizer_weight_decay,
                             #    "alpha": config.model_rl.optimizer_alpha,
                             #    "momentum": config.model_rl.optimizer_momentum,
                             #    "centered": config.model_rl.optimizer_centered,
                            },
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
-                       })
+                       }
+                       )
     elif config.model_rl.model_name == "duel-dqn-custom":
         rl_model = DuelingDQN(policy=CustomDuelingDQNPolicy, env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
                        buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
@@ -302,8 +283,8 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                            "normalize_images": False,
                            "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
                            "optimizer_kwargs": {
-                               "eps": config.model_rl.optimizer_eps,
-                               "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
                             #    "alpha": config.model_rl.optimizer_alpha,
                             #    "momentum": config.model_rl.optimizer_momentum,
                             #    "centered": config.model_rl.optimizer_centered,
@@ -323,13 +304,6 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                        policy_kwargs= {
                            "normalize_images": False,
                            "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                           "optimizer_kwargs": {
-                               "eps": config.model_rl.optimizer_eps,
-                               "weight_decay": config.model_rl.optimizer_weight_decay,
-                            #    "alpha": config.model_rl.optimizer_alpha,
-                            #    "momentum": config.model_rl.optimizer_momentum,
-                            #    "centered": config.model_rl.optimizer_centered,
-                           },
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
                            "custom_net_arch": config.model_rl.custom_net_arch
@@ -346,13 +320,6 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                        policy_kwargs= {
                            "normalize_images": False,
                            "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                           "optimizer_kwargs": {
-                               "eps": config.model_rl.optimizer_eps,
-                               "weight_decay": config.model_rl.optimizer_weight_decay,
-                            #    "alpha": config.model_rl.optimizer_alpha,
-                            #    "momentum": config.model_rl.optimizer_momentum,
-                            #    "centered": config.model_rl.optimizer_centered,
-                           },
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
                            "features_extractor_class": LSTMFCE,
@@ -373,13 +340,6 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                        policy_kwargs= {
                            "normalize_images": False,
                            "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                           "optimizer_kwargs": {
-                               "eps": config.model_rl.optimizer_eps,
-                               "weight_decay": config.model_rl.optimizer_weight_decay,
-                            #    "alpha": config.model_rl.optimizer_alpha,
-                            #    "momentum": config.model_rl.optimizer_momentum,
-                            #    "centered": config.model_rl.optimizer_centered,
-                           },
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
                        })
@@ -396,13 +356,6 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                        policy_kwargs= {
                            "normalize_images": False,
                            "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                           "optimizer_kwargs": {
-                               "eps": config.model_rl.optimizer_eps,
-                               "weight_decay": config.model_rl.optimizer_weight_decay,
-                            #    "alpha": config.model_rl.optimizer_alpha,
-                            #    "momentum": config.model_rl.optimizer_momentum,
-                            #    "centered": config.model_rl.optimizer_centered,
-                           },
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
                        })
@@ -419,13 +372,6 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                        policy_kwargs= {
                            "normalize_images": False,
                            "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                        #    "optimizer_kwargs": {
-                    #         #    "eps": config.model_rl.optimizer_eps,
-                    #         #    "weight_decay": config.model_rl.optimizer_weight_decay,
-                    #         #    "alpha": config.model_rl.optimizer_alpha,
-                    # #         #    "momentum": config.model_rl.optimizer_momentum,
-                    # #         #    "centered": config.model_rl.optimizer_centered,
-                        #    },
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
                        }
@@ -442,30 +388,62 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
 
     elif config.model_rl.model_name == "qrdqn":
         print(f"Loading QRDQN - Quantile Regression DQN model")
-        rl_model = QRDQN(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate)
+        # rl_model = QRDQN(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate)
+
+        rl_model = QRDQN(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                       tau= config.model_rl.tau, 
+                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                       learning_starts=config.model_rl.learning_starts,
+                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                       }
+                    )
     # elif config.model_rl.model_name == "a2cRe":
         # TODO: this doesn't work so easily as replacing the policy
         # print(f"Loading A2C - Asynchronous Advantage Actor-Critic Algorithm model with LSTM policy")
         # rl_model = A2C(env=env, policy= RecurrentActorCriticPolicy, device= device, learning_rate= config.model_rl.learning_rate, n_steps=1) #, n_steps= is like a batch size
     elif config.model_rl.model_name == "a2c":
         print(f"Loading A2C - Asynchronous Advantage Actor-Critic Algorithm model")
-        rl_model = A2C(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=1) #, n_steps= is like a batch size
-        # n_steps: int = 5,
-        # gamma: float = 0.99,
-        # gae_lambda: float = 1.0,
-        # ent_coef: float = 0.0,
-        # vf_coef: float = 0.5,
-        # max_grad_norm: float = 0.5,
-        # rms_prop_eps: float = 1e-5,
-        # use_rms_prop: bool = True,
-        # use_sde: bool = False,
-        # sde_sample_freq: int = -1,
+        # rl_model = A2C(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=1) #, n_steps= is like a batch size
+    
+        rl_model = A2C(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps= config.model_rl.batch_size, 
+                       gamma= config.model_rl.gamma, 
+                       max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                       }
+                    )
     elif config.model_rl.model_name == "ars":
         print(f"Loading ARS - Augmented Random Search model")
-        rl_model = ARS(env=env, policy= 'LinearPolicy', device= device, learning_rate= config.model_rl.learning_rate)
+        # rl_model = ARS(env=env, policy= 'LinearPolicy', device= device, learning_rate= config.model_rl.learning_rate)
+        rl_model = ARS(env=env, policy= 'LinearPolicy', device= device, learning_rate= config.model_rl.learning_rate, 
+                       policy_kwargs= {
+                        #    "normalize_images": False,
+                        #    "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                        #    "activation_fn": activation_fns[config.model_rl.activation_fn],
+                        #    "net_arch": config.model_rl.net_arch,
+                       }
+                    )
     elif config.model_rl.model_name == "ars-mlp":
         print(f"Loading ARS - Augmented Random Search model with MLP Policy")
-        rl_model = ARS(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate)
+        # rl_model = ARS(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate)
+        rl_model = ARS(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, 
+                       policy_kwargs= {
+                        #    "normalize_images": False,
+                        #    "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                        #    "activation_fn": activation_fns[config.model_rl.activation_fn],
+                        #    "net_arch": config.model_rl.net_arch,
+                       }
+                    )
         
     if rl_model is not None:
         if config.model_rl.checkpoint_to_load is not None:
@@ -491,17 +469,3 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
     # if cfg.model_name == "trpo":
     #     print(f"Loading TRPO - Trust Region Policy Optimization model")
     #     model = TRPO(env=env, **dict_config_to_dict(cfg.model_args_dict))
-
-def create_lstm_model(config: ModelConfig, env: AbstractEnv, device: str):
-    sample_obs = env.observation_space.sample()
-    input_size = sample_obs.shape[1]
-    output_size = env.action_space.n
-
-    return LSTMModel(config, input_size, output_size, device= device)
-
-def create_mlp_model(config: ModelConfig, env: AbstractEnv, device: str):
-    sample_obs = env.observation_space.sample()
-    input_size = sample_obs.shape[1]
-    output_size = env.action_space.n
-
-    return MLPModel(config, input_size, output_size, device= device)

@@ -44,7 +44,7 @@ class BaseCryptoEnv(AbstractEnv):
             # low=-np.inf, high=np.inf, shape=initial_observation.shape, dtype=np.float32
             low=-1, high=1, shape=initial_observation.shape, dtype=np.float32
         )
-    
+
     def get_next_observation(self) -> np.ndarray:
 
         values = self.data_provider.get_values(self.current_step)
@@ -144,6 +144,7 @@ class BaseCryptoEnv(AbstractEnv):
             extra_values.append(1 if self.positions[-1] > 0 else 0)
 
         if self.data_provider.is_multilayered():
+            # if self.data_provider.config.flat_lookback
             extra_values = np.tile(extra_values, (values.shape[0], 1))
             if self.data_provider.config.flat_layers:
                 return np.append(values, extra_values, axis=1).flatten()
@@ -326,30 +327,68 @@ class BaseCryptoEnv(AbstractEnv):
 
         self.last_obs = self.get_next_observation()
 
-
         return self.last_obs, reward, done, finished_early, {}
 
     def _calculate_net_worth(self, step: int):
         offset_step = step + self.data_provider.get_lookback_window() - 1
         return (self.balances[offset_step] + self.positions[offset_step] * self.get_price(step))
-    def _calculate_net_worth2(self, step: int):
-        return (self.balances[step] + self.positions[step] * self.get_price(step)) * (1 - self.transaction_fee_multiplier)
-    def _calculate_cagr(self): #Compound Annual Growth Rate
-        # CAGR % = {[(End of period price / Beginning of period price)^1/t] - 1} x 100
-        # t = the amount of time in terms of years
-        start_amount = self.net_worths[0]
-        end_amount = self.net_worths[-1]
-        time_out_of_year = 0.01
-        return math.pow((end_amount / start_amount) , 1/time_out_of_year) # * 100 # TODO: need to find out time_out_of_year
-    def _calculate_time_spent_in_market(self):
-        return 0 # TODO:
-    def _calculate_risk_adjusted_return(self):
-        time = self._calculate_time_spent_in_market()
-        return 0 if time <= 0 else self._calculate_cagr() / time
     def _calculate_drawdown(self):
         return 0 if self.drawdown_peak <= 0 else (self.drawdown_trough / self.drawdown_peak) - 1.0
     
     def _calculate_reward(self):
+        if self.reward_model == "combo":
+
+            if self.actions_made[-1]: # just made an action
+                # SELL
+                if self.actions[-1] == 2 or self.tpsls[-1] == -1: # SELL action or SL/TP triggered
+                    sell_net_worth = self.sells[-1]
+                    profit_percentage = sell_net_worth/self.initial_net_worth - 1
+                    sell_reward1 = profit_percentage * self.reward_multipliers["combo_sell_profit"]
+
+                    prev_net_worth = self.net_worths[-2]
+                    profit_percentage_prev = sell_net_worth/prev_net_worth - 1
+                    sell_reward2 = profit_percentage_prev * self.reward_multipliers["combo_sell_profit_prev"]
+
+                    signal = self.data_provider.get_signal_buy_sell(self.current_step)
+                    perfect_sell = 1 if signal < 0 else 0
+                    sell_reward3 = perfect_sell * self.reward_multipliers["combo_sell_perfect"]
+
+                    drawdown = self.drawdowns[-1]
+                    sell_reward4 = drawdown * self.reward_multipliers["combo_sell_drawdown"]
+
+                    return sell_reward1 + sell_reward2 + sell_reward3 + sell_reward4
+
+                # BUY
+                if self.actions[-1] == 1:
+                    sell_net_worth = self.buys[-1]
+                    profit_percentage = sell_net_worth/self.initial_net_worth - 1
+                    buy_reward1 = profit_percentage * self.reward_multipliers["combo_buy_profit"]
+
+                    buy_perfect = self.data_provider.get_signal_buy_sell(self.current_step)
+                    buy_perfect_signal = 1 if buy_perfect > 0 else 0
+                    buy_reward2 = buy_perfect_signal * self.reward_multipliers["combo_buy_perfect"]
+
+                    buy_profitable = self.data_provider.get_signal_buy_profitable(self.current_step) # 0 means next step will be profitable, 10 means will be profitable in 10 steps (default profit threshold 0.004)
+                    buy_profitable_signal = self.reward_multipliers["combo_buy_profitable_offset"] - buy_profitable
+                    buy_reward3 = buy_profitable_signal * self.reward_multipliers["combo_buy_profitable"]
+
+                    buy_drawdown = self.data_provider.get_signal_buy_drawdown(self.current_step) # highest negative profit percentage till position is profitable
+                    buy_reward4 = buy_drawdown * self.reward_multipliers["combo_buy_drawdown"]
+
+                    return buy_reward1 + buy_reward2 + buy_reward3 + buy_reward4
+
+            # HOLD
+            price = self.current_price
+            price_next = self.get_price(self.current_step+1)
+            profit_percentage = price_next/price - 1
+            price_direction = 1 if self.positions[-1] > 0 else -1
+            hold_reward1 = (price_direction * profit_percentage) * self.reward_multipliers["combo_hold_profit"]
+            
+            drawdown = self.drawdowns[-1]
+            hold_reward2 = drawdown * self.reward_multipliers["combo_hold_drawdown"]
+            
+            return hold_reward1 + hold_reward2
+
         if self.reward_model == "combo_all" or self.reward_model == "combo_all2":
             if self.actions_made[-1]: # just made an action
                 if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
@@ -360,7 +399,7 @@ class BaseCryptoEnv(AbstractEnv):
                 price = self.current_price
                 price_next = self.get_price(self.current_step+1)
                 price_diff = price_next/price - 1
-                return price_diff * self.reward_multipliers["combo_buy"] # price_diff wasn't here
+                return price_diff * self.reward_multipliers["combo_buy"]
             
             if len(self.positions) > 1 and self.positions[-1] > 0 and self.positions[-2] > 0: # in position is diff than out of position
                 net_worth = self.net_worths[-1]
@@ -381,7 +420,7 @@ class BaseCryptoEnv(AbstractEnv):
             return 0
         elif self.reward_model == "buy_sell_signal" or self.reward_model == "buy_sell_signal2" or self.reward_model == "buy_sell_signal3" or self.reward_model == "buy_sell_signal4":
             if self.actions_made[-1]: # just made an action
-                signal = self.data_provider.get_buy_sell_signal(self.current_step)
+                signal = self.data_provider.get_signal_buy_sell(self.current_step)
                 if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
                     
                     sell_net_worth = self.sells[-1]
@@ -405,7 +444,7 @@ class BaseCryptoEnv(AbstractEnv):
                     return (profit_percentage + self.drawdowns[-1]) * self.reward_multipliers["combo_positionprofitpercentage"]
                 return profit_percentage * self.reward_multipliers["combo_positionprofitpercentage"]
             return 0
-        elif self.reward_model == "combo_actions" or self.reward_model == "combo_actions2":
+        elif self.reward_model == "combo_actions" or self.reward_model == "combo_actions2" or self.reward_model == "combo_actions3":
 
             if self.actions_made[-1]: # just made an action
                 if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
@@ -413,7 +452,7 @@ class BaseCryptoEnv(AbstractEnv):
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
                     return profit_percentage * 10
                 
-                buy_signal = self.data_provider.get_buy_signal(self.current_step)
+                buy_signal = self.data_provider.get_signal_buy_sell(self.current_step)
 
                 multiplier = buy_signal - 2
 
@@ -450,11 +489,32 @@ class BaseCryptoEnv(AbstractEnv):
 
             return (profit_percentage + self.drawdowns[-1]) * self.reward_multipliers["combo_positionprofitpercentage"]
         
-        net_worth = self.net_worths[-1]
-        if self.actions_made[-1]: # just made an action
-            if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
-                net_worth = self.sells[-1]
+        elif self.reward_model == "profit_all" or self.reward_model == "profit_all2":
+            if self.actions_made[-1]: # just made an action
+                if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
+                    net_worth = self.sells[-1] # in $
+                    if self.reward_model == "profit_all2":
+                        net_worth_prev = self.net_worths[-2]
+                        return net_worth/net_worth_prev - 1 + (net_worth/self.initial_net_worth - 1)
+                    return net_worth/self.initial_net_worth - 1
+                if self.actions[-1] == 1:
+                    net_worth = self.buys[-1] # in $
+                    return net_worth/self.initial_net_worth - 1
+            if self.positions[-1] > 0: # in position
+                net_worth = self.net_worths[-1] # in $
+                prev_net_worth = self.net_worths[-2] # in $
+                return net_worth/prev_net_worth - 1
+            
+            if self.positions[-2] == 0: # if currently NOT in position but previous was in position, then it was a sell - ignore, hence 0 at end
+                net_worth = self.net_worths[-1]
+                net_worth_in_position = net_worth / self.current_price # in BTC
+                net_worth_in_position_prev = net_worth / self.get_price(self.current_step-1) # in BTC
+                return net_worth_in_position/net_worth_in_position_prev - 1 
+            return 0
 
+
+
+        net_worth = self.net_worths[-1]
         profit_percentage = net_worth/self.initial_net_worth - 1
 
         if (self.reward_model == "profit_percentage4" or self.reward_model == "profit_percentage3" or self.reward_model == "profit_percentage2") and self.actions_made[-1] and (self.actions[-1] == 2 or self.tpsls[-1] == -1):

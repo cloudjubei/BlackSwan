@@ -16,7 +16,7 @@ class AbstractDataProvider(ABC):
         self.id = self.get_id(config)
    
     def get_id(self, config: DataConfig):
-        return f'{config.id}_{config.type}_{config.timestamp}_{config.indicator}_{config.fidelity}_{"|".join(config.layers)}_{config.lookback_window_size}_{1 if config.flat_lookback else 0}_{1 if config.flat_layers else 0}_{config.percent_buysell}'
+        return f'{config.id}_{config.type}_{config.timestamp}_{config.indicator}_{config.fidelity}_{"|".join(config.layers)}_{config.lookback_window_size}_{1 if config.flat_lookback else 0}_{1 if config.flat_layers else 0}_{config.buyreward_percent}_{config.buyreward_maxwait}'
     
     def is_multilayered(self) -> bool:
         return len(self.config.layers) > 1
@@ -30,13 +30,13 @@ class AbstractDataProvider(ABC):
         pass
 
     @abstractmethod
-    def get_buy_sell_signal(self, step: int) -> int:
+    def get_signal_buy_sell(self, step: int) -> int:
         pass
     @abstractmethod
-    def get_hold_signal(self, step: int) -> int:
+    def get_signal_buy_profitable(self, step: int) -> int:
         pass
     @abstractmethod
-    def get_buy_signal(self, step: int) -> int:
+    def get_signal_buy_drawdown(self, step: int) -> int:
         pass
     
     @abstractmethod
@@ -49,7 +49,9 @@ class AbstractDataProvider(ABC):
     def get_start_index(self):
         return 0
     
-    def get_buy_sell(self, df):
+    # buy_sell positive means buy, negative means sell for matching number of buy.
+    # buy_sell [0,0,1,0,0,-1,2,-2] shows matching 1|-1 and matching 2|-2 buy|sell pairs
+    def get_rewards_buy_sell(self, df):
         prices = df['price'].values
 
         count = 0
@@ -80,44 +82,42 @@ class AbstractDataProvider(ABC):
 
         return buy_sell
 
-    # sell is percent diff + perfect sell
     # buy is time to go profitable
-    # hold is -1 or +1
-    def get_rewards_action(self, df, percent_to_pass = 0.004, max_buy_wait = 10):
+    def get_rewards_buy(self, df, percent_to_pass = 0.004, max_buy_wait = 20):
         prices = df['price'].values
 
-        rewards_hold = []
-        rewards_buy = []
+        rewards_profitable = []
+        rewards_drawdown = []
         
         total_prices = len(prices) - 1
         for i in range(total_prices):
             current = prices[i]
-            next = prices[i+1]
-            
-            rewards_hold.append(-1 if current > next else 1)
 
             profit_count = 0
+            drawdown = 0
             for j in range(min(total_prices - i, max_buy_wait)):
                 next = prices[i+1 + j]
 
                 percent_diff = next/current - 1
 
+                if percent_diff < drawdown:
+                    drawdown = percent_diff
+
                 if percent_to_pass <= percent_diff:
                     break
                 profit_count += 1
 
-            rewards_buy.append(profit_count)
+            rewards_profitable.append(profit_count)
+            rewards_drawdown.append(drawdown)
 
-        rewards_hold.append(0)
-        rewards_buy.append(0)
+        rewards_profitable.append(0)
 
-        # plot_indicator(df, np.array(rewards_hold), "RewardsHold")
         # plot_indicator(df, np.array(rewards_buy) - 5, "RewardsBuy")
 
-        return rewards_hold, rewards_buy
+        return rewards_profitable, rewards_drawdown
 
 
-    def get_data(self, paths, type, timestamp, indicator, percent_buysell):
+    def get_data(self, paths, type, timestamp, indicator, buyreward_percent, buyreward_maxwait):
         dfs = []
         
         for path in paths:
@@ -125,14 +125,14 @@ class AbstractDataProvider(ABC):
             dfs.append(df)
 
         result_df = pd.concat(dfs)
-        return self.process_df(result_df, type, timestamp, indicator, percent_buysell)
+        return self.process_df(result_df, type, timestamp, indicator, buyreward_percent, buyreward_maxwait)
     
-    def process_df(self, result_df, type, timestamp, indicator, percent_buysell):
+    def process_df(self, result_df, type, timestamp, indicator, buyreward_percent, buyreward_maxwait):
 
         prices = result_df["price"].values
         timestamps = ((pd.to_datetime(result_df["timestamp_close"]).astype('int64') // 10**6) + 1).to_numpy()
-        buy_sells = self.get_buy_sell(result_df)
-        rewards_hold, rewards_buy = self.get_rewards_action(result_df, percent_buysell)
+        rewards_buysell = self.get_rewards_buy_sell(result_df)
+        rewards_buy_profitable, rewards_buy_drawdown = self.get_rewards_buy(result_df, buyreward_percent, buyreward_maxwait)
 
         if type != "standard" and type != "solo_price" and type != "only_price":
             result_df['price_percent'] = pd.to_numeric(result_df['price'], errors='coerce').astype(float).pct_change()
@@ -171,24 +171,67 @@ class AbstractDataProvider(ABC):
                 result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
         elif indicator == "indicators4":
             exploded_df = result_df['indicators'].apply(pd.Series)
-            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger15Low"]
+            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30"]
             for ind in indicators:
                 result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
         elif indicator == "indicators5":
             exploded_df = result_df['indicators'].apply(pd.Series)
-            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30", "bollinger10Mid"]
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30"]
             for ind in indicators:
-                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)       
         elif indicator == "indicators6":
             exploded_df = result_df['indicators'].apply(pd.Series)
-            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger10Mid"]
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "cci10"]
             for ind in indicators:
                 result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
         elif indicator == "indicators7":
             exploded_df = result_df['indicators'].apply(pd.Series)
-            indicators = ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger10Mid", "bollinger15Low"]
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "disparityIndex7", "disparityIndex10"]
             for ind in indicators:
                 result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators8":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "sortinoRatio30"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        
+
+        elif indicator == "indicators9":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "volatilityVolume30", "volatilityVolume7"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators10":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "cci5", "cci7", "cci10", "turbulenceIndex10", "disparityIndex7", "disparityIndex10", "volatilityVolume30", "volatilityVolume7"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators11":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "williams5"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators12":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "williams10"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators13":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "stochasticOscillator5"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators14":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "stochasticOscillator10"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        elif indicator == "indicators15":
+            exploded_df = result_df['indicators'].apply(pd.Series)
+            indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "sortinoRatio5"]
+            for ind in indicators:
+                result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
+        
         elif indicator != "none":
             exploded_df = result_df['indicators'].apply(pd.Series)
             result_df[indicator] = pd.to_numeric(exploded_df[indicator], errors='coerce').astype(float)
@@ -239,7 +282,7 @@ class AbstractDataProvider(ABC):
 
         result_df = result_df.reset_index(drop=True)
 
-        return result_df, prices, timestamps, buy_sells, rewards_hold, rewards_buy
+        return result_df, prices, timestamps, rewards_buysell, rewards_buy_profitable, rewards_buy_drawdown
     
 def days_in_month(row):
     year = row['timestamp'].year

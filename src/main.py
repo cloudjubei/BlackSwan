@@ -20,7 +20,7 @@ def run_training(config: Config, model: AbstractModel, env: AbstractEnv, data_pr
     print(f"Model {model.id} env: {env.id} data: {data_provider.id} is training...")
 
     # TODO:
-    # capture time and add to get_run_state
+    # capture time
     env.setup(model.get_reward_model(), model.get_reward_multipliers())
     # env.reset()
 
@@ -38,7 +38,7 @@ def run_testing(config: Config, model: AbstractModel, env: AbstractEnv, determin
     print("Testing the model...")
     
     # TODO:
-    # capture time and add to get_run_state
+    # capture time
     env.setup(model.get_reward_model(), model.get_reward_multipliers())
     model.test(env, deterministic)
 

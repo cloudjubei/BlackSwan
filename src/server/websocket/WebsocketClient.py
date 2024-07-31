@@ -21,14 +21,24 @@ class WebsocketClient:
         print(f"WS Client starting to listen to price on: {tokenPair}")
         self.sio_client.on(tokenPair, callback)
 
-    async def ask_price(self, tokenPair: str, interval: str, callback):
-        print('WS Client ask_price')
+    async def ask_signal(self, tokenPair: str, interval: str, lookback_window: int, callback):
+        print('WS Client ask_values')
         data = json.dumps({
             "tokenPair": tokenPair,
-            "interval": interval
+            "interval": interval,
+            "lookback_window": lookback_window
         })
-        await self.sio_client.emit("price_latestKline", data, callback= callback)
-        print('WS Client ask_price done')
+        await self.sio_client.emit("signal_latest", data, callback= callback)
+        print('WS Client ask_values done')
+
+    # async def ask_price(self, tokenPair: str, interval: str, callback):
+    #     print('WS Client ask_price')
+    #     data = json.dumps({
+    #         "tokenPair": tokenPair,
+    #         "interval": interval
+    #     })
+    #     await self.sio_client.emit("price_latestKline", data, callback= callback)
+    #     print('WS Client ask_price done')
 
     def __setup_callbacks(self):
         @self.sio_client.event

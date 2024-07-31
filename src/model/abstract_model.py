@@ -65,6 +65,18 @@ class BaseRLModel(AbstractModel):
             "combo_positionprofitpercentage": self.rl_config.reward_multiplier_combo_positionprofitpercentage,
             "combo_buy": self.rl_config.reward_multiplier_combo_buy,
             "combo_sell": self.rl_config.reward_multiplier_combo_sell,
+
+            "combo_sell_profit": self.rl_config.reward_multiplier_combo_sell_profit,
+            "combo_sell_profit_prev": self.rl_config.reward_multiplier_combo_sell_profit_prev,
+            "combo_sell_perfect": self.rl_config.reward_multiplier_combo_sell_perfect,
+            "combo_sell_drawdown": self.rl_config.reward_multiplier_combo_sell_drawdown,
+            "combo_buy_profit": self.rl_config.reward_multiplier_combo_buy_profit,
+            "combo_buy_perfect": self.rl_config.reward_multiplier_combo_buy_perfect,
+            "combo_buy_profitable_offset": self.rl_config.reward_multiplier_combo_buy_profitable_offset,
+            "combo_buy_profitable": self.rl_config.reward_multiplier_combo_buy_profitable,
+            "combo_buy_drawdown": self.rl_config.reward_multiplier_combo_buy_drawdown,
+            "combo_hold_profit": self.rl_config.reward_multiplier_combo_hold_profit,
+            "combo_hold_drawdown": self.rl_config.reward_multiplier_combo_hold_drawdown
         }
 
 class BaseDeepModel(AbstractModel):
@@ -195,30 +207,6 @@ class BaseDeepModel(AbstractModel):
             obs, reward, done, finished_early, info = env.step(action)
             if done:
                 break
-
-class BaseLSTMModel(BaseDeepModel):
-    def __init__(self, config: ModelConfig):
-        super(BaseLSTMModel, self).__init__(config)
-
-        self.lstm_config = config.model_lstm
-
-    def get_id(self, config: ModelConfig):
-        return f'{config.model_type}_{config.model_lstm.loss_fn}__{config.model_lstm.learning_rate}_{config.model_lstm.weight_decay}_{config.model_lstm.episodes}_{config.model_lstm.layers}_{config.model_lstm.lstm_dropout}_{config.model_lstm.extra_dropout}_{config.model_lstm.first_activation}_{config.model_lstm.last_activation}'
-    
-    def get_checkpoints_path(self):
-        return f'{self.lstm_config.checkpoints_folder}{self.id}'
-
-class BaseMLPModel(BaseDeepModel):
-    def __init__(self, config: ModelConfig):
-        super(BaseMLPModel, self).__init__(config)
-
-        self.mlp_config = config.model_mlp
-
-    def get_id(self, config: ModelConfig):
-        return f'{config.model_type}_{config.model_mlp.loss_fn}__{config.model_mlp.learning_rate}_{config.model_mlp.weight_decay}_{config.model_mlp.episodes}_{config.model_mlp.hidden_dim1}_{config.model_mlp.hidden_dim2}_{config.model_mlp.first_activation}_{config.model_mlp.last_activation}'
-    
-    def get_checkpoints_path(self):
-        return f'{self.mlp_config.checkpoints_folder}{self.id}'
 
 class BaseStrategyModel(AbstractModel):
     

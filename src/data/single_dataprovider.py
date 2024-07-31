@@ -11,12 +11,12 @@ class SingleDataProvider(AbstractDataProvider):
 
         self.paths = paths
 
-        df, prices, timestamps, buy_sells, rewards_hold, rewards_buy = self.get_data(self.paths, self.config.type, config.timestamp, config.indicator, config.percent_buysell)
+        df, prices, timestamps, buy_sells, rewards_buy_profitable, rewards_buy_drawdown = self.get_data(self.paths, self.config.type, config.timestamp, config.indicator, config.buyreward_percent, config.buyreward_maxwait)
         self.df = df
         self.prices = prices
-        self.buy_sell_signals = buy_sells
-        self.hold_signals = rewards_hold
-        self.buy_signals = rewards_buy
+        self.signals_buy_sell = buy_sells
+        self.signals_buy_profitable = rewards_buy_profitable
+        self.signals_buy_drawdown = rewards_buy_drawdown
 
     def get_timesteps(self) -> int:
         return self.df.shape[0] - self.get_start_index() - 1
@@ -37,11 +37,11 @@ class SingleDataProvider(AbstractDataProvider):
             return np.array(vs.flatten())
         return np.array(vs)
     
-    def get_buy_sell_signal(self, step: int) -> int:
-        return self.buy_sell_signals[step + self.get_start_index()]
+    def get_signal_buy_sell(self, step: int) -> int:
+        return self.signals_buy_sell[step + self.get_start_index()]
     
-    def get_hold_signal(self, step: int) -> int:
-        return self.hold_signals[step + self.get_start_index()]
+    def get_signal_buy_profitable(self, step: int) -> int:
+        return self.signals_buy_profitable[step + self.get_start_index()]
     
-    def get_buy_signal(self, step: int) -> int:
-        return self.buy_signals[step + self.get_start_index()]
+    def get_signal_buy_drawdown(self, step: int) -> int:
+        return self.signals_buy_drawdown[step + self.get_start_index()]
