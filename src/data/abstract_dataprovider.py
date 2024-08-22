@@ -194,7 +194,6 @@ class AbstractDataProvider(ABC):
             indicators = ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "sortinoRatio30"]
             for ind in indicators:
                 result_df[ind] = pd.to_numeric(exploded_df[ind], errors='coerce').astype(float)
-        
 
         elif indicator == "indicators9":
             exploded_df = result_df['indicators'].apply(pd.Series)

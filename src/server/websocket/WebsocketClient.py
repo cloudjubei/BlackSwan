@@ -1,4 +1,5 @@
 import asyncio
+from typing import List
 import socketio
 import json
 from config import PRICE_PORT
@@ -21,14 +22,14 @@ class WebsocketClient:
         print(f"WS Client starting to listen to price on: {tokenPair}")
         self.sio_client.on(tokenPair, callback)
 
-    async def ask_signal(self, tokenPair: str, interval: str, lookback_window: int, callback):
+    async def ask_signal(self, tokenPair: str, layers: List[str], lookback_window: int, callback):
         print('WS Client ask_values')
         data = json.dumps({
             "tokenPair": tokenPair,
-            "interval": interval,
+            "layers": layers,
             "lookback_window": lookback_window
         })
-        await self.sio_client.emit("signal_latest", data, callback= callback)
+        await self.sio_client.emit("values_full", data, callback= callback)
         print('WS Client ask_values done')
 
     # async def ask_price(self, tokenPair: str, interval: str, callback):

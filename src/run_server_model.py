@@ -32,6 +32,7 @@ interval = args.interval
 lookback_window = args.lookback_window
 seconds_to_wait = args.check_interval
 emitter_port = args.port
+layers = ["1m", "1h", "1d"] if interval == "1m" else ["1h", "1d"]
 
 latest_price = "0"
 # model_path = "trials/rl_dqn_combo_all_0.01_0.995_Adamax_CELU_[64, 64]_1_1716187086.833314"
@@ -40,7 +41,7 @@ device = 'cpu'
 
 env_config = EnvConfig(observations_contain= ["networth_percent_this_trade", "in_position", "drawdown"], stop_loss=0.02)
 
-data_config = DataConfig(id="latest", train_data_paths= [], test_data_paths= [], layers= ["1h", "1d"])
+data_config = DataConfig(id="latest", train_data_paths= [], test_data_paths= [], layers= layers)
 data_provider = ServerDataProvider(data_config)
 env = ServerCryptoEnv(env_config, data_provider, device)
 
@@ -107,7 +108,7 @@ async def process_signal(signals_data):
 async def periodic_emit(seconds_to_wait: int = 5):
     while True:
         if client.is_connected:
-            await client.ask_signal(tokenPair, interval, lookback_window, callback= process_signal)
+            await client.ask_signal(tokenPair, layers, lookback_window, callback= process_signal)
             # await client.ask_price(tokenPair, interval, callback= process_signal)
         print(f'Emit waiting: {seconds_to_wait}s')
         await asyncio.sleep(seconds_to_wait)
