@@ -249,18 +249,15 @@ class ModelConfig:
 # SharpeRatio - ALL improve
 
 
-# BatchNorm1d single with single dropout improves things a lot
-# Dropout0.5 seems too strong, but had single great results -> experiment more later
+# BatchNorm1d +++
+# Dropout +++
 # DropConnectLinear got some great results, placing it at the beginning can lead to no learning, but also great results, at the beginning it seems to improve things -> experiment more
-# LayerNorm seems to improve slightly, just 1 is good enough (at the beginning rather than end)
 # GRULocal improves
-# ScaledDotProductAttention improves
-# AdditiveAttention improves
-# BatchNorm1d + -> start
-# ResidualBlock + -> near the start
+# ScaledDotProductAttention +
+# AdditiveAttention +
+# ResidualBlock +
 # LayerNorm -> improves $, but not sure
 # BAD -> MultiHeadAttention
-# BAD -> SelfAttention
 # BAD -> weight_norm
 # BAD -> spectral_norm
 # BAD -> GRUFull
@@ -269,27 +266,30 @@ class ModelConfig:
 # BAD -> LSTMLocalN
 # BAD -> GRULocal2+4
 # BAD -> Dense
+# GlobalContextAttention - needs to be fixed
+# SelfAttention ?
 
-# MIN lr1 x reward_model 4/6
-# MIN lr2 x reward_model 4/6
-# MIN custom_net_arch9 2/8
-# MIN model_name 7/10
-# custom_net_arch2 3/7
-# custom_net_arch3 2/7
 
-# custom_net_arch4 1/7 #READY
+# MIN custom_net_arch1 1/5
+# MIN custom_net_arch9 5/8
+# munchausen-duel-dqn-custom-lstm 5/6
+# duel-dqn-custom-lstm3 5/6
+# duel-dqn-custom-lstm8 5/6
+# extra1+2 1/6
+# [512,64] x custom_net_arch 1/12
+
+# [512,128,32] x custom_net_arch READY
+# [64,64,64,64,64,64] x custom_net_arch READY
+
+# test having hourly + daily data, but shifted by min (so the missing way of feeding multi data but excluding minutes)
+# TODO: make ppo,reppo,trpo,qrdqn,iqn custom
 
 # TODO: min combo profitable
-# TODO: custom_net_arch + indicators1-8
-# TODO: custom_net_arch more
 
-# TODO:
-    # @ApiProperty() trades_number: string = "0"
-    # @ApiProperty() asset_volume_quote: string = "0"
-    # @ApiProperty() asset_volume_taker_base: string = "0"
-    # @ApiProperty() asset_volume_taker_quote: string = "0"
+# TODO: DQN line 210 uses HuberLoss for the loss function -> make this customizable and try MSE as proposed by 1 paper -> this needs to be tested against different optimizer_class
 
 # and then min tests
+
 
 # TODO: optimizer optim
 
@@ -297,10 +297,18 @@ model_rl_h = ModelConfigSearch(
     model_type= "rl",
     model_rl= ModelRLConfigSearch(
         # model_name= ["ppo", "reppo", "trpo", "a2c", "ars", "ars-mlp", "qrdqn", "dqn", "duel-dqn"], 
+        # model_name= ["munchausen-dqn-custom", "rainbow-dqn-custom"],
+
         model_name= ["duel-dqn-custom"],
-        # model_name= ["munchausen-dqn-custom"], # TODO: check custom
+        # model_name= ["munchausen-duel-dqn-custom-lstm"],
+        # model_name= ["duel-dqn-custom-lstm"], # works well
+        # model_name= ["munchausen-duel-dqn-custom"], # can work well
+        # model_name= ["duel-dqn-custom-lstm3"],
+        # model_name= ["duel-dqn-custom-lstm8"],
+
         # model_name= ["munchausen-dqn"],
-        # model_name= ["rainbow-dqn", "iqn"], # very slow (12it/s, 10it/s), but can work very well
+        # model_name= ["rainbow-dqn"],
+        # model_name= ["rainbow-dqn-old", "iqn"], # very slow (12it/s, 10it/s), but can work very well
         # model_name= ["duel-dqn-lstm"], # can have some very good results with hidden size 2,4
 
         # reward_model= ["combo_all", "profit_percentage3", "profit_percentage4", "profit_all", "profit_all2", "combo"],
@@ -351,61 +359,97 @@ model_rl_h = ModelConfigSearch(
         # activation_fn = ['LogSigmoid', 'CELU', 'PReLU', 'ReLU6', 'Softsign'],
         activation_fn= ['CELU'],
         # net_arch= [[512,256,64,32], [256,256,256,256,256,256], [1024,1024], [2048,512,64], [256,256,256,256], [256,256,256,256,256], [1024,256,64,16], [512,256,128,64,32]],
-        net_arch= [[512,256,64,32]],
+        # net_arch= [[512,256,64,32]],
+
+        # net_arch4= [[512,256,64,32], [256,256,256,256], [1024,256,64,16]],
+        # net_arch5= [[256,256,256,256,256], [512,256,128,64,32], [512,512,512,512,512]],
+        # net_arch6= [[256,256,256,256,256,256],[128,128,128,128,128,128],[64,64,64,64,64,64]],
+        # net_arch3= [[2048,512,64], [512,64,8], [512,128,32], [1024,1024,1024]],
+        # net_arch2= [[1024,1024], [2048,2048], [512,64], [512,32], [2048,128]],
+        
+        # net_arch= [[512,64]],
+        # custom_net_arch= [
+        #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch count
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm2", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "Dropout", "activation_fn", "weight_norm2"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],  
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+        # ],
+        net_arch= [[512,128,32]],
+        custom_net_arch= [
+            ["Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch count
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "weight_norm2"],
+            ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+            ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],  
+            ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+        ],
+        # net_arch= [[64,64,64,64,64,64]],
+        # custom_net_arch= [
+        #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch count
+
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "weight_norm2", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "NoisyLinear", "activation_fn", "NoisyLinear", "activation_fn", "NoisyLinear", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "weight_norm2"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "weight_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],  
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+        # ],
         
         # custom_net_arch= [[""]],
-        
         # custom_net_arch= [
-        #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch number
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        # ],
+        # custom_net_arch= [
+        #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch count
+
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm2", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "NoisyLinear", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     # ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "weight_norm2"],
+        #     # ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+        #     # ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "weight_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],  
+        # #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        # #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
         # ],
 
         # custom_net_arch1= [
-        #     ["Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear"],
-        #     ["Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear"],
-        #     ["Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
-        #     ["Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear"],
-        
             # latest OK one with good Win ratio
+
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Dropout", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
         #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-        
-        #     ["Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "activation_fn", "Linear"],
-        #     ["ScaledDotProductAttention", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "ResidualBlock", "Linear"],
+        ##     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "activation_fn", "Linear"],
+    
+        # interesting results
+        #     ["BatchNorm1d", "ScaledDotProductAttention", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["ScaledDotProductAttention", "BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
         
         # less OK but still good
-        #     ["BatchNorm1d", "Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
         #     ["Linear", "Dropout05", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout05", "activation_fn", "Linear"],
         #     ["Linear", "LayerNorm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
         # ],
-        # custom_net_arch2= [
-        #     ["BatchNorm1d", "Linear", "LayerNorm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-        #     ["BatchNorm1d", "Linear", "LayerNorm", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-        #     ["ScaledDotProductAttention", "BatchNorm1d", "Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-        #     ["ScaledDotProductAttention", "BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-        #     ["BatchNorm1d", "ScaledDotProductAttention", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-        #     ["ScaledDotProductAttention", "BatchNorm1d", "Linear", "LayerNorm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"]
-        # ],
-        # custom_net_arch3= [
-        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "ResidualBlock", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "ResidualBlock", "activation_fn", "Linear", "activation_fn", "Linear"],
-        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "ResidualBlock", "Linear", "activation_fn", "Linear"],
-        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "activation_fn", "Linear"],
-        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "ResidualBlock", "Linear"],
-        # ],
-        custom_net_arch= [ #TODO
-            ["DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-            ["BatchNorm1d", "DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-            ["Linear", "activation_fn", "DropConnectLinear", "activation_fn", "DropConnectLinear", "activation_fn", "DropConnectLinear", "activation_fn", "Linear"],
-            ["BatchNorm1d", "Linear", "activation_fn", "DropConnectLinear", "activation_fn", "DropConnectLinear", "activation_fn", "DropConnectLinear", "activation_fn", "Linear"],
-            ["DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "DropConnectLinear", "activation_fn", "Linear"],
-            ["BatchNorm1d", "DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "DropConnectLinear", "activation_fn", "Linear"],
-        ],
-        
 
-        # medium= [
-        #     ["ResidualBlock", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
-        # ],
-        # bad= [
+        # tested= [
         #     ["LayerNorm", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
         #     ["Linear", "BatchNorm1d", "ScaledDotProductAttention", "activation_fn", "Linear", "activation_fn", "Linear"],
         #     ["BatchNorm1d", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
@@ -492,6 +536,171 @@ model_rl_h = ModelConfigSearch(
         #     ["Linear", "Dropout", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
         #     ["Linear", "Dropout1", "activation_fn", "Linear", "Dropout1", "activation_fn", "Linear", "Dropout1", "activation_fn", "Linear", "Dropout1", "activation_fn", "Linear"],
         #     ["Linear", "Dropout2", "activation_fn", "Linear", "Dropout2", "activation_fn", "Linear", "Dropout2", "activation_fn", "Linear", "Dropout2", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "ResidualBlock", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "ResidualBlock", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "ResidualBlock", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "LayerNorm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "LayerNorm", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["ScaledDotProductAttention", "BatchNorm1d", "Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["ScaledDotProductAttention", "BatchNorm1d", "Linear", "LayerNorm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"]
+        #     ["LayerNorm", "BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "LayerNorm", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear"],
+        #     ["DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["Linear", "activation_fn", "DropConnectLinear", "activation_fn", "DropConnectLinear", "activation_fn", "DropConnectLinear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "DropConnectLinear", "activation_fn", "DropConnectLinear", "activation_fn", "DropConnectLinear", "activation_fn", "Linear"],
+        #     ["DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "DropConnectLinear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "DropConnectLinear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "Dropout", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "DropConnectLinear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "DropConnectLinear", "activation_fn", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "DropConnectLinear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Dropout", "Linear"],
+        #     ["BatchNorm1d", "ScaledDotProductAttention", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "ScaledDotProductAttention", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "ScaledDotProductAttention", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "ResidualBlock", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "ResidualBlock", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "ResidualBlock", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "ResidualBlock", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "ResidualBlock", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "ResidualBlock", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "weight_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "spectral_norm"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm2"],
+        #     ["BatchNorm1d", "spectral_norm2", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "spectral_norm2"],
+        #     ["BatchNorm1d", "NoisyLinear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "NoisyLinear", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "NoisyLinear"],
+        #     ["BatchNorm1d", "NoisyLinear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "NoisyLinear", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "NoisyLinear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["MultiHeadAttention", "BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "MultiHeadAttention", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "MultiHeadAttention", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "MultiHeadAttention", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "activation_fn", "weight_norm", "activation_fn", "weight_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "activation_fn", "weight_norm", "activation_fn", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "spectral_norm"],
+        #     ["BatchNorm1d", "spectral_norm2", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "spectral_norm2", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "spectral_norm2"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "spectral_norm2", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "spectral_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm2", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "spectral_norm", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "spectral_norm2", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["MultiHeadAttention4", "BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "MultiHeadAttention4", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "MultiHeadAttention4", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "MultiHeadAttention4", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "activation_fn", "weight_norm", "activation_fn", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "activation_fn", "weight_norm", "activation_fn", "weight_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "weight_norm2"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm2"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "spectral_norm"],
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "spectral_norm"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "spectral_norm2"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "spectral_norm2", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "spectral_norm2"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "weight_norm_noisy", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "weight_norm_noisy2", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "weight_norm_noisy3", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "weight_norm2_noisy", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "weight_norm2_noisy2", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "weight_norm2_noisy3", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "spectral_norm_noisy", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "spectral_norm_noisy2", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "spectral_norm_noisy3", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "spectral_norm2_noisy", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "spectral_norm2_noisy2", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "spectral_norm2_noisy3", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "Dropout", "activation_fn", "ResidualBlock", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "Dropout", "ResidualBlock", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "ResidualBlock", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "ResidualBlock", "Dropout", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "ResidualBlock", "activation_fn", "Dropout", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "ResidualBlock", "Linear", "activation_fn", "Dropout", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "ResidualBlock", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "ResidualBlock", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "ResidualBlock", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Dropout", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "activation_fn", "weight_norm", "activation_fn", "weight_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "activation_fn", "weight_norm", "activation_fn", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "weight_norm2"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "spectral_norm"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "spectral_norm2"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm", "activation_fn", "weight_norm", "activation_fn", "weight_norm", "Dropout", "activation_fn", "weight_norm2"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm2"],
+        #     ["BatchNorm1d", "spectral_norm2", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "spectral_norm2"],
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "spectral_norm"],
+        #     ["BatchNorm1d", "spectral_norm2", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "spectral_norm"],
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "spectral_norm2"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "MultiHeadAttention", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "MultiHeadAttention", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "MultiHeadAttention", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "MultiHeadAttention", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "MultiHeadAttention", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "MultiHeadAttention", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "MultiHeadAttention", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "MultiHeadAttention", "Linear"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm2"],
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "spectral_norm"],
+        #     ["BatchNorm1d", "spectral_norm2", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "spectral_norm2", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "spectral_norm2", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "spectral_norm2"],
+        #     ["ScaledDotProductAttention", "BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "ScaledDotProductAttention", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "ScaledDotProductAttention", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "ScaledDotProductAttention", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "ScaledDotProductAttention", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ScaledDotProductAttention", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "ScaledDotProductAttention", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "ScaledDotProductAttention", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "ScaledDotProductAttention", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ScaledDotProductAttention", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "ScaledDotProductAttention", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "ScaledDotProductAttention", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "ScaledDotProductAttention", "Linear"],
         # ],
 
         episodes= [1],
@@ -538,14 +747,14 @@ model_rl_min = ModelConfigSearch(
         model_name= ["duel-dqn-custom"],
         # model_name= ["ppo", "reppo", "trpo", "a2c", "ars", "ars-mlp", "qrdqn", "dqn", "duel-dqn"], 
 
-        # reward_model= ["combo_all", "profit_percentage3", "profit_percentage4", "profit_all", "profit_all2", "combo"],
-        # reward_model= ["combo_all", "profit_percentage3", "profit_percentage4", "profit_all", "profit_all2"],
+        # reward_model= ["combo_all", "profit_all", "profit_all2", "combo"],
+        # reward_model= ["combo_all", "profit_all", "profit_all2"],
         reward_model= ["combo_all"],
         # reward_model= ["combo"], #TODO:
  
-        # learning_rate= [0.00000001, 0.000001, 0.0001],
-        # learning_rate= [0.0001],
-        learning_rate= [0.0000001],
+        # learning_rate= [0.00001, 0.0001],
+        learning_rate= [0.0001],
+        # learning_rate= [0.00001],
         batch_size= [512],
         # buffer_size = [10, 100_000, 1_000_000],
         buffer_size = [1_000_000],
@@ -562,7 +771,7 @@ model_rl_min = ModelConfigSearch(
         max_grad_norm= [0.01],
         optimizer_class = ['RMSprop'],
 
-         optimizer_eps = [0.5],
+        optimizer_eps = [0.5],
         optimizer_weight_decay = [0.00000001],
         optimizer_centered = [True],
         optimizer_alpha = [0.9],
@@ -571,7 +780,15 @@ model_rl_min = ModelConfigSearch(
         net_arch= [[512,256,64,32]],
         
         custom_net_arch= [
-            ["Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
+            # ["Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch number
+
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm2", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "NoisyLinear", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+            # ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "weight_norm2"],
+            # ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm", "activation_fn", "spectral_norm", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],    
         ],
         # custom_net_arch9= [
         #     ["ScaledDotProductAttention", "Linear", "activation_fn", "Linear", "ResidualBlock", "activation_fn", "Linear"],

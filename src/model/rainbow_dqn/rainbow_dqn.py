@@ -14,6 +14,7 @@ class RainbowDQN(DQN):
     def __init__(
         self,
         env: Union[gym.Env, str],
+        policy: RainbowPolicy = RainbowPolicy,
         learning_rate: Union[float, Schedule] = 1e-4,
         buffer_size: int = 1000000,
         learning_starts: int = 50000,
@@ -37,7 +38,7 @@ class RainbowDQN(DQN):
         _init_setup_model: bool = True,
     ):
         super(RainbowDQN, self).__init__(
-            RainbowPolicy,
+            policy,
             env,
             learning_rate=learning_rate,
             buffer_size=buffer_size,

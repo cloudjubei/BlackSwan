@@ -6,8 +6,6 @@ import torch.nn.functional as F
 class NoisyLinear(nn.Module):
     """Noisy linear module for NoisyNet.
     
-    
-        
     Attributes:
         in_features (int): input size of linear module
         out_features (int): output size of linear module
@@ -33,12 +31,8 @@ class NoisyLinear(nn.Module):
         self.std_init = std_init
 
         self.weight_mu = nn.Parameter(torch.Tensor(out_features, in_features))
-        self.weight_sigma = nn.Parameter(
-            torch.Tensor(out_features, in_features)
-        )
-        self.register_buffer(
-            "weight_epsilon", torch.Tensor(out_features, in_features)
-        )
+        self.weight_sigma = nn.Parameter(torch.Tensor(out_features, in_features))
+        self.register_buffer("weight_epsilon", torch.Tensor(out_features, in_features))
 
         self.bias_mu = nn.Parameter(torch.Tensor(out_features))
         self.bias_sigma = nn.Parameter(torch.Tensor(out_features))
@@ -47,17 +41,17 @@ class NoisyLinear(nn.Module):
         self.reset_parameters()
         self.reset_noise()
 
+
     def reset_parameters(self):
         """Reset trainable network parameters (factorized gaussian noise)."""
         mu_range = 1 / math.sqrt(self.in_features)
+        # mu_range = 1 / torch.sqrt(torch.tensor(self.in_features, dtype=torch.float32))
         self.weight_mu.data.uniform_(-mu_range, mu_range)
-        self.weight_sigma.data.fill_(
-            self.std_init / math.sqrt(self.in_features)
-        )
+        self.weight_sigma.data.fill_(self.std_init / math.sqrt(self.in_features))
+        # self.weight_sigma.data.fill_(self.std_init / torch.sqrt(torch.tensor(self.in_features, dtype=torch.float32)))
         self.bias_mu.data.uniform_(-mu_range, mu_range)
-        self.bias_sigma.data.fill_(
-            self.std_init / math.sqrt(self.out_features)
-        )
+        self.bias_sigma.data.fill_(self.std_init / math.sqrt(self.out_features))
+        # self.bias_sigma.data.fill_(self.std_init / torch.sqrt(torch.tensor(self.out_features, dtype=torch.float32)))
 
     def reset_noise(self):
         """Make new noise."""

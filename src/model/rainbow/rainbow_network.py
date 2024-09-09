@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.model.rainbow.noisy_layer import NoisyLinear
+from src.model.custom_dqn.noisylinear import NoisyLinear
 
 class RainbowNetwork(nn.Module):
     def __init__(

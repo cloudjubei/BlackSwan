@@ -10,10 +10,9 @@ import sbx.dqn
 import sbx.ppo
 from src.conf.model_config import ModelConfigSearch, ModelConfig, ModelTechnicalConfig, ModelTimeConfig, ModelRLConfig, ModelLSTMConfig, ModelMLPConfig
 from src.model.custom_dqn.dgwo import DGWO
-from src.model.custom_dqn.policies import CustomDQNPolicy, CustomDuelingDQNPolicy
+from src.model.custom_dqn.policies import CustomDQNPolicy, CustomDuelingDQNPolicy, CustomRainbowPolicy
 from src.model.dqn_lstm_policy import LSTMFCE
 from src.model.dueling_dqn.dueling_dqn import DuelingDQN
-from src.model.dueling_dqn.dueling_dqn2 import DuelingDQN2
 from src.model.dueling_dqn.policies import DuelingDQNPolicy
 from src.model.hodl_model import HodlModel
 from src.model.iqn.iqn import IQN
@@ -232,7 +231,7 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                         # #    "activation_fn": activation_fns[config.model_rl.activation_fn], # <-- doesn't yet work properly
                         # #    "net_arch": config.model_rl.net_arch, # <-- doesn't yet work properly
                        })
-    elif config.model_rl.model_name == "rainbow-dqn":
+    elif config.model_rl.model_name == "rainbow-dqn-old":
         seed = 777
         rl_model = RainbowDQNAgent(env, memory_size= config.model_rl.buffer_size, batch_size= config.model_rl.batch_size, target_update=config.model_rl.target_update_interval, seed= seed)
     elif config.model_rl.model_name == "iqn":
@@ -300,8 +299,8 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                            "net_arch": config.model_rl.net_arch,
                            "custom_net_arch": config.model_rl.custom_net_arch
                        })
-    elif config.model_rl.model_name == "dqn-custom":
-        rl_model = DQN(env=env, policy= CustomDQNPolicy, device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+    elif config.model_rl.model_name == "duel-dqn-custom-lstm":
+        rl_model = DuelingDQN(policy=CustomDuelingDQNPolicy, env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
                        buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
                        tau= config.model_rl.tau, 
                        exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
@@ -320,32 +319,88 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                            },
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
-                           "custom_net_arch": config.model_rl.custom_net_arch
-                       })
-    elif config.model_rl.model_name == "dqn-lstm":
-        print(f"Loading DQN - Deep Q Network model")
-        rl_model = DQN(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
-                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
-                       tau= config.model_rl.tau, 
-                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
-                       learning_starts=config.model_rl.learning_starts,
-                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
-                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
-                       policy_kwargs= {
-                           "normalize_images": False,
-                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                           "optimizer_kwargs": {
-                            #    "eps": config.model_rl.optimizer_eps,
-                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
-                            #    "alpha": config.model_rl.optimizer_alpha,
-                            #    "momentum": config.model_rl.optimizer_momentum,
-                            #    "centered": config.model_rl.optimizer_centered,
-                           },
-                           "activation_fn": activation_fns[config.model_rl.activation_fn],
-                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch,
                            "features_extractor_class": LSTMFCE,
                            "features_extractor_kwargs": {
-                               "lstm_hidden_size": 4
+                               "lstm_hidden_size": 2
+                           }
+                       })
+    elif config.model_rl.model_name == "duel-dqn-custom-lstm3":
+        rl_model = DuelingDQN(policy=CustomDuelingDQNPolicy, env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                       tau= config.model_rl.tau, 
+                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                       learning_starts=config.model_rl.learning_starts,
+                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "alpha": config.model_rl.optimizer_alpha,
+                            #    "momentum": config.model_rl.optimizer_momentum,
+                            #    "centered": config.model_rl.optimizer_centered,
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch,
+                           "features_extractor_class": LSTMFCE,
+                           "features_extractor_kwargs": {
+                               "lstm_hidden_size": 3
+                           }
+                       })
+    elif config.model_rl.model_name == "duel-dqn-custom-lstm8":
+        rl_model = DuelingDQN(policy=CustomDuelingDQNPolicy, env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                       tau= config.model_rl.tau, 
+                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                       learning_starts=config.model_rl.learning_starts,
+                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "alpha": config.model_rl.optimizer_alpha,
+                            #    "momentum": config.model_rl.optimizer_momentum,
+                            #    "centered": config.model_rl.optimizer_centered,
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch,
+                           "features_extractor_class": LSTMFCE,
+                           "features_extractor_kwargs": {
+                               "lstm_hidden_size": 8
+                           }
+                       })
+    elif config.model_rl.model_name == "duel-dqn-custom-lstm8":
+        rl_model = DuelingDQN(policy=CustomDuelingDQNPolicy, env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                       tau= config.model_rl.tau, 
+                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                       learning_starts=config.model_rl.learning_starts,
+                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "alpha": config.model_rl.optimizer_alpha,
+                            #    "momentum": config.model_rl.optimizer_momentum,
+                            #    "centered": config.model_rl.optimizer_centered,
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch,
+                           "features_extractor_class": LSTMFCE,
+                           "features_extractor_kwargs": {
+                               "lstm_hidden_size": 8
                            }
                        })
     elif config.model_rl.model_name == "duel-dqn-lstm":
@@ -397,6 +452,30 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
                        })
+    elif config.model_rl.model_name == "rainbow-dqn-custom":
+        print(f"Loading Rainbow DQN - Rainbow Deep Q Network model")
+
+        rl_model = RainbowDQN(env=env, policy=CustomRainbowPolicy, device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                       tau= config.model_rl.tau, 
+                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                       learning_starts=config.model_rl.learning_starts,
+                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "alpha": config.model_rl.optimizer_alpha,
+                            #    "momentum": config.model_rl.optimizer_momentum,
+                            #    "centered": config.model_rl.optimizer_centered,
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch
+                       })
     elif config.model_rl.model_name == "munchausen-dqn":
         print(f"Loading MunchausenDQN DQN - Munchhausen Deep Q Network model")
 
@@ -420,8 +499,31 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
                        }
-                       )
+                    )
     elif config.model_rl.model_name == "munchausen-dqn-custom":
+        print(f"Loading MunchausenDQN Custom - Munchhausen Deep Q Network model")
+        rl_model = MunchausenDQN(env=env, policy=CustomDQNPolicy, device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                       tau= config.model_rl.tau, 
+                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                       learning_starts=config.model_rl.learning_starts,
+                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "alpha": config.model_rl.optimizer_alpha,
+                            #    "momentum": config.model_rl.optimizer_momentum,
+                            #    "centered": config.model_rl.optimizer_centered,
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch
+                       })
+    elif config.model_rl.model_name == "munchausen-duel-dqn-custom":
         print(f"Loading MunchausenDQN Custom - Munchhausen Deep Q Network model")
         rl_model = MunchausenDQN(env=env, policy=CustomDuelingDQNPolicy, device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
                        buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
@@ -443,6 +545,33 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
                            "custom_net_arch": config.model_rl.custom_net_arch
+                       })
+    elif config.model_rl.model_name == "munchausen-duel-dqn-custom-lstm":
+        print(f"Loading MunchausenDQN Custom - Munchhausen Deep Q Network model")
+        rl_model = MunchausenDQN(env=env, policy=CustomDuelingDQNPolicy, device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                       tau= config.model_rl.tau, 
+                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                       learning_starts=config.model_rl.learning_starts,
+                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "alpha": config.model_rl.optimizer_alpha,
+                            #    "momentum": config.model_rl.optimizer_momentum,
+                            #    "centered": config.model_rl.optimizer_centered,
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch,
+                           "features_extractor_class": LSTMFCE,
+                           "features_extractor_kwargs": {
+                               "lstm_hidden_size": 2
+                           }
                        })
     elif config.model_rl.model_name == "dqn":
         print(f"Loading DQN - Deep Q Network model")
@@ -478,6 +607,54 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
         # maximize: bool = False,
         # differentiable: bool = False,
 
+    elif config.model_rl.model_name == "dqn-custom":
+        rl_model = DQN(env=env, policy= CustomDQNPolicy, device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                       tau= config.model_rl.tau, 
+                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                       learning_starts=config.model_rl.learning_starts,
+                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "alpha": config.model_rl.optimizer_alpha,
+                            #    "momentum": config.model_rl.optimizer_momentum,
+                            #    "centered": config.model_rl.optimizer_centered,
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch
+                       })
+    elif config.model_rl.model_name == "dqn-lstm":
+        print(f"Loading DQN - Deep Q Network model")
+        rl_model = DQN(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                       tau= config.model_rl.tau, 
+                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                       learning_starts=config.model_rl.learning_starts,
+                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "alpha": config.model_rl.optimizer_alpha,
+                            #    "momentum": config.model_rl.optimizer_momentum,
+                            #    "centered": config.model_rl.optimizer_centered,
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "features_extractor_class": LSTMFCE,
+                           "features_extractor_kwargs": {
+                               "lstm_hidden_size": 4
+                           }
+                       })
     elif config.model_rl.model_name == "qrdqn":
         print(f"Loading QRDQN - Quantile Regression DQN model")
         # rl_model = QRDQN(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate)
