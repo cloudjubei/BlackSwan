@@ -36,6 +36,8 @@ class BaseCryptoEnv(AbstractEnv):
 
     # Action space: 0 = Hold, 1 = Buy, 2 = Sell (BEWARE: by default the RL models return actions as [0..<n])
     def create_action_space(self) -> spaces.Discrete:
+        if self.env_config.no_sell_action:
+            return spaces.Discrete(2)
         return spaces.Discrete(3)
 
     def create_observation_space(self, initial_observation) -> spaces.Box:
@@ -51,105 +53,66 @@ class BaseCryptoEnv(AbstractEnv):
         
         lookback_window_size = self.data_provider.get_lookback_window()
 
-        if lookback_window_size > 1:
-            extra_values = []
-            if 'networth_percent_this_trade' in self.env_config.observations_contain:
-                vs = []
-                for i in range(lookback_window_size-1, -1, -1):
-                    index = self.current_step - i
-                    buys_count = self.buys_count[index]
-                    sells_count = self.sells_count[index]
-                    if buys_count > sells_count:
-                        net_worth = self.net_worths[index]
-                        vs.append(net_worth/self.initial_net_worth - 1)
-                    else:
-                        vs.append(0)
-                extra_values.append(vs)
-            if 'drawdown' in self.env_config.observations_contain:
-                vs = self.drawdowns[self.current_step : self.current_step + lookback_window_size]
-                extra_values.append(vs)
-            if self.env_config.stop_loss is not None:
-                stop_loss_threshold = self.env_config.stop_loss
-
-                vs = []
-                for i in range(lookback_window_size-1, -1, -1):
-                    index = self.current_step - i
-                    buys_count = self.buys_count[index]
-                    sells_count = self.sells_count[index]
-                    if buys_count > sells_count:
-                        net_worth = self.net_worths[index]
-                        loss = 1 - (net_worth / self.initial_net_worth)
-                        if loss > 0:
-                            vs.append(loss/stop_loss_threshold)
-                        else:
-                            vs.append(0)
-                    else:
-                        vs.append(0)
-                extra_values.append(vs)
-            if 'in_position' in self.env_config.observations_contain:
-                vs = self.positions[self.current_step : self.current_step + lookback_window_size]
-                vs = [1 if v > 0 else 0 for v in vs]
-                extra_values.append(vs)
-# self.actions_made_count
-
-            if self.data_provider.is_multilayered():
-                if self.data_provider.get_lookback_window() > 1: 
-                    extra_values = np.column_stack((extra_values))
-                    extra_values = np.tile(extra_values, (values.shape[0], 1, 1))
-                else:
-                    extra_values = np.tile(extra_values, (values.shape[0], 1))
-            else:
-                if self.data_provider.get_lookback_window() > 1: 
-                    extra_values = np.column_stack((extra_values))
-
-            out = np.concatenate((values, extra_values), axis=-1)
-            if self.data_provider.config.flat_lookback:
-                if not self.data_provider.is_multilayered() or self.data_provider.config.flat_layers:
-                    out = out.flatten()
-                else:
-                    new_out = []
-                    for i in range(len(self.data_provider.config.layers)):
-                        new_out.append(out[i].flatten())
-                    out = np.array(new_out)
-            elif self.data_provider.config.flat_layers and self.data_provider.is_multilayered():
-                new_out = out[0]
-                for i in range(len(self.data_provider.config.layers)-1):
-                    new_out = np.concatenate((new_out, out[i+1]), axis=0)
-                out = new_out
-
-            return out
-        
         extra_values = []
-
         if 'networth_percent_this_trade' in self.env_config.observations_contain:
-            if len(self.buys) > len(self.sells):
-                net_worth = self.net_worths[self.current_step]
-                extra_values.append(net_worth/self.initial_net_worth - 1)
+            vs = []
+            for i in range(lookback_window_size-1, -1, -1):
+                index = self.current_step - i
+                buys_count = self.buys_count[index]
+                sells_count = self.sells_count[index]
+                if buys_count > sells_count:
+                    net_worth = self.net_worths[index]
+                    vs.append(net_worth/self.initial_net_worth - 1)
+                else:
+                    vs.append(0)
+            if lookback_window_size > 1:
+                extra_values.append(vs)
             else:
-                extra_values.append(0)
+                extra_values += vs
         if 'drawdown' in self.env_config.observations_contain:
-            extra_values.append(self.drawdowns[-1])
+            vs = self.drawdowns[self.current_step : self.current_step + lookback_window_size]
+            if lookback_window_size > 1:
+                extra_values.append(vs)
+            else:
+                extra_values += vs
         if self.env_config.stop_loss is not None:
             stop_loss_threshold = self.env_config.stop_loss
-            if len(self.buys) > len(self.sells):
-                net_worth = self.net_worths[self.current_step]
-                loss = 1 - (net_worth / self.initial_net_worth)
-                if loss > 0:
-                    extra_values.append(loss/stop_loss_threshold)
-                else:
-                    extra_values.append(0)
-            else:
-                extra_values.append(0)
-        if 'in_position' in self.env_config.observations_contain:
-            extra_values.append(1 if self.positions[-1] > 0 else 0)
 
-        if self.data_provider.is_multilayered():
-            # if self.data_provider.config.flat_lookback
-            extra_values = np.tile(extra_values, (values.shape[0], 1))
-            if self.data_provider.config.flat_layers:
-                return np.append(values, extra_values, axis=1).flatten()
-            return np.append(values, extra_values, axis=1)
-        return np.append(values, extra_values, axis=0)
+            vs = []
+            for i in range(lookback_window_size-1, -1, -1):
+                index = self.current_step - i
+                buys_count = self.buys_count[index]
+                sells_count = self.sells_count[index]
+                if buys_count > sells_count:
+                    net_worth = self.net_worths[index]
+                    loss = 1 - (net_worth / self.initial_net_worth)
+                    if loss > 0:
+                        vs.append(loss/stop_loss_threshold)
+                    else:
+                        vs.append(0)
+                else:
+                    vs.append(0)
+            if lookback_window_size > 1:
+                extra_values.append(vs)
+            else:
+                extra_values += vs
+        if 'in_position' in self.env_config.observations_contain:
+            vs = self.positions[self.current_step : self.current_step + lookback_window_size]
+            vs = [1 if v > 0 else 0 for v in vs]
+            if lookback_window_size > 1:
+                extra_values.append(vs)
+            else:
+                extra_values += vs
+
+        if lookback_window_size > 1:
+            extra_values_T = [list(row) for row in zip(*extra_values)]
+            out = np.concatenate(values, axis=1) # so [[1h, 1h, 1h...], [1d, 1d, 1d...]] = [[1h, 1d], [1h,1d], ...]
+            out = np.concatenate((out, extra_values_T), axis=1)
+            out = out.flatten()
+        else:
+            out = np.concatenate((values, extra_values), axis=-1)
+
+        return out
 
     def reset(self, seed: int = None, options: dict[str, Any] = None):
         super().reset(seed=seed)
@@ -177,6 +140,9 @@ class BaseCryptoEnv(AbstractEnv):
         self.forced_actions = []
         self.rewards = []
         self.tpsls = []
+
+        self.position_price_highest = 0
+        self.position_price_entry = 0
 
         for _ in range(self.data_provider.get_lookback_window()):
             self.balances.append(self.initial_balance)
@@ -206,7 +172,17 @@ class BaseCryptoEnv(AbstractEnv):
         self.trades_tp = []
         self.trades_sl = []
 
+        #TODO: REMOVE
+        # values = self.data_provider.get_values(0)
+        # print("values[0]:")
+        # print(values)
+        # values = self.data_provider.get_values(self.data_provider.get_timesteps()-1)
+        # values = self.data_provider.get_values(self.data_provider.get_timesteps())
+        
+        # raise ValueError("TEST")
+
         self.last_obs = self.get_next_observation()
+
         return self.last_obs, {}
     
     def resolve_tpsl(self):
@@ -214,6 +190,18 @@ class BaseCryptoEnv(AbstractEnv):
             if self.env_config.take_profit is not None:
                 net_worth = self._calculate_net_worth(self.current_step)
                 take_profit = self.env_config.take_profit
+                
+                if self.env_config.trailing_take_profit is not None:
+                    entry_price_amount = self.position_price_entry
+                    activation_amount = entry_price_amount * (1.0 + take_profit)
+                    current_price_amount = self.current_price
+                    highest_price_amount = self.position_price_highest
+                    if highest_price_amount >= activation_amount:
+                        trailing_take_profit = self.env_config.trailing_take_profit
+                        trigger_amount = highest_price_amount * (1.0 - trailing_take_profit)
+                        if current_price_amount <= trigger_amount:
+                            return 2, True # TP TRAILING SELL
+
                 profit_percentage = (net_worth / self.initial_net_worth) - 1.0
                 if profit_percentage >= take_profit:
                     return 2, True # TP SELL
@@ -222,9 +210,27 @@ class BaseCryptoEnv(AbstractEnv):
                 stop_loss = self.env_config.stop_loss
                 loss_percentage = 1.0 - (net_worth / self.initial_net_worth)
                 if loss_percentage >= stop_loss:
-                    # print("SL step: ", self.current_step, " loss: ", round(loss_percentage, 3), " net_worth: ", net_worth, " position: ", self.positions[-1], " price: ", self.get_price(self.current_step), " prev: ", self.net_worths[-1], " prev_price:", self.get_price(self.current_step-1))
                     return 2, False # SL SELL
         return 0, None
+    
+
+    # static UpdateTakeProfit(trade: TradingSetupTradeModel, setup: TradingSetupModel, minAmount: string) : TradingSetupActionModel
+    # {
+    #     const takeProfit = setup.config.takeProfit
+    #     if (takeProfit){
+    #         const trailingStop = takeProfit.trailingStop
+    #         if (trailingStop){
+    #             const activationAmount = MathUtils.MultiplyNumbers(trade.entryPriceAmount, "" + (1.0 + takeProfit.percentage))
+    #             if (MathUtils.IsGreaterThanOrEqualTo(trade.highestPriceAmount, activationAmount)){
+    #                 const triggerAmount = MathUtils.MultiplyNumbers(trade.highestPriceAmount, "" + (1.0 - trailingStop.deltaPercentage))
+    #                 if (MathUtils.IsLessThanOrEqualTo(setup.currentPriceAmount, triggerAmount)){
+    #                     return new TradingSetupActionModel(TradingSetupActionType.TAKEPROFIT, -1)
+    #                 }
+    #             }
+    #         }
+    # }
+
+
     
     def resolve_action(self, action):
         made_action = self.take_action(action) if action is not None else False
@@ -285,6 +291,17 @@ class BaseCryptoEnv(AbstractEnv):
         self.sells_count.append(len(self.sells))
         self.total_profits.append(self.total_profit)
 
+    def update_position_prices(self):
+        if self.positions[-1] > 0:
+            if self.actions_made[-1]: # just made an action
+                if self.actions[-1] == 1: # had made a buy action
+                    self.position_price_entry = self.current_price
+            if self.current_price > self.position_price_highest:
+                self.position_price_highest = self.current_price
+        else:
+            self.position_price_entry = 0
+            self.position_price_highest = 0
+
     def update_drawdown(self):
         if self.positions[-1] > 0:
             if self.current_price > self.drawdown_peak:
@@ -317,6 +334,7 @@ class BaseCryptoEnv(AbstractEnv):
         self.resolve_action(action)
 
         self.update_position_and_balance()
+        self.update_position_prices()
         self.update_drawdown()
         reward = self.update_reward()
 
@@ -340,7 +358,7 @@ class BaseCryptoEnv(AbstractEnv):
 
             if self.actions_made[-1]: # just made an action
                 # SELL
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1: # SELL action or SL/TP triggered
+                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # SELL action or SL/TP triggered
                     sell_net_worth = self.sells[-1]
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
                     sell_reward1 = profit_percentage * self.reward_multipliers["combo_sell_profit"]
@@ -391,7 +409,7 @@ class BaseCryptoEnv(AbstractEnv):
 
         if self.reward_model == "combo_all" or self.reward_model == "combo_all2":
             if self.actions_made[-1]: # just made an action
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
+                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # has made a sell action or SL/TP triggered
                     sell_net_worth = self.sells[-1]
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
                     return profit_percentage * self.reward_multipliers["combo_sell"]
@@ -421,7 +439,7 @@ class BaseCryptoEnv(AbstractEnv):
         elif self.reward_model == "buy_sell_signal" or self.reward_model == "buy_sell_signal2" or self.reward_model == "buy_sell_signal3" or self.reward_model == "buy_sell_signal4":
             if self.actions_made[-1]: # just made an action
                 signal = self.data_provider.get_signal_buy_sell(self.current_step)
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
+                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # has made a sell action or SL/TP triggered
                     
                     sell_net_worth = self.sells[-1]
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
@@ -447,7 +465,7 @@ class BaseCryptoEnv(AbstractEnv):
         elif self.reward_model == "combo_actions" or self.reward_model == "combo_actions2" or self.reward_model == "combo_actions3":
 
             if self.actions_made[-1]: # just made an action
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
+                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # has made a sell action or SL/TP triggered
                     sell_net_worth = self.sells[-1]
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
                     return profit_percentage * 10
@@ -479,7 +497,7 @@ class BaseCryptoEnv(AbstractEnv):
             return 0
         elif self.reward_model == "drawdown":
             if self.actions_made[-1]: # just made an action
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
+                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # has made a sell action or SL/TP triggered
                     sell_net_worth = self.sells[-1]
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
                     return profit_percentage * self.reward_multipliers["combo_sell"]
@@ -491,7 +509,7 @@ class BaseCryptoEnv(AbstractEnv):
         
         elif self.reward_model == "profit_all" or self.reward_model == "profit_all2":
             if self.actions_made[-1]: # just made an action
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1: # has made a sell action or SL triggered
+                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # has made a sell action or SL/TP triggered
                     net_worth = self.sells[-1] # in $
                     if self.reward_model == "profit_all2":
                         net_worth_prev = self.net_worths[-2]

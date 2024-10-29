@@ -4,6 +4,7 @@ from src.conf.data_config import DataConfig
 import pandas as pd
 import numpy as np
 import calendar
+import datetime
 
 from src.data.data_utils import plot_indicator
 from src.util.plot import plot_timeseries
@@ -16,7 +17,7 @@ class AbstractDataProvider(ABC):
         self.id = self.get_id(config)
    
     def get_id(self, config: DataConfig):
-        return f'{config.id}_{config.type}_{config.timestamp}_{config.indicator}_{config.fidelity}_{"|".join(config.layers)}_{config.lookback_window_size}_{1 if config.flat_lookback else 0}_{1 if config.flat_layers else 0}_{config.buyreward_percent}_{config.buyreward_maxwait}'
+        return f'{config.id}_{config.type}_{config.timestamp}_{config.indicator}_{config.fidelity_input + "|" + config.fidelity_run}_{"|".join(config.layers)}_{config.fidelity_input_test + "|" + config.fidelity_run_test}_{"|".join(config.layers_test)}_{config.lookback_window_size}_{config.buyreward_percent}_{config.buyreward_maxwait}'
     
     def is_multilayered(self) -> bool:
         return len(self.config.layers) > 1
@@ -124,7 +125,7 @@ class AbstractDataProvider(ABC):
             df = pd.read_json(path)
             dfs.append(df)
 
-        result_df = pd.concat(dfs)
+        result_df = pd.concat(dfs, ignore_index=True)
         return self.process_df(result_df, type, timestamp, indicator, buyreward_percent, buyreward_maxwait)
     
     def process_df(self, result_df, type, timestamp, indicator, buyreward_percent, buyreward_maxwait):
@@ -283,7 +284,167 @@ class AbstractDataProvider(ABC):
 
         return result_df, prices, timestamps, rewards_buysell, rewards_buy_profitable, rewards_buy_drawdown
     
+    def get_raw_data(self, paths, timestamp = "none", columns = ["timestamp","price","price_high","price_low","price_open","volume","timestamp_close"]):
+        dfs = []
+        
+        for path in paths:
+            df = pd.read_json(path)
+            dfs.append(df)
+
+        result_df = pd.concat(dfs, ignore_index=True)
+
+        raw_df = result_df[columns]
+        result_df, prices, timestamps = self.process_df_simple(raw_df.copy(), timestamp, columns)
+        return raw_df, result_df, prices, timestamps
+    
+    def process_df_simple(self, result_df, timestamp, columns):
+
+        prices = result_df["price"].values
+        timestamps = ((pd.to_datetime(result_df["timestamp_close"]).astype('int64') // 10**6) + 1).to_numpy()
+
+        result_df['price_percent'] = pd.to_numeric(result_df['price'], errors='coerce').astype(float).pct_change()
+        result_df['price_high_percent'] = pd.to_numeric(result_df['price_high']/result_df['price'] - 1, errors='coerce').astype(float)
+        result_df['price_low_percent'] = pd.to_numeric(result_df['price_low']/result_df['price'] - 1, errors='coerce').astype(float)
+        result_df['volume_percent'] = pd.to_numeric(result_df['volume'], errors='coerce').astype(float).pct_change()
+
+        if timestamp == "expanded":
+            result_df['timestamp_close'] = pd.to_datetime(result_df['timestamp_close'], unit='ms')
+            result_df['month'] = (result_df['timestamp_close'].dt.month - 1)/11
+            result_df['day'] = result_df['timestamp_close'].dt.day - 1
+            result_df['days_in_month'] = result_df.apply(days_in_month, axis=1) - 1
+            result_df['day'] = result_df['day'] / result_df['days_in_month']
+            result_df = result_df.drop(columns=['days_in_month'])
+            result_df['time'] = (result_df['timestamp_close'].dt.hour * 60 + result_df['timestamp_close'].dt.minute)/1439
+            result_df['day_of_week'] = result_df['timestamp_close'].dt.dayofweek/6
+        elif timestamp == "day_of_week":
+            result_df['timestamp_close'] = pd.to_datetime(result_df['timestamp_close'], unit='ms')
+            result_df['day_of_week'] = result_df['timestamp_close'].dt.dayofweek/6
+        elif timestamp == "normal":
+            result_df['timestamp_new'] = pd.to_numeric(result_df['timestamp']).astype(int) / 1000000000
+            result_df['timestamp_close_new'] = pd.to_numeric(result_df['timestamp_close']).astype(int) / 1000000000
+
+        result_df = result_df.drop(columns=columns).fillna(0).replace([np.inf, -np.inf], 0).reset_index(drop=True)
+
+        return result_df, prices, timestamps
+    
+    def process_fidelity(self, df, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run, multiplier_input_to_run, timestamp, columns = ["timestamp","price","price_high","price_low","volume","timestamp_close"]):
+        steps = df.shape[0]
+
+        dfs = []
+        raw_dfs = []
+        for i in range(0, multiplier_run):
+            dfs.append(pd.DataFrame())
+            raw_dfs.append(pd.DataFrame())
+        for i in range(0, multiplier_run):
+            values = {
+                'timestamp': [],
+                'timestamp_close': [],
+                'price': [],
+                'price_high': [],
+                'price_low': [],
+                'volume': []
+            }
+            mapping = self.get_current_mapping(df, i*multiplier_input_to_run, layer, fidelity_run)
+
+            fidelity_steps = int((steps-fidelity_offset-i*multiplier_input_to_run)/multiplier_input)
+
+            for j in range(0, fidelity_steps):
+                pos_from = fidelity_offset + i*multiplier_input_to_run + (j*multiplier_input)
+                part = df.iloc[pos_from:pos_from+multiplier_input].reset_index(drop=True)
+
+                values["timestamp"].append(part['timestamp'].values[0])
+                values["timestamp_close"].append(part['timestamp_close'].values[multiplier_input-1])
+                values["price"].append(part['price'].values[multiplier_input-1])
+                values["price_high"].append(part['price_high'].max())
+                values["price_low"].append(part['price_low'].min())
+                values["volume"].append(part['volume'].sum())
+                
+            raw_df = pd.DataFrame(values, columns=columns)
+            result_df, _, _ = self.process_df_simple(raw_df.copy(), timestamp, columns)
+            dfs[mapping] = result_df
+            raw_dfs[mapping] = raw_df
+
+            # print(raw_df.head())
+
+        return dfs, raw_dfs
+
+    def get_current_mapping(self, df, step, layer, fidelity):
+        date_time = self.get_timestamp_datetime(df, step)
+
+        if fidelity == "1m":
+            if layer == "1w":
+                return date_time.weekday *60*24 + date_time.hour *60 + date_time.minute
+            if layer == "1d":
+                return date_time.hour *60 + date_time.minute
+            if layer == "1h":
+                return date_time.minute
+            if layer == "30m":
+                return date_time.minute % 30
+            if layer == "15m":
+                return date_time.minute % 15
+            if layer == "10m":
+                return date_time.minute % 10
+            if layer == "5m":
+                return date_time.minute % 5
+            return 0
+        if fidelity == "30m":
+            if layer == "1w":
+                return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 30 % (2*24*7))
+            if layer == "1d":
+                return int((date_time.hour *60 + date_time.minute) / 30 % (2*24))
+            if layer == "1h":
+                return int((date_time.minute) / 30 % 2)
+            return 0
+        if fidelity == "15m":
+            if layer == "1w":
+                return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 15 % (4*24*7))
+            if layer == "1d":
+                return int((date_time.hour *60 + date_time.minute) / 15 % (4*24))
+            if layer == "1h":
+                return int((date_time.minute) / 15 % 4)
+            if layer == "30m":
+                return int((date_time.minute) / 15 % 2)
+            return 0
+        if fidelity == "10m":
+            if layer == "1w":
+                return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 10 % (6*24*7))
+            if layer == "1d":
+                return int((date_time.hour *60 + date_time.minute) / 10 % (6*24))
+            if layer == "1h":
+                return int((date_time.minute) / 10 % 6)
+            if layer == "30m":
+                return int((date_time.minute) / 10 % 3)
+            return 0
+        if fidelity == "5m":
+            if layer == "1w":
+                return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 5 % (12*24*7))
+            if layer == "1d":
+                return int((date_time.hour *60 + date_time.minute) / 5 % (12*24))
+            if layer == "1h":
+                return int((date_time.minute) / 5 % 12)
+            if layer == "30m":
+                return int((date_time.minute) / 5 % 6)
+            if layer == "15m":
+                return int((date_time.minute) / 5 % 3)
+            if layer == "10m":
+                return int((date_time.minute) / 5 % 2)
+            return 0
+        else:
+            if layer == "1w":
+                return date_time.weekday *24 + date_time.hour
+            if layer == "1d":
+                return date_time.hour % 24
+            return 0
+            
+
+    def get_timestamp_datetime(self, df, i):
+        return pd.to_datetime(df.iloc[i]["timestamp"])
+        # return datetime.datetime.fromtimestamp(df.iloc[i]['timestamp'])
+
+
+
+    
 def days_in_month(row):
-    year = row['timestamp'].year
-    month = row['timestamp'].month
+    year = row['timestamp_close'].year
+    month = row['timestamp_close'].month
     return calendar.monthrange(year, month)[1]

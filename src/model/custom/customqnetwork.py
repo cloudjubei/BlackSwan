@@ -6,12 +6,12 @@ from torch import nn
 
 from gymnasium import spaces
 
-from src.model.custom_dqn.attention import AdditiveAttention, GlobalContextAttention, MultiHeadAttention, ScaledDotProductAttention, SelfAttention
-from src.model.custom_dqn.denseblock import DenseBlock
-from src.model.custom_dqn.dropconnect import DropConnectLinear
-from src.model.custom_dqn.memorymodels import GRULocal, LSTMLocal
-from src.model.custom_dqn.noisylinear import NoisyLinear
-from src.model.custom_dqn.residualblock import ResidualBlock
+from src.model.custom.attention import AdditiveAttention, GlobalContextAttention, MultiHeadAttention, ScaledDotProductAttention, SelfAttention
+from src.model.custom.denseblock import DenseBlock
+from src.model.custom.dropconnect import DropConnectLinear
+from src.model.custom.memorymodels import GRULocal, LSTMLocal
+from src.model.custom.noisylinear import NoisyLinear
+from src.model.custom.residualblock import ResidualBlock
 
 class CustomQNetwork(QNetwork):
 
@@ -39,7 +39,6 @@ class CustomQNetwork(QNetwork):
         action_dim = int(self.action_space.n)
         q_net = self.create_mlp_custom(self.features_dim, action_dim, self.net_arch, self.activation_fn, custom_net_arch)
         self.q_net = nn.Sequential(*q_net)
-        print(self.q_net)
 
     # net_arch= [64, 64]
     # custom_net_arch= ["GlobalContextAttention", "activation_fn", "GlobalContextAttention"]

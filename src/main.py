@@ -7,7 +7,7 @@ from src.conf.structured_config import Config
 from src.conf.data_config import DataConfig
 from src.conf.model_config import ModelConfig
 from src.data.data_factory import create_provider
-from src.data.data_utils import plot_actions_data
+from src.data.data_utils import fill_missing_timestamps, plot_actions_data
 from src.environment.env_factory import create_environment
 from src.model.model_factory import create_model, get_model_combinations
 from src.environment.abstract_env import AbstractEnv
@@ -76,6 +76,8 @@ def get_model_configs_count(config: Config) -> int:
 @hydra.main(version_base=None, config_name="config_simple_1h_1d")
 # @hydra.main(version_base=None, config_name="config_simple_1m_1h_1d")
 def main(config: Config) -> None:
+    # fill_missing_timestamps("binance_new")
+    # return
     pd.options.display.float_format = '{:.3f}'.format
     np.set_printoptions(formatter={'float_kind':'{:.4f}'.format})
 
@@ -86,10 +88,10 @@ def main(config: Config) -> None:
 
     for data_config in config.data_configs:
         print("Preparing train data...")
-        data_provider_train = create_provider(data_config, data_config.train_data_paths, data_config.train_data_paths_extra)
+        data_provider_train = create_provider(data_config, data_config.train_data_paths, data_config.fidelity_input, data_config.fidelity_run, data_config.layers)
 
         print("Preparing test data...")
-        data_provider_test = create_provider(data_config, data_config.test_data_paths, data_config.test_data_paths_extra)
+        data_provider_test = create_provider(data_config, data_config.test_data_paths, data_config.fidelity_input_test, data_config.fidelity_run_test, data_config.layers_test)
 
         for env_config in config.env_configs:
             print("Creating train environment...")
@@ -111,7 +113,7 @@ def main(config: Config) -> None:
                         print(f'Iteration {i+1}/{max_iterations}')
                         run_model(config, model_config, data_provider_train, env_train, env_test, result_states)
                         # if (not model_config.is_hodl()):
-                        #     plot_actions_data(data_config.test_data_paths_extra[0] if data_provider_test.is_multilayered() else data_config.test_data_paths, env_test)
+                        #     plot_actions_data(env_test)
                         #     return
                     
                     print(f'Run {run_count}/{run_count_total} Complete')

@@ -8,7 +8,7 @@ from stable_baselines3.dqn.policies import DQNPolicy
 from torch import nn
 import torch.nn.functional as F
 
-from src.model.custom_dqn.noisylinear import NoisyLinear
+from src.model.custom.noisylinear import NoisyLinear
 
 class RainbowPolicy(DQNPolicy):
 

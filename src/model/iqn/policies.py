@@ -99,7 +99,7 @@ class QuantileNetwork(BasePolicy):
         self.features_dim = features_dim
         self.n_quantiles = n_quantiles
         self.num_cosine = num_cosine
-        action_dim = self.action_space.n  # number of actions
+        action_dim = int(self.action_space.n)  # number of actions
         quantile_net = create_mlp(self.features_dim, action_dim, self.net_arch, self.activation_fn)
         self.quantile_net = nn.Sequential(*quantile_net)
         self.cosine_net = CosineEmbeddingNetwork(self.num_cosine, self.features_dim)

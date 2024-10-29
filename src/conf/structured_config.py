@@ -2,9 +2,9 @@ from hydra.core.config_store import ConfigStore
 from dataclasses import dataclass, field
 from omegaconf import DictConfig, OmegaConf
 from typing import List
-from src.conf.data_config import DataConfig, get_datas_downtrend, get_datas_1h_1d, get_datas_1m_1h_1d
+from src.conf.data_config import DataConfig, get_datas_1h_1d, get_datas_1m_1h_1d
 from src.conf.model_config import ModelConfigSearch, get_models_all, get_models_simple, get_models_rl_h, get_models_rl_min
-from src.conf.env_config import EnvConfig, get_envs_all, get_envs_simple, get_envs_swaps, get_envs_simple2
+from src.conf.env_config import EnvConfig, get_envs_all, get_envs_simple, get_envs_swaps
 
 @dataclass
 class Repo:

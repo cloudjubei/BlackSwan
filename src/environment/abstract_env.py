@@ -21,7 +21,7 @@ class AbstractEnv(gymnasium.Env):
 
     # observations_contain: List[str]
     def get_id(self) -> str:
-        return f'{self.env_config.type}_{self.env_config.amount}_{len(self.env_config.observations_contain)}_-{self.env_config.transaction_fee * 100 if self.env_config.transaction_fee is not None else 0}%_{self.env_config.take_profit if self.env_config.take_profit is not None else 0}_{self.env_config.stop_loss if self.env_config.stop_loss is not None else 0}'
+        return f'{self.env_config.type}_{self.env_config.amount}_{len(self.env_config.observations_contain)}_-{self.env_config.transaction_fee * 100 if self.env_config.transaction_fee is not None else 0}%_TP{self.env_config.take_profit if self.env_config.take_profit is not None else 0}_TR{self.env_config.trailing_take_profit if self.env_config.trailing_take_profit is not None else 0}_SL{self.env_config.stop_loss if self.env_config.stop_loss is not None else 0}'
 
     def get_timesteps(self) -> int:
         return self.data_provider.get_timesteps()
@@ -63,4 +63,8 @@ class AbstractEnv(gymnasium.Env):
 
     @abstractmethod
     def get_run_state(self):
+        pass
+    
+    @abstractmethod
+    def get_raw_df_for_plotting(self) -> pd.DataFrame:
         pass
