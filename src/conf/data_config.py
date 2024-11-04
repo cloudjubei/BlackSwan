@@ -81,13 +81,13 @@ data_2017_to_2023vs2024_only_price_percent_32_at_15m = DataConfig(id=data_2017_t
 
 def get_datas_1h_1d():
     # return [data_2017_to_2023vs2024_only_price_percent]
-    # return [data_2017_to_2023vs2024_only_price_percent_32]
+    return [data_2017_to_2023vs2024_only_price_percent_32]
     # return [data_2017_to_2023vs2024_only_price_percent_32_1m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_5m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_5m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_10m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_10m]
-    return [data_2017_to_2023vs2024_only_price_percent_32_15m]
+    # return [data_2017_to_2023vs2024_only_price_percent_32_15m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_15m]
 
 def get_datas_1m_1h_1d():

@@ -12,7 +12,7 @@ def plot_actions_data(env):
     #     dfs.append(df)
     # result_df = pd.concat(dfs)
 
-    end_point = 10 * 24 * 60
+    end_point = 26 * 24 * 60
     # end_point = 3 * 26 * 24 * 60
     actions = env.actions[env.data_provider.get_lookback_window()-1:][:end_point]
     actions_made = env.actions_made[env.data_provider.get_lookback_window()-1:][:end_point]
