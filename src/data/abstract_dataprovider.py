@@ -17,7 +17,7 @@ class AbstractDataProvider(ABC):
         self.id = self.get_id(config)
    
     def get_id(self, config: DataConfig):
-        return f'{config.id}_{config.type}_{config.timestamp}_{config.indicator}_{config.fidelity_input + "|" + config.fidelity_run}_{"|".join(config.layers)}_{config.fidelity_input_test + "|" + config.fidelity_run_test}_{"|".join(config.layers_test)}_{config.lookback_window_size}_{config.buyreward_percent}_{config.buyreward_maxwait}'
+        return f'{config.id}_{config.type}_{config.timestamp}_{config.indicator}_{config.fidelity_input + "|" + config.fidelity_run}_{"|".join(config.layers)}_{config.fidelity_input_test + "|" + config.fidelity_run_test}_{"|".join(config.layers_test)}_{config.lookback_window_size}_{config.buyreward_percent}_{config.buyreward_maxwait}'.replace('.', '~').replace('|', ']')
     
     def is_multilayered(self) -> bool:
         return len(self.config.layers) > 1

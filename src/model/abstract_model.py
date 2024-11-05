@@ -51,7 +51,7 @@ class BaseRLModel(AbstractModel):
         
     def get_id(self, config: ModelConfig):
         custom_net_arch = ("-".join([s[:4] + s[-1] for s in config.model_rl.custom_net_arch])) if len(config.model_rl.custom_net_arch) > 0 and config.model_rl.custom_net_arch[0] != '' else ""
-        return f'{config.model_type}_{config.model_rl.model_name}_{config.model_rl.reward_model}_{config.model_rl.learning_rate}_{config.model_rl.learning_starts}_{config.model_rl.batch_size}_{config.model_rl.buffer_size}_{config.model_rl.gamma}_{config.model_rl.optimizer_class}_{config.model_rl.activation_fn}_{"|".join(str(s) for s in config.model_rl.net_arch)}_{custom_net_arch}_{config.model_rl.episodes}_{time.time()}'
+        return f'{config.model_type}_{config.model_rl.model_name}_{config.model_rl.reward_model}_{config.model_rl.learning_rate}_{config.model_rl.learning_starts}_{config.model_rl.batch_size}_{config.model_rl.buffer_size}_{config.model_rl.gamma}_{config.model_rl.optimizer_class}_{config.model_rl.activation_fn}_{"|".join(str(s) for s in config.model_rl.net_arch)}_{custom_net_arch}_{config.model_rl.episodes}_{time.time()}'.replace('.', '~').replace('|', ']')
     
     def is_pretrained(self):
         return self.rl_config.checkpoint_to_load is not None

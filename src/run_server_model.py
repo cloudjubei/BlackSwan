@@ -90,7 +90,7 @@ model_config = ModelConfig(
         reward_multiplier_combo_hold_profit= 100,
         reward_multiplier_combo_hold_drawdown= 0.01,
 
-        checkpoints_folder='trials/',
+        checkpoints_folder='trials',
         checkpoint_to_load='rl_dqn_combo_all_0.01_0.995_Adamax_CELU_[64, 64]_1_1716187086.833314'
     )
 )

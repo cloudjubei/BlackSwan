@@ -10,7 +10,7 @@ class TimeStrategyModel(BaseStrategyModel):
         self.time_config = config.model_time
 
     def get_id(self, config: ModelConfig):
-        return f'{config.model_type}_{config.model_time.time_buy}_{config.model_time.time_sell}'
+        return f'{config.model_type}_{config.model_time.time_buy}_{config.model_time.time_sell}'.replace('.', '~').replace('|', ']')
 
     def get_action(self, env: AbstractEnv, obs):
 

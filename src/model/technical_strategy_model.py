@@ -10,7 +10,7 @@ class TechnicalStrategyModel(BaseStrategyModel):
         self.technical_config = config.model_technical
 
     def get_id(self, config: ModelConfig):
-        return f'{config.model_technical.buy_indicator}_{config.model_technical.buy_amount_threshold}_{config.model_technical.sell_indicator if config.model_technical.buy_indicator != config.model_technical.sell_indicator else ""}_{config.model_technical.sell_amount_threshold}'
+        return f'{config.model_technical.buy_indicator}_{config.model_technical.buy_amount_threshold}_{config.model_technical.sell_indicator if config.model_technical.buy_indicator != config.model_technical.sell_indicator else ""}_{config.model_technical.sell_amount_threshold}'.replace('.', '~').replace('|', ']')
 
     def get_action(self, env: AbstractEnv, obs):
         # net_worth = obs[-1]

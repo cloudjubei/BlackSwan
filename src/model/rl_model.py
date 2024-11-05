@@ -3,6 +3,7 @@ from src.model.abstract_model import BaseRLModel
 from src.conf.model_config import ModelConfig, ModelRLConfig
 from src.environment.abstract_env import AbstractEnv
 from stable_baselines3.common.base_class import BaseAlgorithm
+import os
 
 # based on https://stable-baselines3.readthedocs.io/en/master/modules/base.html
 
@@ -19,7 +20,7 @@ class RLModel(BaseRLModel):
             print(f"TRAINING EPISODE {i+1}/{self.rl_config.episodes}")
             self.rl_model.learn(total_timesteps=timesteps, progress_bar=self.rl_config.progress_bar, log_interval=1000)
 
-        path = self.rl_config.checkpoints_folder + self.id
+        path = os.path.join(self.rl_config.checkpoints_folder, self.id)
         self.rl_model.save(path)
         print(f"Saved RL model to {path}")
 

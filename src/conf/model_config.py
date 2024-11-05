@@ -47,7 +47,7 @@ class ModelRLConfigSearch:
     reward_multiplier_combo_hold_drawdown: List[float] = field(default_factory=[])
 
     progress_bar: bool = True
-    checkpoints_folder: str = 'checkpoints/'
+    checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
 @dataclass
 class ModelRLConfig:
@@ -95,7 +95,7 @@ class ModelRLConfig:
     reward_multiplier_combo_hold_drawdown: float = 0,
 
     progress_bar: bool = True
-    checkpoints_folder: str = 'checkpoints/'
+    checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
 @dataclass
 class ModelLSTMConfigSearch:
@@ -125,7 +125,7 @@ class ModelLSTMConfig:
     last_activation: str = 'sigmoid'
 
     progress_bar: bool = True
-    checkpoints_folder: str = 'checkpoints/'
+    checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
 @dataclass
 class ModelMLPConfigSearch:
@@ -151,7 +151,7 @@ class ModelMLPConfig:
     last_activation: str = 'relu'
 
     progress_bar: bool = True
-    checkpoints_folder: str = 'checkpoints/'
+    checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
 @dataclass
 class ModelTimeConfigSearch:
@@ -313,15 +313,20 @@ class ModelConfig:
 # H+15m@15m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 7/8
 # H+5m@5m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 1/8
 
-# TODO:
-# H+15m@15m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings_new NO SELL 1/24
+# AIPC:
+# H+15m@15m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings_new NO SELL 1/8
+# H+15m@15m ["trpo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings_new NO SELL 1/8
+# H+15m@15m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings_new NO SELL 1/8
+
 
 #TODO:
+# H+15m@15m ["duel-dqn-custom-lstm"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings_new NO SELL 1/8
+# H+15m@15m ["munchausen-duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 1/8
+
 # inspect model
 # create an env which works for buys - we want to give a score based on TP/SL and not care about sell, so whenever the AI does a buy -> immediate reward based on future data
 # maybe immediate reward won't be so good -> the AI doesn't know where that 'reward' came from -> create an env that allows trading multiple positions and it shows the final profit per position (when sold at the next timestep)
 
-# stop loss could be > TP
 # check lookback1
 
 # run the checkpoint test to see the results
@@ -355,12 +360,12 @@ model_rl_h = ModelConfigSearch(
         # model_name= ["ppo", "reppo", "trpo", "a2c", "ars", "ars-mlp", "qrdqn", "dqn", "duel-dqn"], 
         # model_name= ["munchausen-dqn-custom", "rainbow-dqn-custom"],
         # model_name= ["trpo-custom", "reppo-custom", "ppo-custom"], # all can give good results
-        model_name= ["reppo-custom"],
+        # model_name= ["reppo-custom"],
         # model_name= ["trpo-custom"],
         # model_name= ["qrdqn-custom", "iqn-custom"],
         # model_name= ["a2c-custom"], # only last two with spectral_norm
 
-        # model_name= ["duel-dqn-custom"],
+        model_name= ["duel-dqn-custom"],
         # model_name= ["duel-dqn-custom-lstm"], # works well
         # model_name= ["munchausen-duel-dqn-custom-lstm"], # can work well
         # model_name= ["munchausen-duel-dqn-custom"], # can work well
@@ -431,7 +436,7 @@ model_rl_h = ModelConfigSearch(
         #     # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
         # ],
 
-        net_arch= [[512,64]],
+        # net_arch= [[512,64]],
         # custom_net_arch= [
         #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch count
         #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
@@ -445,13 +450,13 @@ model_rl_h = ModelConfigSearch(
         #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
         #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
         # ],
-        custom_net_arch= [
-            ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
-            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
-            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
-            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
-            ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
-        ],
+        # custom_net_arch= [
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
+        #     # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+        #     # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
+        #     # ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        # ],
         # net_arch= [[512,128,32]],
         # custom_net_arch= [
         #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch count
@@ -502,7 +507,7 @@ model_rl_h = ModelConfigSearch(
         #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
         # ],
         
-        # net_arch= [[512,256,64,32]],
+        net_arch= [[512,256,64,32]],
         # custom_net_arch= [
         #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch count
         #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
@@ -516,14 +521,14 @@ model_rl_h = ModelConfigSearch(
         #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],
         #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
         # ],
-        # custom_net_arch= [
-        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
-        #     # ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
-        #     # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "NoisyLinear", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
-        #     # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
-        #     # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
-        #     # ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],
-        # ],
+        custom_net_arch= [
+            ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+            # ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "NoisyLinear", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+            # ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        ],
         # custom_net_arch= [
         #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch count
 
@@ -837,7 +842,7 @@ model_rl_h = ModelConfigSearch(
         # reward_multiplier_combo_hold_drawdown= [0.0001, 0.01, 0.001, 1], #
         reward_multiplier_combo_hold_drawdown= [0.0001],
 
-        # checkpoints_folder='checkpoints/',
+        # checkpoints_folder='checkpoints',
         # checkpoint_to_load='rl_reppo-custom_combo_all_0.0001_20000_512_1000000_0.99_RMSprop_CELU_512|64_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1729800794.002219'
     )
 )
@@ -1119,9 +1124,9 @@ model_rl_comboall_adamax = ModelConfigSearch(
         reward_multiplier_combo_hold_profit= [100],
         reward_multiplier_combo_hold_drawdown= [0.01],
 
-        # checkpoints_folder='trials/',
+        # checkpoints_folder='trials',
         # checkpoint_to_load='rl_dqn_combo_all_0.01_0.995_Adamax_CELU_[64, 64]_1_1716187086.833314'
-        checkpoints_folder='checkpoints/',
+        checkpoints_folder='checkpoints',
         checkpoint_to_load='rl_dqn_combo_all_0.005_1000_4_1000000_0.995_Adamax_CELU_[64, 64, 64, 64]_1_1716768803.222076'
     )
 )
@@ -1172,7 +1177,7 @@ class ModelRLConfig:
     reward_multiplier_combo_hold_drawdown: float = 0,
 
     progress_bar: bool = True
-    checkpoints_folder: str = 'checkpoints/'
+    checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
 
 def get_models_simple():

@@ -40,6 +40,7 @@ import torch
 
 import sys
 import itertools
+import os
 
 optimizer_classes = {
     "Adam" : torch.optim.Adam,
@@ -803,7 +804,7 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
         
     if rl_model is not None:
         if config.model_rl.checkpoint_to_load is not None:
-            path = config.model_rl.checkpoints_folder + config.model_rl.checkpoint_to_load
+            path = os.path.join(config.model_rl.checkpoints_folder, config.model_rl.checkpoint_to_load)
             rl_model = rl_model.load(path)
             
         rl_model.set_logger(Logger(
