@@ -196,7 +196,7 @@ class ModelConfigSearch:
 @dataclass
 class ModelConfig:
     model_type: str # possible ["hodl", "rl", "technical", "time"]
-    iterations_to_pick_best: int = 1
+    iterations_to_pick_best: int = 10
     model_rl: ModelRLConfig | None = None
     model_lstm: ModelLSTMConfig | None = None
     model_mlp: ModelMLPConfig | None = None
@@ -308,12 +308,13 @@ class ModelConfig:
 # H+10m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 3/8
 # H+15m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 7/8
 # H+10m@10m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 17/24
-# H+5m@5m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 9/24
+# H+5m@5m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 11/24
 # H+15m@15m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 5/8
-# H+15m@15m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 5/8
+# H+15m@15m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 7/8
 # H+5m@5m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 1/8
 
-# H+15m@15m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 
+# TODO:
+# H+15m@15m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings_new NO SELL 1/24
 
 #TODO:
 # inspect model
@@ -446,10 +447,10 @@ model_rl_h = ModelConfigSearch(
         # ],
         custom_net_arch= [
             ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
-        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
-        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
-        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
-        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
         ],
         # net_arch= [[512,128,32]],
         # custom_net_arch= [
@@ -836,8 +837,8 @@ model_rl_h = ModelConfigSearch(
         # reward_multiplier_combo_hold_drawdown= [0.0001, 0.01, 0.001, 1], #
         reward_multiplier_combo_hold_drawdown= [0.0001],
 
-        checkpoints_folder='checkpoints/',
-        checkpoint_to_load='rl_reppo-custom_combo_all_0.0001_20000_512_1000000_0.99_RMSprop_CELU_512|64_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1729800794.002219'
+        # checkpoints_folder='checkpoints/',
+        # checkpoint_to_load='rl_reppo-custom_combo_all_0.0001_20000_512_1000000_0.99_RMSprop_CELU_512|64_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1729800794.002219'
     )
 )
 
