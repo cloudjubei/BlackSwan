@@ -114,7 +114,6 @@ def main(config: Config) -> None:
                         run_model(config, model_config, data_provider_train, env_train, env_test, result_states)
                         # if (not model_config.is_hodl()):
                         #     plot_actions_data(env_test)
-                            # return
                     
                     print(f'Run {run_count}/{run_count_total} Complete')
 

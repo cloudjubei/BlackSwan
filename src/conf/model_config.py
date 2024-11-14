@@ -303,25 +303,14 @@ class ModelConfig:
 
 
 
-# H+5m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 3/8
-# H+1m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 3/8
-# H+10m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 3/8
-# H+15m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 7/8
-# H+10m@10m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 17/24
-# H+5m@5m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 11/24
-# H+15m@15m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 5/8
-# H+15m@15m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 7/8
-# H+5m@5m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 1/8
+# H@5m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL
+# H+5m@5m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL
+# H+5m@5m ["trpo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL
+# H@5m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL
+# H+5m@5m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL
+# H+5m@5m ["duel-dqn-custom-lstm"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL
+# H+5m@5m ["munchausen-duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL
 
-# AIPC:
-# H+15m@15m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings_new NO SELL 1/8
-# H+15m@15m ["trpo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings_new NO SELL 1/8
-# H+15m@15m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings_new NO SELL 1/8
-
-
-#TODO:
-# H+15m@15m ["duel-dqn-custom-lstm"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings_new NO SELL 1/8
-# H+15m@15m ["munchausen-duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 1/8
 
 # inspect model
 # create an env which works for buys - we want to give a score based on TP/SL and not care about sell, so whenever the AI does a buy -> immediate reward based on future data

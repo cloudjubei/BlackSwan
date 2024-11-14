@@ -21,8 +21,6 @@ def plot_actions_data(env):
     # buysignals_data = (np.array(env.data_provider.buy_signals[env.data_provider.get_start_index():-1])[:end_point] - 3) * -0.01
 
     result_df = env.data_provider.get_raw_df_for_plotting()
-    print('post get_raw_df_for_plotting')
-    print(result_df.head())
     
     result_df['open'] = result_df['price_open']
     result_df['close'] = result_df['price']
