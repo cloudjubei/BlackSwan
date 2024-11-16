@@ -44,21 +44,21 @@ env_trade_all_tpsl = EnvConfig(
 # 0.02|0.01|0.005
 # 0.01|0.01|0.001
 
-# env_trade_all_tpsl_trailing0 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.02, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.01)
-# env_trade_all_tpsl_trailing1 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.02, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.01)
-# env_trade_all_tpsl_trailing2 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.02, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
-# env_trade_all_tpsl_trailing3 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
-# env_trade_all_tpsl_trailing4 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss= 0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.005)
+env_trade_all_tpsl_trailing0 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.02, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
+env_trade_all_tpsl_trailing1 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.02, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.01)
+env_trade_all_tpsl_trailing2 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.02, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
+env_trade_all_tpsl_trailing3 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
+env_trade_all_tpsl_trailing4 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss= 0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.005)
 
-# env_trade_all_tpsl_trailing1 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.005)
-# env_trade_all_tpsl_trailing2 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
-# env_trade_all_tpsl_trailing3 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.005, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
-# env_trade_all_tpsl_trailing4 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss= 0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.01)
+# env_trade_all_tpsl_trailing5 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.005)
+# env_trade_all_tpsl_trailing6 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
+# env_trade_all_tpsl_trailing7 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.005, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
+# env_trade_all_tpsl_trailing8 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss= 0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.01)
 
-env_trade_all_tpsl_trailing1 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.001, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
-env_trade_all_tpsl_trailing2 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.001, stop_loss= 0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
-env_trade_all_tpsl_trailing3 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.005, stop_loss= 0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
-env_trade_all_tpsl_trailing4 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.005, stop_loss= 0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
+env_trade_all_tpsl_trailing5 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.001, stop_loss= 0.02, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
+env_trade_all_tpsl_trailing6 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.001, stop_loss= 0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
+env_trade_all_tpsl_trailing7 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.005, stop_loss= 0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
+env_trade_all_tpsl_trailing8 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.005, stop_loss= 0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
 
 env_trade_all_tpsl_trailingTEST1 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss=0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.005)
 env_trade_all_tpsl_trailingTEST2 = EnvConfig(type= env_trade_all_tpsl.type, observations_contain= env_trade_all_tpsl.observations_contain, take_profit= 0.01, stop_loss=0.01, no_sell_action= env_trade_all_tpsl.no_sell_action, trailing_take_profit= 0.001)
@@ -84,8 +84,10 @@ env_trade_amount_1 = EnvConfig(
 def get_envs_simple():
     # return [env_trade_all_sl]
 
+    return [env_trade_all_tpsl_trailing0]
     # return [env_trade_all_tpsl_trailing1, env_trade_all_tpsl_trailing2, env_trade_all_tpsl_trailing3, env_trade_all_tpsl_trailing4]
-    return [env_trade_all_tpsl_trailingTEST1]
+    # return [env_trade_all_tpsl_trailing5, env_trade_all_tpsl_trailing6, env_trade_all_tpsl_trailing7, env_trade_all_tpsl_trailing8]
+    # return [env_trade_all_tpsl_trailingTEST1]
     # return [env_trade_all_tpsl_trailingTEST1, env_trade_all_tpsl_trailingTEST2, env_trade_all_tpsl_trailingTEST3, env_trade_all_tpsl_trailingTEST4]
     
 def get_envs_swaps():

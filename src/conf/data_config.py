@@ -25,10 +25,10 @@ data_2017_to_2023vs2024_only_price_percent = DataConfig(
     train_data_paths= [
         [
             # "binance/BTCUSDT-1m-2017-8.json", 
-            "binance/BTCUSDT-1m-2017-9.json", "binance/BTCUSDT-1m-2017-10.json", "binance/BTCUSDT-1m-2017-11.json", "binance/BTCUSDT-1m-2017-12.json",               
-            "binance/BTCUSDT-1m-2018-1.json", "binance/BTCUSDT-1m-2018-2.json", "binance/BTCUSDT-1m-2018-3.json", "binance/BTCUSDT-1m-2018-4.json", "binance/BTCUSDT-1m-2018-5.json", "binance/BTCUSDT-1m-2018-6.json", "binance/BTCUSDT-1m-2018-7.json", "binance/BTCUSDT-1m-2018-8.json", "binance/BTCUSDT-1m-2018-9.json", "binance/BTCUSDT-1m-2018-10.json", "binance/BTCUSDT-1m-2018-11.json", "binance/BTCUSDT-1m-2018-12.json",               
-            "binance/BTCUSDT-1m-2019-1.json", "binance/BTCUSDT-1m-2019-2.json", "binance/BTCUSDT-1m-2019-3.json", "binance/BTCUSDT-1m-2019-4.json", "binance/BTCUSDT-1m-2019-5.json", "binance/BTCUSDT-1m-2019-6.json", "binance/BTCUSDT-1m-2019-7.json", "binance/BTCUSDT-1m-2019-8.json", "binance/BTCUSDT-1m-2019-9.json", "binance/BTCUSDT-1m-2019-10.json", "binance/BTCUSDT-1m-2019-11.json", "binance/BTCUSDT-1m-2019-12.json",               
-            "binance/BTCUSDT-1m-2020-1.json", "binance/BTCUSDT-1m-2020-2.json", "binance/BTCUSDT-1m-2020-3.json", "binance/BTCUSDT-1m-2020-4.json", "binance/BTCUSDT-1m-2020-5.json", "binance/BTCUSDT-1m-2020-6.json", "binance/BTCUSDT-1m-2020-7.json", "binance/BTCUSDT-1m-2020-8.json", "binance/BTCUSDT-1m-2020-9.json", "binance/BTCUSDT-1m-2020-10.json", "binance/BTCUSDT-1m-2020-11.json", "binance/BTCUSDT-1m-2020-12.json",
+            # "binance/BTCUSDT-1m-2017-9.json", "binance/BTCUSDT-1m-2017-10.json", "binance/BTCUSDT-1m-2017-11.json", "binance/BTCUSDT-1m-2017-12.json",               
+            # "binance/BTCUSDT-1m-2018-1.json", "binance/BTCUSDT-1m-2018-2.json", "binance/BTCUSDT-1m-2018-3.json", "binance/BTCUSDT-1m-2018-4.json", "binance/BTCUSDT-1m-2018-5.json", "binance/BTCUSDT-1m-2018-6.json", "binance/BTCUSDT-1m-2018-7.json", "binance/BTCUSDT-1m-2018-8.json", "binance/BTCUSDT-1m-2018-9.json", "binance/BTCUSDT-1m-2018-10.json", "binance/BTCUSDT-1m-2018-11.json", "binance/BTCUSDT-1m-2018-12.json",               
+            # "binance/BTCUSDT-1m-2019-1.json", "binance/BTCUSDT-1m-2019-2.json", "binance/BTCUSDT-1m-2019-3.json", "binance/BTCUSDT-1m-2019-4.json", "binance/BTCUSDT-1m-2019-5.json", "binance/BTCUSDT-1m-2019-6.json", "binance/BTCUSDT-1m-2019-7.json", "binance/BTCUSDT-1m-2019-8.json", "binance/BTCUSDT-1m-2019-9.json", "binance/BTCUSDT-1m-2019-10.json", "binance/BTCUSDT-1m-2019-11.json", "binance/BTCUSDT-1m-2019-12.json",               
+            # "binance/BTCUSDT-1m-2020-1.json", "binance/BTCUSDT-1m-2020-2.json", "binance/BTCUSDT-1m-2020-3.json", "binance/BTCUSDT-1m-2020-4.json", "binance/BTCUSDT-1m-2020-5.json", "binance/BTCUSDT-1m-2020-6.json", "binance/BTCUSDT-1m-2020-7.json", "binance/BTCUSDT-1m-2020-8.json", "binance/BTCUSDT-1m-2020-9.json", "binance/BTCUSDT-1m-2020-10.json", "binance/BTCUSDT-1m-2020-11.json", "binance/BTCUSDT-1m-2020-12.json",
             "binance/BTCUSDT-1m-2021-1.json", "binance/BTCUSDT-1m-2021-2.json", "binance/BTCUSDT-1m-2021-3.json", "binance/BTCUSDT-1m-2021-4.json", "binance/BTCUSDT-1m-2021-5.json", "binance/BTCUSDT-1m-2021-6.json", "binance/BTCUSDT-1m-2021-7.json", "binance/BTCUSDT-1m-2021-8.json", "binance/BTCUSDT-1m-2021-9.json", "binance/BTCUSDT-1m-2021-10.json", "binance/BTCUSDT-1m-2021-11.json", "binance/BTCUSDT-1m-2021-12.json",
             "binance/BTCUSDT-1m-2022-1.json", "binance/BTCUSDT-1m-2022-2.json", "binance/BTCUSDT-1m-2022-3.json", "binance/BTCUSDT-1m-2022-4.json", "binance/BTCUSDT-1m-2022-5.json", "binance/BTCUSDT-1m-2022-6.json", "binance/BTCUSDT-1m-2022-7.json", "binance/BTCUSDT-1m-2022-8.json", "binance/BTCUSDT-1m-2022-9.json", "binance/BTCUSDT-1m-2022-10.json", "binance/BTCUSDT-1m-2022-11.json", "binance/BTCUSDT-1m-2022-12.json",
             "binance/BTCUSDT-1m-2023-1.json", "binance/BTCUSDT-1m-2023-2.json", "binance/BTCUSDT-1m-2023-3.json", "binance/BTCUSDT-1m-2023-4.json", "binance/BTCUSDT-1m-2023-5.json", "binance/BTCUSDT-1m-2023-6.json", "binance/BTCUSDT-1m-2023-7.json", "binance/BTCUSDT-1m-2023-8.json", "binance/BTCUSDT-1m-2023-9.json", "binance/BTCUSDT-1m-2023-10.json", "binance/BTCUSDT-1m-2023-11.json", "binance/BTCUSDT-1m-2023-12.json"
@@ -83,11 +83,11 @@ def get_datas_1h_1d():
     # return [data_2017_to_2023vs2024_only_price_percent]
     # return [data_2017_to_2023vs2024_only_price_percent_32]
     # return [data_2017_to_2023vs2024_only_price_percent_32_1m]
-    # return [data_2017_to_2023vs2024_only_price_percent_32_5m]
+    return [data_2017_to_2023vs2024_only_price_percent_32_5m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_5m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_10m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_10m]
-    return [data_2017_to_2023vs2024_only_price_percent_32_15m]
+    # return [data_2017_to_2023vs2024_only_price_percent_32_15m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_15m]
 
 def get_datas_1m_1h_1d():

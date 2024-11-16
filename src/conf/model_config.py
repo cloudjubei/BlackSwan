@@ -303,43 +303,33 @@ class ModelConfig:
 
 
 
-# H@5m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL
-# H+5m@5m ["reppo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL
-# H+5m@5m ["trpo-custom"] x [512,64] x lr[0.0001] x combo_all x test min x trailings NO SELL
-# H@5m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL
-# H+5m@5m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL
-# H+5m@5m ["duel-dqn-custom-lstm"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL
-# H+5m@5m ["munchausen-duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL
+# sH+5m@5m ["reppo-custom"] x [64,64,64,64,64,64] x lr[0.0001] x combo_all x test min x trailings NO SELL 1/8
+# sH+5m@5m ["reppo-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 1/12
+# sH+5m@5m ["reppo-custom"] x net_archs x lr[0.0001] x combo_all x test min x trailings NO SELL 1/5
+# sH+5m@5m ["duel-dqn-custom", "duel-dqn-custom-lstm", "munchausen-duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x combo_all x test min x trailings NO SELL 2/4
+# sH+5m@5m ["duel-dqn-custom"] x [512,256,64,32] x lr[0.0001] x reward_models x test min x trailings NO SELL 3/5
 
 
-# inspect model
+# record time
+# record learning reward + money
+
 # create an env which works for buys - we want to give a score based on TP/SL and not care about sell, so whenever the AI does a buy -> immediate reward based on future data
 # maybe immediate reward won't be so good -> the AI doesn't know where that 'reward' came from -> create an env that allows trading multiple positions and it shows the final profit per position (when sold at the next timestep)
 
+# check reward models
 # check lookback1
 
-# run the checkpoint test to see the results
-
-
-# TODO:
-# check reward models with Hourly+min test
 
 # check if allowing the model to make many bets with small amounts works better with rolling TP
 
-#TODO MIN:
-# diff custom setups - try duel-dqn-custom first
+#TODO:
 # combo FIX getting it
 # diff reward models
 # x indicators
-# diff approaches - munchausen, qrdqn etc
 
 # TODO: min combo profitable
 
 # TODO: DQN line 210 uses HuberLoss for the loss function -> make this customizable and try MSE as proposed by 1 paper -> this needs to be tested against different optimizer_class
-
-# and then min tests
-
-
 # TODO: optimizer optim
 
 
@@ -355,6 +345,7 @@ model_rl_h = ModelConfigSearch(
         # model_name= ["a2c-custom"], # only last two with spectral_norm
 
         model_name= ["duel-dqn-custom"],
+        # model_name= ["duel-dqn-custom", "duel-dqn-custom-lstm", "munchausen-duel-dqn-custom"],
         # model_name= ["duel-dqn-custom-lstm"], # works well
         # model_name= ["munchausen-duel-dqn-custom-lstm"], # can work well
         # model_name= ["munchausen-duel-dqn-custom"], # can work well
@@ -366,8 +357,8 @@ model_rl_h = ModelConfigSearch(
         # model_name= ["duel-dqn-lstm"], # can have some very good results with hidden size 2,4
 
         # reward_model= ["combo_all", "profit_percentage3", "profit_percentage4", "profit_all", "profit_all2"],# "combo"],
-        # reward_model= ["profit_percentage3", "profit_percentage4", "profit_all", "profit_all2"],# "combo"],
-        reward_model= ["combo_all"],
+        reward_model= ["profit_percentage3", "profit_percentage4", "profit_all", "profit_all2"],# "combo"],
+        # reward_model= ["combo_all"],
 
         # learning_rate= [0.0001, 0.0005, 0.001],
         learning_rate= [0.0001],
@@ -426,6 +417,7 @@ model_rl_h = ModelConfigSearch(
         # ],
 
         # net_arch= [[512,64]],
+        # net_arch= [[4096,32],[2048,512],[1024,256],[512,128]],
         # custom_net_arch= [
         #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch count
         #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
@@ -491,9 +483,9 @@ model_rl_h = ModelConfigSearch(
         # ],
         # custom_net_arch= [
         #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
-        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "weight_norm2"],
-        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
-        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+        #     # ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "weight_norm2"],
+        #     # ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+        #     # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
         # ],
         
         net_arch= [[512,256,64,32]],
