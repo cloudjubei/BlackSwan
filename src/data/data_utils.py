@@ -35,6 +35,7 @@ def plot_actions_data(env):
 
     result_df['actions_buy'] = np.array([1 if a == 1 else np.nan for a in actions])
     result_df['actions_made_buy'] = result_df['actions_buy'] * result_df['actions_made'] * result_df['tpsls_sell_reverse']
+    result_df['actions_buy_total'] = result_df['actions_buy'] * result_df['close']
 
     result_df['actions_sell'] = np.array([1 if a == 2 else np.nan for a in actions])
     result_df['actions_made_sell'] = result_df['actions_sell'] * result_df['actions_made'] * result_df['tpsls_sell_reverse']
@@ -52,8 +53,10 @@ def plot_actions_data(env):
     tpsl_tp_signals = mpf.make_addplot(result_df['tpsls_made_tp'], type='scatter', markersize=100, marker='v', color='purple', secondary_y=False)
     reward_signals = mpf.make_addplot(rewards, color='purple', ylabel='Rewards', secondary_y=True)
     # buysignals_data_signals = mpf.make_addplot(buysignals_data, color='red', ylabel='Buy|Sell', type='scatter', secondary_y=True)
+    buy_attempts = mpf.make_addplot(result_df['actions_buy_total'], type='scatter', markersize=60, marker='^', color='green', secondary_y=False)
 
-    mpf.plot(result_df, type='candle', style='charles', title='Buy Sell Signals', ylabel='Price', addplot=[buy_signals, sell_signals, tpsl_sl_signals, tpsl_tp_signals, reward_signals])
+    # mpf.plot(result_df, type='candle', style='charles', title='Buy Sell Signals', ylabel='Price', addplot=[buy_signals, sell_signals, tpsl_sl_signals, tpsl_tp_signals, reward_signals])
+    mpf.plot(result_df, type='candle', style='charles', title='Buy Sell Signals', ylabel='Price', addplot=[buy_signals, sell_signals, tpsl_sl_signals, tpsl_tp_signals, reward_signals, buy_attempts])
     # mpf.plot(result_df, type='candle', style='charles', title='Buy Sell Signals', ylabel='Price', addplot=[buy_signals, sell_signals, tpsl_sell_signals, reward_signals, buysignals_data_signals])
     
     # env.render_profits()
