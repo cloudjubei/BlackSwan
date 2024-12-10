@@ -5,6 +5,7 @@ import pandas as pd
 import mplfinance as mpf
 
 def plot_actions_data(env):
+    
     # dfs = []
     
     # for path in paths:
@@ -14,10 +15,15 @@ def plot_actions_data(env):
 
     end_point = 26 * 24 * 60
     # end_point = 3 * 26 * 24 * 60
-    actions = env.actions[env.data_provider.get_lookback_window()-1:][:end_point]
-    actions_made = env.actions_made[env.data_provider.get_lookback_window()-1:][:end_point]
-    tpsls = env.tpsls[env.data_provider.get_lookback_window()-1:][:end_point]
-    rewards = env.rewards_history[env.data_provider.get_lookback_window():][:end_point]
+    actions = env.actions[:end_point]
+    actions_made = env.actions_made[:end_point]
+    tpsls = env.tpsls[:end_point]
+    rewards = env.rewards_history[:end_point]
+
+    # actions = env.actions[env.data_provider.get_lookback_window()-1:][:end_point]
+    # actions_made = env.actions_made[env.data_provider.get_lookback_window()-1:][:end_point]
+    # tpsls = env.tpsls[env.data_provider.get_lookback_window()-1:][:end_point]
+    # rewards = env.rewards_history[env.data_provider.get_lookback_window():][:end_point]
     # buysignals_data = (np.array(env.data_provider.buy_signals[env.data_provider.get_start_index():-1])[:end_point] - 3) * -0.01
 
     result_df = env.data_provider.get_raw_df_for_plotting()
@@ -26,7 +32,7 @@ def plot_actions_data(env):
     result_df['close'] = result_df['price']
     result_df['low'] = result_df['price_low']
     result_df['high'] = result_df['price_high']
-    result_df = result_df[['timestamp', 'open', 'close', 'low', 'high']].iloc[:-1].iloc[:end_point]
+    result_df = result_df[['timestamp', 'open', 'close', 'low', 'high']].iloc[:end_point]
     result_df['timestamp'] = pd.to_datetime(result_df['timestamp'], unit='ms')
     result_df.set_index('timestamp', inplace=True)
     
@@ -61,6 +67,43 @@ def plot_actions_data(env):
     
     # env.render_profits()
 
+def plot_actions_data_non_trade(env):
+    
+    end_point = 26 * 24 * 60
+    # end_point = 3 * 26 * 24 * 60
+    actions = env.actions[:end_point]
+    rewards = env.rewards_history[:end_point]
+    accuracies = env.accuracies[:end_point]
+
+    result_df = env.data_provider.get_raw_df_for_plotting()
+    # print(result_df.head())
+    
+    result_df['open'] = result_df['price_open']
+    result_df['close'] = result_df['price']
+    result_df['low'] = result_df['price_low']
+    result_df['high'] = result_df['price_high']
+    result_df = result_df[['timestamp', 'open', 'close', 'low', 'high', 'volume']].iloc[:-1].iloc[env.data_provider.get_lookback_window()-1:end_point]
+    result_df['timestamp'] = pd.to_datetime(result_df['timestamp'], unit='ms')
+    result_df.set_index('timestamp', inplace=True)
+    
+    print('len of results:', len(result_df), ' len of actions: ', len(actions))
+
+
+
+    result_df['rewards_pos'] = np.array([1 if a > 0 else np.nan for a in rewards])
+    result_df['rewards_neg'] = np.array([1 if a < 0 else np.nan for a in rewards])
+    result_df['actions_ok'] = np.array([1 if a > 0 else np.nan for a in actions]) * result_df['rewards_pos'] * result_df['low']
+    result_df['actions_bad'] = np.array([1 if a > 0 else np.nan for a in actions]) * result_df['rewards_neg'] * result_df['high']
+
+    # result_df['actions_ok'] = np.array([1 if a > 0 else np.nan for a in actions]) * result_df['low']
+
+    action_signals_ok = mpf.make_addplot(result_df['actions_ok'], type='scatter', markersize=100, marker='^', color='blue', secondary_y=False)
+    action_signals_bad = mpf.make_addplot(result_df['actions_bad'], type='scatter', markersize=100, marker='v', color='red', secondary_y=False)
+    # reward_signals = mpf.make_addplot(rewards, color='purple', ylabel='Rewards', secondary_y=True)
+    # accuracies_signals = mpf.make_addplot(accuracies, color='yellow', ylabel='Rewards', secondary_y=True)
+
+    mpf.plot(result_df, type='candle', style='charles', title='Action Signals', ylabel='Price', addplot=[action_signals_ok, action_signals_bad])
+    # mpf.plot(result_df, type='candle', style='charles', title='Action Signals', ylabel='Price', addplot=[action_signals, reward_signals, accuracies_signals])
 
 def plot_indicator(df, indicator, name):
     result_df = df[['timestamp', 'price_open', 'price', 'price_low', 'price_high']].iloc[0:50]
@@ -78,17 +121,17 @@ def plot_indicator(df, indicator, name):
     
     # env.render_profits()
 
-def fill_missing_timestamps(folder='binance'):
-    # new_folder = 'binance_new'
-    # for filename in os.listdir(new_folder):
-    #     if filename.endswith(".json"):
-    #         file_path = os.path.join(new_folder, filename)
-    #         with open(file_path, 'r') as file:
-    #             data = json.load(file)
+def fill_missing_timestamps(folder='binance_new'):
+    new_folder = 'binance2'
+    for filename in os.listdir(new_folder):
+        if filename.endswith(".json"):
+            file_path = os.path.join(new_folder, filename)
+            with open(file_path, 'r') as file:
+                data = json.load(file)
 
-    #             new_filepath = os.path.join(folder, "BTCUSDT-1m-" + filename)
-    #             with open(new_filepath, 'w') as file2:
-    #                 json.dump(data, file2, default=str, separators=(',', ':'))
+                new_filepath = os.path.join(folder, "SOLUSDT-1m-" + filename)
+                with open(new_filepath, 'w') as file2:
+                    json.dump(data, file2, default=str, separators=(',', ':'))
 
     for filename in os.listdir(folder):
         if filename.endswith(".json"):

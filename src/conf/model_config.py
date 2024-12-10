@@ -30,6 +30,7 @@ class ModelRLConfigSearch:
     episodes: List[int] = field(default_factory=[])
 
     reward_multiplier_combo_noaction: List[float] = field(default_factory=[])
+    reward_multiplier_combo_wrongaction: List[float] = field(default_factory=[])
     reward_multiplier_combo_positionprofitpercentage: List[float] = field(default_factory=[])
     reward_multiplier_combo_buy: List[float] = field(default_factory=[])
     reward_multiplier_combo_sell: List[float] = field(default_factory=[])
@@ -78,6 +79,7 @@ class ModelRLConfig:
     episodes: int = 1
 
     reward_multiplier_combo_noaction: float = 0
+    reward_multiplier_combo_wrongaction: float = 0
     reward_multiplier_combo_positionprofitpercentage: float = 0
     reward_multiplier_combo_buy: float = 0
     reward_multiplier_combo_sell: float = 0
@@ -209,11 +211,6 @@ class ModelConfig:
     def is_hodl(self) -> bool:
         return self.model_type == "hodl"
     
-# duel_dqn seems to get much better rewards than dqn, yet much lower profits on combo_actions_diff
-# drawdown + profit percentage seems to be an ok indicator -> the model definitely learns something
-# profit_percentage2 + profit_percentage3 + profit_percentage4 -> are all ok indicators, the model learns from them
-# buy_sell_signal + buy_sell_signal2 -> are ok
-
 # indicators1 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi5", "rsi10", "rsi15"]
 # indicators2 - ["timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "rsi10", "choppiness30"]
 # indicators3 - ["kallman15", "timeseriesMomentum7", "closenessTo1000", "closenessTo10000", "meanReversion10", "meanReversion15", "choppiness30", "bollinger15Low"]
@@ -312,8 +309,8 @@ class ModelConfig:
 #TODO:
 # record time
 # record learning reward + money
+# give model info about trailing profit distance
 
-# create an env which works for buys - we want to give a score based on TP/SL and not care about sell, so whenever the AI does a buy -> immediate reward based on future data
 # maybe immediate reward won't be so good -> the AI doesn't know where that 'reward' came from -> create an env that allows trading multiple positions and it shows the final profit per position (when sold at the next timestep)
 
 # check reward models
@@ -325,7 +322,7 @@ class ModelConfig:
 # TODO: optimizer optim
 
 
-model_rl_h = ModelConfigSearch(
+model_rl = ModelConfigSearch(
     model_type= "rl",
     model_rl= ModelRLConfigSearch(
         # model_name= ["ppo", "reppo", "trpo", "a2c", "ars", "ars-mlp", "qrdqn", "dqn", "duel-dqn"], 
@@ -349,7 +346,11 @@ model_rl_h = ModelConfigSearch(
 
         # reward_model= ["combo_all", "profit_percentage3", "profit_percentage4", "profit_all", "profit_all2"],# "combo"],
         # reward_model= ["profit_percentage3", "profit_percentage4", "profit_all", "profit_all2"],# "combo"],
-        reward_model= ["combo_all"],
+        # reward_model= ["combo_all"],
+        # reward_model= ["combo"],
+        # reward_model= ["combo_all", "combo"],
+        reward_model= ["combo_all2"],
+        # reward_model= ["combo2"],
 
         # learning_rate= [0.0001, 0.0005, 0.001],
         learning_rate= [0.0001],
@@ -530,6 +531,269 @@ model_rl_h = ModelConfigSearch(
         #     ["Linear", "Dropout05", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout05", "activation_fn", "Linear"],
         #     ["Linear", "LayerNorm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
         # ],
+
+        episodes= [1],
+
+        reward_multiplier_combo_noaction= [-1],
+        reward_multiplier_combo_wrongaction= [-0.01],
+        # reward_multiplier_combo_wrongaction= [0, -0.001, -0.01, -0.1, -1],
+        reward_multiplier_combo_positionprofitpercentage= [10],
+        reward_multiplier_combo_buy= [0.1],
+        reward_multiplier_combo_sell= [1000],
+
+        # reward_multiplier_combo_sell_profit= [1000, 100, 10], #
+        reward_multiplier_combo_sell_profit= [1000],
+        # reward_multiplier_combo_sell_profit_prev= [100, 10, 1, 0], #
+        reward_multiplier_combo_sell_profit_prev= [100],
+        # reward_multiplier_combo_sell_perfect= [0.001, 0, 0.0001], #
+        reward_multiplier_combo_sell_perfect= [0.001],
+        # reward_multiplier_combo_sell_drawdown= [0, 0.1, 0.001], #
+        reward_multiplier_combo_sell_drawdown= [0],
+        # reward_multiplier_combo_buy_profit= [1, 0.1, 1000], #
+        reward_multiplier_combo_buy_profit= [1],
+        # reward_multiplier_combo_buy_perfect= [0.001, 0.1], #
+        reward_multiplier_combo_buy_perfect= [0.001],
+        
+        # reward_multiplier_combo_buy_profitable_offset= [5, 10], #
+        reward_multiplier_combo_buy_profitable_offset= [5],
+        # reward_multiplier_combo_buy_profitable= [0.1, 0.01, 0.001], #
+        reward_multiplier_combo_buy_profitable= [0.1],
+
+        # reward_multiplier_combo_buy_drawdown= [0.001, 0.1, 10], #
+        reward_multiplier_combo_buy_drawdown= [0.001],
+        # reward_multiplier_combo_hold_profit= [10, 1, 100], #
+        reward_multiplier_combo_hold_profit= [10],
+        # reward_multiplier_combo_hold_drawdown= [0.0001, 0.01, 0.001, 1], #
+        reward_multiplier_combo_hold_drawdown= [0.0001],
+
+        # checkpoint_to_load='rl_reppo-custom_combo_all2_0~0001_20000_512_1000000_0~99_RMSprop_CELU_512]64_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1733280295~7779999'
+    )
+)
+model_rl_dip = ModelConfigSearch(
+    model_type= "rl",
+    model_rl= ModelRLConfigSearch(
+        # model_name= ["duel-dqn-custom"],
+        model_name= ["reppo-custom"],
+        reward_model= ["dip"],
+
+        learning_rate= [0.0001],
+        batch_size= [512],
+        buffer_size = [1_000_000],
+        gamma = [0.99],
+        tau = [0.99],
+        exploration_fraction = [0.1],
+        exploration_final_eps = [0.2],
+        learning_starts= [20_000],
+        train_freq= [16],
+        gradient_steps= [-1],
+        target_update_interval= [10_000],
+        max_grad_norm= [0.01],
+
+        optimizer_class = ['RMSprop'],
+        optimizer_eps = [0.5],
+
+        optimizer_weight_decay = [0.00000001],
+        optimizer_centered = [True],
+        optimizer_alpha = [0.9],
+        optimizer_momentum = [0.0001], 
+
+        activation_fn= ['CELU'],
+        
+
+        # net_arch= [[512,64]],
+        net_arch= [[2048,512]],
+        custom_net_arch= [
+            ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        ],
+
+        # 0.2, -1, 1.2, -1.1 - 0.308@10m
+
+        episodes= [1],
+        reward_multiplier_combo_noaction= [0.01, 0], # not-dip + no action
+        reward_multiplier_combo_wrongaction= [-1], # dip + no action
+        reward_multiplier_combo_buy= [1], # dip + action
+        reward_multiplier_combo_sell= [-1], # not-dip + action
+
+        # reward_multiplier_combo_noaction= [0.2], # not-dip + no action
+        # reward_multiplier_combo_wrongaction= [-1], # dip + no action
+        # reward_multiplier_combo_buy= [1.2], # dip + action
+        # reward_multiplier_combo_sell= [-1.1], # not-dip + action
+
+        reward_multiplier_combo_positionprofitpercentage= [10],
+
+        reward_multiplier_combo_sell_profit= [1000],
+        reward_multiplier_combo_sell_profit_prev= [100],
+        reward_multiplier_combo_sell_perfect= [0.001],
+        reward_multiplier_combo_sell_drawdown= [0],
+        reward_multiplier_combo_buy_profit= [1],
+        reward_multiplier_combo_buy_perfect= [0.001],
+        
+        reward_multiplier_combo_buy_profitable_offset= [5],
+        reward_multiplier_combo_buy_profitable= [0.1],
+
+        reward_multiplier_combo_buy_drawdown= [0.001],
+        reward_multiplier_combo_hold_profit= [10],
+        reward_multiplier_combo_hold_drawdown= [0.0001],
+
+        # checkpoint_to_load='rl_reppo-custom_dip_0~0001_20000_512_1000000_0~99_RMSprop_CELU_512]64_Batcd-Liner-actin-Dropt-Noisr-Dropt-actin-Liner_1_1733372245~92985'
+    )
+)
+
+
+model_hodl = ModelConfigSearch(
+    model_type= "hodl"
+)
+model_time = ModelConfigSearch(
+    model_type= "time",
+    model_time= ModelTimeConfigSearch(
+        time_buy=[600, 700, 800, 900, 1000, 1100, 1200, 1300],
+        time_sell=[1400, 1500, 1600, 1700, 1800, 1900, 2000]
+    )
+)
+model_time2 = ModelConfigSearch(
+    model_type= "time",
+    model_time= ModelTimeConfigSearch(
+        time_buy=[1000,1100,1200,1300,1350],
+        time_sell=[1400,1401,1405,1410,1430,1500,1505,1600]
+    )
+)
+model_technical_bollinger= ModelConfigSearch(
+    model_type= "technical",
+    model_technical= ModelTechnicalConfigSearch(
+        buy_indicator= ["bollinger20Low"],
+        buy_amount_threshold= [1.01, 1.05, 1.1, 1.2, 1.3, 1.5],
+        buy_amount_is_multiplier= True,
+        buy_is_price_check= True,
+        sell_indicator= ["bollinger20High"],
+        sell_amount_threshold= [0.5, 0.7, 0.8, 0.9, 0.95, 0.99],
+        sell_amount_is_multiplier= True,
+        sell_is_price_check= True,
+    )
+)
+model_technical_kallmanfilter5 = ModelConfigSearch(
+    model_type= "technical",
+    model_technical= ModelTechnicalConfigSearch(
+        buy_indicator= ["kallman5Momentum"],
+        buy_amount_threshold= [0.01, 0.1, 0.6, 1.0, 5.0],
+        sell_indicator= ["kallman5Momentum"],
+        sell_amount_threshold= [-0.01, -0.1, -0.6, -1.0, -5.0],
+    )
+)
+model_technical_kallmanfilter14 = ModelConfigSearch(
+    model_type= "technical",
+    model_technical= ModelTechnicalConfigSearch(
+        buy_indicator= ["kallman14Momentum"],
+        buy_amount_threshold= [0.01, 0.1, 0.6, 1.0, 5.0],
+        sell_indicator= ["kallman14Momentum"],
+        sell_amount_threshold= [-0.01, -0.1, -0.6, -1.0, -5.0],
+    )
+)
+model_technical_kallmanfilter20 = ModelConfigSearch(
+    model_type= "technical",
+    model_technical= ModelTechnicalConfigSearch(
+        buy_indicator= ["kallman20Momentum"],
+        buy_amount_threshold= [0.01, 0.1, 0.6, 1.0, 5.0],
+        sell_indicator= ["kallman20Momentum"],
+        sell_amount_threshold= [-0.01, -0.1, -0.6, -1.0, -5.0],
+    )
+)
+
+model_time_test = ModelConfigSearch(
+    model_type= "time",
+    model_time= ModelTimeConfigSearch(
+        time_buy=[1200],
+        time_sell=[1400]
+    )
+)
+model_technical_kallmanfilter_test = ModelConfigSearch(
+    model_type= "technical",
+    model_technical= ModelTechnicalConfigSearch(
+        buy_indicator= ["kallman20Momentum"],
+        buy_amount_threshold= [0.01],
+        sell_indicator= ["kallman20Momentum"],
+        sell_amount_threshold= [-0.01],
+    )
+)
+model_technical_bollinger_test = ModelConfigSearch(
+    model_type= "technical",
+    model_technical= ModelTechnicalConfigSearch(
+        buy_indicator= ["bollinger20Low"],
+        buy_amount_threshold= [1.3],
+        buy_amount_is_multiplier= True,
+        buy_is_price_check= True,
+        sell_indicator= ["bollinger20High"],
+        sell_amount_threshold= [0.7],
+        sell_amount_is_multiplier= True,
+        sell_is_price_check= True,
+    )
+)
+
+@dataclass
+class ModelRLConfig:
+    model_name: str
+    reward_model: str
+    learning_rate: float = 0.0001
+    batch_size: int = 32
+    buffer_size: int = 1_000_000
+    gamma: float = 0.99
+    tau: float = 1.0
+    exploration_fraction: float = 0.1
+    exploration_final_eps: float = 0.05
+    learning_starts: int = 50000
+    train_freq: int = 4
+    gradient_steps: int = 1
+    target_update_interval: int = 10000
+    max_grad_norm: float = 10
+    optimizer_class: str = 'Adam'
+    optimizer_eps: float = 0.00000001
+    optimizer_weight_decay: float = 0
+    optimizer_centered: bool = False
+    optimizer_alpha: float = 0.99
+    optimizer_momentum: float = 0
+    activation_fn: str = 'ReLU'
+    net_arch: List[int] = field(default_factory=[])
+    custom_net_arch: List[str] = field(default_factory=[])
+
+    episodes: int = 1
+
+    reward_multiplier_combo_noaction: float = 0
+    reward_multiplier_combo_wrongaction: float = 0
+    reward_multiplier_combo_positionprofitpercentage: float = 0
+    reward_multiplier_combo_buy: float = 0
+    reward_multiplier_combo_sell: float = 0
+
+    reward_multiplier_combo_sell_profit: float = 0,
+    reward_multiplier_combo_sell_profit_prev: float = 0,
+    reward_multiplier_combo_sell_perfect: float = 0,
+    reward_multiplier_combo_sell_drawdown: float = 0,
+    reward_multiplier_combo_buy_profit: float = 0,
+    reward_multiplier_combo_buy_perfect: float = 0,
+    reward_multiplier_combo_buy_profitable_offset: int = 0,
+    reward_multiplier_combo_buy_profitable: float = 0,
+    reward_multiplier_combo_buy_drawdown: float = 0,
+    reward_multiplier_combo_hold_profit: float = 0,
+    reward_multiplier_combo_hold_drawdown: float = 0,
+
+    progress_bar: bool = True
+    checkpoints_folder: str = 'checkpoints'
+    checkpoint_to_load: str | None = None
+
+def get_models_simple():
+    return [model_hodl, model_time_test, model_technical_kallmanfilter_test, model_technical_bollinger_test]
+
+def get_models_rl():
+    # return [model_hodl, model_rl]
+    return [model_rl_dip]
+
+def get_models_all():
+    return [model_hodl]
+
+
+
 
         # tested= [
         #     ["LayerNorm", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],

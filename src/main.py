@@ -7,7 +7,7 @@ from src.conf.structured_config import Config
 from src.conf.data_config import DataConfig
 from src.conf.model_config import ModelConfig
 from src.data.data_factory import create_provider
-from src.data.data_utils import fill_missing_timestamps, plot_actions_data
+from src.data.data_utils import fill_missing_timestamps, plot_actions_data, plot_actions_data_non_trade
 from src.environment.env_factory import create_environment
 from src.model.model_factory import create_model, get_model_combinations
 from src.environment.abstract_env import AbstractEnv
@@ -31,7 +31,7 @@ def run_training(config: Config, model: AbstractModel, env: AbstractEnv, data_pr
 
     # env.log_metrics_over_time(f'train', not config.local_only)
 
-    print(f'Model finished learning with total reward: {env.total_reward} and profit: ${env.total_profit}')
+    print(f'Model finished learning with total reward: {env.total_reward}')
     return env.get_run_state()
 
 def run_testing(config: Config, model: AbstractModel, env: AbstractEnv, deterministic: bool = True):
@@ -73,11 +73,10 @@ def get_model_configs_count(config: Config) -> int:
 # AMD Ryzen Threadripper PRO 5995WX 16-core + RTX 4090  -> 440 it/s + 235 it/s SBX + 74 it/s rainbow + 224 it/s iqn
 # 490 it/s vs 385 it/s vs 250 it/s MAC
 
-@hydra.main(version_base=None, config_name="config_simple_1h_1d")
-# @hydra.main(version_base=None, config_name="config_simple_1m_1h_1d")
+@hydra.main(version_base=None, config_name="config_simple")
+# @hydra.main(version_base=None, config_name="config_simple_other")
 def main(config: Config) -> None:
-    # fill_missing_timestamps("binance_new")
-    # return
+
     pd.options.display.float_format = '{:.3f}'.format
     np.set_printoptions(formatter={'float_kind':'{:.4f}'.format})
 
@@ -100,6 +99,8 @@ def main(config: Config) -> None:
             print("Creating testing environment...")
             env_test = create_environment(env_config, data_provider_test, config.device)
 
+            print(f'Run 0/{run_count_total} Started')
+
             for model_config_search in config.model_configs:
                 model_config_combinations = get_model_combinations(model_config_search)
                 for model_config in model_config_combinations:
@@ -113,15 +114,17 @@ def main(config: Config) -> None:
                         print(f'Iteration {i+1}/{max_iterations}')
                         run_model(config, model_config, data_provider_train, env_train, env_test, result_states)
                         # if (not model_config.is_hodl()):
-                        #     plot_actions_data(env_test)
+                        #     plot_actions_data_non_trade(env_test)
+                            # plot_actions_data(env_test)
                     
                     print(f'Run {run_count}/{run_count_total} Complete')
 
-        
-    df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "$", "%", "Trade$", "CompoundTrade$", "Wins", "Losses", "Win%", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "#trades", "SLs", "SL$", "Multipliers"])
+    # df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "$", "%", "Trade$", "CompoundTrade$", "Wins", "Losses", "Win%", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "#trades", "SLs", "SL$", "Multipliers"])
+    df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "F1", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Totals", "Multipliers"])
     df_results.to_csv(f'results_{time.time()}.csv', index=False)  
 
-    df_results = df_results.drop(columns=["Data", "Env", "%", "CompoundTrade$", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "SLs", "SL$", "Multipliers"])
+    # df_results = df_results.drop(columns=["Data", "Env", "%", "CompoundTrade$", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "SLs", "SL$", "Multipliers"])
+    df_results = df_results.drop(columns=["Data", "Env", "Acc%", "Prec%", "Rec%", "-Rec%", "Multipliers"])
     pd.set_option('display.max_rows', None)  # None means unlimited rows
     # pd.set_option('display.max_columns', None)  # None means unlimited columns
     print(df_results)

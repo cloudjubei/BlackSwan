@@ -6,6 +6,12 @@ import numpy as np
 
 class TradeAllCryptoEnv(BaseCryptoEnv):
     
+    # Action space: 0 = Hold, 1 = Buy, 2 = Sell (BEWARE: by default the RL models return actions as [0..<n])
+    def create_action_space(self) -> spaces.Discrete:
+        if self.env_config.no_sell_action:
+            return spaces.Discrete(2)
+        return spaces.Discrete(3)
+    
     def take_action(self, action) -> bool:
         if action == 1: # Buy
             balance = self.balances[-1]
