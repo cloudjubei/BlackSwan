@@ -33,13 +33,6 @@ class BaseCryptoEnv(AbstractEnv):
         obs, _ = self.reset()
         self.observation_space = self.create_observation_space(obs)
 
-
-    # Action space: 0 = Hold, 1 = Buy, 2 = Sell (BEWARE: by default the RL models return actions as [0..<n])
-    def create_action_space(self) -> spaces.Discrete:
-        if self.env_config.no_sell_action:
-            return spaces.Discrete(2)
-        return spaces.Discrete(3)
-
     def create_observation_space(self, initial_observation) -> spaces.Box:
         # print(f'initial_observation.shape: {initial_observation.shape}')
         return spaces.Box(
@@ -75,6 +68,28 @@ class BaseCryptoEnv(AbstractEnv):
                 extra_values.append(vs)
             else:
                 extra_values += vs
+        if self.env_config.take_profit is not None:
+            take_profit_threshold = self.env_config.take_profit
+            
+            vs = []
+            for i in range(lookback_window_size-1, -1, -1):
+                index = self.current_step - i
+                buys_count = self.buys_count[index]
+                sells_count = self.sells_count[index]
+                if buys_count > sells_count:
+                    net_worth = self.net_worths[index]
+                    profit_percentage = (net_worth / self.initial_net_worth) - 1
+                    if profit_percentage > 0:
+                        vs.append(profit_percentage/take_profit_threshold)
+                    else:
+                        vs.append(0)
+                else:
+                    vs.append(0)
+            if lookback_window_size > 1:
+                extra_values.append(vs)
+            else:
+                extra_values += vs
+
         if self.env_config.stop_loss is not None:
             stop_loss_threshold = self.env_config.stop_loss
 
@@ -353,6 +368,7 @@ class BaseCryptoEnv(AbstractEnv):
     def _calculate_drawdown(self):
         return 0 if self.drawdown_peak <= 0 else (self.drawdown_trough / self.drawdown_peak) - 1.0
     
+    
     def _calculate_reward(self):
         if self.reward_model == "combo":
 
@@ -368,7 +384,7 @@ class BaseCryptoEnv(AbstractEnv):
                     sell_reward2 = profit_percentage_prev * self.reward_multipliers["combo_sell_profit_prev"]
 
                     signal = self.data_provider.get_signal_buy_sell(self.current_step)
-                    perfect_sell = 1 if signal < 0 else 0
+                    perfect_sell = 1 if signal < -1 else 0
                     sell_reward3 = perfect_sell * self.reward_multipliers["combo_sell_perfect"]
 
                     drawdown = self.drawdowns[-1]
@@ -383,10 +399,10 @@ class BaseCryptoEnv(AbstractEnv):
                     buy_reward1 = profit_percentage * self.reward_multipliers["combo_buy_profit"]
 
                     buy_perfect = self.data_provider.get_signal_buy_sell(self.current_step)
-                    buy_perfect_signal = 1 if buy_perfect > 0 else 0
+                    buy_perfect_signal = 1 if buy_perfect > 1 else 0
                     buy_reward2 = buy_perfect_signal * self.reward_multipliers["combo_buy_perfect"]
 
-                    buy_profitable = self.data_provider.get_signal_buy_profitable(self.current_step) # 0 means next step will be profitable, 10 means will be profitable in 10 steps (default profit threshold 0.004)
+                    buy_profitable = self.data_provider.get_signal_buy_profitable(self.current_step) # 1 means next step will be profitable, 10 means will be profitable in 10 steps (default profit threshold 0.004)
                     buy_profitable_signal = self.reward_multipliers["combo_buy_profitable_offset"] - buy_profitable
                     buy_reward3 = buy_profitable_signal * self.reward_multipliers["combo_buy_profitable"]
 
@@ -404,8 +420,12 @@ class BaseCryptoEnv(AbstractEnv):
             
             drawdown = self.drawdowns[-1]
             hold_reward2 = drawdown * self.reward_multipliers["combo_hold_drawdown"]
+            wrong_action_reward = 0
+
+            if self.actions[-1] != 0 and self.reward_model == "combo2": # acting but shouldn't
+                wrong_action_reward = self.reward_multipliers["combo_wrongaction"]
             
-            return hold_reward1 + hold_reward2
+            return hold_reward1 + hold_reward2 + wrong_action_reward
 
         if self.reward_model == "combo_all" or self.reward_model == "combo_all2":
             if self.actions_made[-1]: # just made an action
@@ -425,8 +445,8 @@ class BaseCryptoEnv(AbstractEnv):
                 profit_percentage = net_worth/self.initial_net_worth - 1
                 prev_profit_percentage = prev_net_worth/self.initial_net_worth - 1
 
-                if self.reward_model == "combo_all2":
-                    return (profit_percentage - prev_profit_percentage + self.drawdowns[-1]) * self.reward_multipliers["combo_positionprofitpercentage"]
+                if self.actions[-1] == 1 and self.reward_model == "combo_all2": # buying but already in position
+                    return (profit_percentage - prev_profit_percentage) * self.reward_multipliers["combo_positionprofitpercentage"] + self.reward_multipliers["combo_wrongaction"]
 
                 return (profit_percentage - prev_profit_percentage) * self.reward_multipliers["combo_positionprofitpercentage"]
 
@@ -434,8 +454,13 @@ class BaseCryptoEnv(AbstractEnv):
                 price_prev = self.get_price(self.current_step-1)
                 price = self.current_price
                 price_diff = price/price_prev - 1
+
+                if self.actions[-1] == 2 and self.reward_model == "combo_all2": # selling but not in position
+                    return self.reward_multipliers["combo_wrongaction"]
+                
                 return price_diff * self.reward_multipliers["combo_noaction"]
             return 0
+
         elif self.reward_model == "buy_sell_signal" or self.reward_model == "buy_sell_signal2" or self.reward_model == "buy_sell_signal3" or self.reward_model == "buy_sell_signal4":
             if self.actions_made[-1]: # just made an action
                 signal = self.data_provider.get_signal_buy_sell(self.current_step)
@@ -443,11 +468,11 @@ class BaseCryptoEnv(AbstractEnv):
                     
                     sell_net_worth = self.sells[-1]
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
-                    if signal < 0: # perfect sell
+                    if signal < -1: # perfect sell
                         profit_percentage = profit_percentage * 1.1
                     return profit_percentage * 100
                 else:
-                    if signal > 0: # perfect buy
+                    if signal > 1: # perfect buy
                         return 1
                     
             if self.reward_model == "buy_sell_signal2" or self.reward_model == "buy_sell_signal3" or self.reward_model == "buy_sell_signal4":
@@ -462,50 +487,6 @@ class BaseCryptoEnv(AbstractEnv):
                     return (profit_percentage + self.drawdowns[-1]) * self.reward_multipliers["combo_positionprofitpercentage"]
                 return profit_percentage * self.reward_multipliers["combo_positionprofitpercentage"]
             return 0
-        elif self.reward_model == "combo_actions" or self.reward_model == "combo_actions2" or self.reward_model == "combo_actions3":
-
-            if self.actions_made[-1]: # just made an action
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # has made a sell action or SL/TP triggered
-                    sell_net_worth = self.sells[-1]
-                    profit_percentage = sell_net_worth/self.initial_net_worth - 1
-                    return profit_percentage * 10
-                
-                buy_signal = self.data_provider.get_signal_buy_sell(self.current_step)
-
-                multiplier = buy_signal - 2
-
-                if multiplier <= 0:
-                    out = 0.01 * ((1-multiplier)/(2 + 1))
-                    return out
-
-                out = -0.0001 * multiplier 
-                return out
-                
-            # signal = self.data_provider.get_hold_signal(self.current_step)
-            if self.current_step > 0:
-                if self.reward_model == "combo_actions2":
-                    return self.drawdowns[-1] * 0.1
-
-                multiplier = -1 if self.positions[-1] == 0 else 1
-                price_prev = self.get_price(self.current_step-1)
-                price = self.get_price(self.current_step)
-                price_diff = price/price_prev - 1
-                if self.reward_model == "combo_actions3":
-                    return (multiplier * price_diff + self.drawdowns[-1]) * 0.1
-                return multiplier * price_diff * 0.1
-            # print(f'REWARD NOTHING step: {self.current_step} price: {self.get_price(self.current_step)}')
-            return 0
-        elif self.reward_model == "drawdown":
-            if self.actions_made[-1]: # just made an action
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # has made a sell action or SL/TP triggered
-                    sell_net_worth = self.sells[-1]
-                    profit_percentage = sell_net_worth/self.initial_net_worth - 1
-                    return profit_percentage * self.reward_multipliers["combo_sell"]
-                
-            net_worth = self.net_worths[-1]
-            profit_percentage = net_worth/self.initial_net_worth - 1
-
-            return (profit_percentage + self.drawdowns[-1]) * self.reward_multipliers["combo_positionprofitpercentage"]
         
         elif self.reward_model == "profit_all" or self.reward_model == "profit_all2":
             if self.actions_made[-1]: # just made an action

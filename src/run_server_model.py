@@ -74,6 +74,7 @@ model_config = ModelConfig(
         episodes= 1,
 
         reward_multiplier_combo_noaction= 0.1,
+        reward_multiplier_combo_wrongaction= 0,
         reward_multiplier_combo_positionprofitpercentage= 0.001,
         reward_multiplier_combo_buy= 1,
         reward_multiplier_combo_sell= 100,

@@ -62,6 +62,7 @@ class BaseRLModel(AbstractModel):
     def get_reward_multipliers(self):
         return {
             "combo_noaction": self.rl_config.reward_multiplier_combo_noaction,
+            "combo_wrongaction": self.rl_config.reward_multiplier_combo_wrongaction,
             "combo_positionprofitpercentage": self.rl_config.reward_multiplier_combo_positionprofitpercentage,
             "combo_buy": self.rl_config.reward_multiplier_combo_buy,
             "combo_sell": self.rl_config.reward_multiplier_combo_sell,

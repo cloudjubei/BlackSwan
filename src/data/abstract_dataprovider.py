@@ -51,26 +51,26 @@ class AbstractDataProvider(ABC):
         return 0
     
     # buy_sell positive means buy, negative means sell for matching number of buy.
-    # buy_sell [0,0,1,0,0,-1,2,-2] shows matching 1|-1 and matching 2|-2 buy|sell pairs
+    # buy_sell [-1,-1,2,1,1,-2,3,-3] shows matching 2|-2 and matching 3|-3 buy|sell pairs
     def get_rewards_buy_sell(self, df):
         prices = df['price'].values
 
-        count = 0
+        count = 1
         buy_sell = []
-        action = 0
+        action = -1
         for i in range(len(prices) - 1):
             current = prices[i]
             next = prices[i+1]
             if current < next:
                 if action == 1:
-                    buy_sell.append(0)
+                    buy_sell.append(action)
                 else:
                     action = 1
                     count += 1
                     buy_sell.append(count)
             else:
                 if action == -1:
-                    buy_sell.append(0)
+                    buy_sell.append(action)
                 else:
                     action = -1
                     buy_sell.append(-count)
@@ -94,7 +94,7 @@ class AbstractDataProvider(ABC):
         for i in range(total_prices):
             current = prices[i]
 
-            profit_count = 0
+            profit_count = 1
             drawdown = 0
             for j in range(min(total_prices - i, max_buy_wait)):
                 next = prices[i+1 + j]
@@ -112,6 +112,7 @@ class AbstractDataProvider(ABC):
             rewards_drawdown.append(drawdown)
 
         rewards_profitable.append(0)
+        rewards_drawdown.append(0)
 
         # plot_indicator(df, np.array(rewards_buy) - 5, "RewardsBuy")
 
@@ -284,8 +285,10 @@ class AbstractDataProvider(ABC):
 
         return result_df, prices, timestamps, rewards_buysell, rewards_buy_profitable, rewards_buy_drawdown
     
-    def get_raw_data(self, paths, timestamp = "none", columns = ["timestamp","price","price_high","price_low","price_open","volume","timestamp_close"]):
+    def get_raw_data(self, paths, timestamp = "none", columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","price_open","volume","asset_volume_quote","trades_number"]):
         dfs = []
+
+        # "asset_volume_taker_base":"616.24854100","asset_volume_taker_quote":"2678216.40060401"
         
         for path in paths:
             df = pd.read_json(path)
@@ -302,10 +305,69 @@ class AbstractDataProvider(ABC):
         prices = result_df["price"].values
         timestamps = ((pd.to_datetime(result_df["timestamp_close"]).astype('int64') // 10**6) + 1).to_numpy()
 
+        #1 Empty 5/15
+        #2 Empty duel-dqn 2/15
+        #3 total_volume 7/15
+        #4 total_volume + volumes-max 7/15
+        #5 total_volume + price-max|avg 7/15
+        #6 total_volume + price-max|avg + price_z_score 1/3
+
+        # TODO: check 1d vs 1y vs 1m vs 1w
+        
+        result_df['price_z_score_1d'] = (result_df['price'] - result_df['price'].rolling(1440).mean()) / result_df['price'].rolling(1440).std()
+        result_df['price_z_score_1m'] = (result_df['price'] - result_df['price'].rolling(43200).mean()) / result_df['price'].rolling(43200).std()
+        result_df['price_z_score_1y'] = (result_df['price'] - result_df['price'].rolling(525600).mean()) / result_df['price'].rolling(525600).std()
+        
+        result_df['price_to_max_1d'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=1440).max(), errors='coerce').astype(float)
+        result_df['price_to_max_1m'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=43200).max(), errors='coerce').astype(float)
+        result_df['price_to_max_1y'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=525600).max(), errors='coerce').astype(float)
+        result_df['price_to_avg_1d'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=1440).mean(), errors='coerce').astype(float)
+        result_df['price_to_avg_1m'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=43200).mean(), errors='coerce').astype(float)
+        result_df['price_to_avg_1y'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=525600).mean(), errors='coerce').astype(float)
+
+        # result_df['volume_avg_1d'] = result_df['volume'].rolling(window=1440).mean()
+        # result_df['volume_avg_1m'] = result_df['volume'].rolling(window=43200).mean()
+        # result_df['volume_avg_1y'] = result_df['volume'].rolling(window=525600).mean()
+        # result_df['volume_max_1d'] = result_df['volume'].rolling(window=1440).max()
+        # result_df['volume_max_1m'] = result_df['volume'].rolling(window=43200).max()
+        # result_df['volume_max_1y'] = result_df['volume'].rolling(window=525600).max()
+
+        # result_df['volume_quote_avg_1d'] = result_df['asset_volume_quote'].rolling(window=1440).mean()
+        # result_df['volume_quote_avg_1m'] = result_df['asset_volume_quote'].rolling(window=43200).mean()
+        # result_df['volume_quote_avg_1y'] = result_df['asset_volume_quote'].rolling(window=525600).mean()
+        # result_df['volume_quote_max_1d'] = result_df['asset_volume_quote'].rolling(window=1440).max()
+        # result_df['volume_quote_max_1m'] = result_df['asset_volume_quote'].rolling(window=43200).max()
+        # result_df['volume_quote_max_1y'] = result_df['asset_volume_quote'].rolling(window=525600).max()
+
+        result_df['total_volume'] = result_df['volume'] + result_df['asset_volume_quote']
+
+        columns_to_drop = [] + columns
+        columns_to_drop = columns_to_drop + ['total_volume'] 
+        
+        # result_df['volume_to_max_1d'] = pd.to_numeric(result_df['volume'] / result_df['volume_max_1d'], errors='coerce').astype(float)
+        # result_df['volume_to_max_1m'] = pd.to_numeric(result_df['volume'] / result_df['volume_max_1m'], errors='coerce').astype(float)
+        # result_df['volume_to_max_1y'] = pd.to_numeric(result_df['volume'] / result_df['volume_max_1y'], errors='coerce').astype(float)
+        # result_df['volume_to_avg_1d'] = pd.to_numeric(result_df['volume'] / result_df['volume_avg_1d'], errors='coerce').astype(float)
+        # result_df['volume_to_avg_1m'] = pd.to_numeric(result_df['volume'] / result_df['volume_avg_1m'], errors='coerce').astype(float)
+        # result_df['volume_to_avg_1y'] = pd.to_numeric(result_df['volume'] / result_df['volume_avg_1y'], errors='coerce').astype(float)
+        # result_df['volume_quote_to_max_1d'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_max_1d'], errors='coerce').astype(float)
+        # result_df['volume_quote_to_max_1m'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_max_1m'], errors='coerce').astype(float)
+        # result_df['volume_quote_to_max_1y'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_max_1y'], errors='coerce').astype(float)
+        # result_df['volume_quote_to_avg_1d'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_avg_1d'], errors='coerce').astype(float)
+        # result_df['volume_quote_to_avg_1m'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_avg_1m'], errors='coerce').astype(float)
+        # result_df['volume_quote_to_avg_1y'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_avg_1y'], errors='coerce').astype(float)
+
+        result_df['total_volume_percent'] = pd.to_numeric(result_df['total_volume'], errors='coerce').astype(float).pct_change()
+        result_df['total_volume_to_max_1d'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=1440).max(), errors='coerce').astype(float)
+        result_df['total_volume_to_max_1m'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=43200).max(), errors='coerce').astype(float)
+        result_df['total_volume_to_max_1y'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=525600).max(), errors='coerce').astype(float)
+
         result_df['price_percent'] = pd.to_numeric(result_df['price'], errors='coerce').astype(float).pct_change()
         result_df['price_high_percent'] = pd.to_numeric(result_df['price_high']/result_df['price'] - 1, errors='coerce').astype(float)
         result_df['price_low_percent'] = pd.to_numeric(result_df['price_low']/result_df['price'] - 1, errors='coerce').astype(float)
         result_df['volume_percent'] = pd.to_numeric(result_df['volume'], errors='coerce').astype(float).pct_change()
+        result_df['volume_quote_percent'] = pd.to_numeric(result_df['asset_volume_quote'], errors='coerce').astype(float).pct_change()
+        result_df['trades_number_percent'] = pd.to_numeric(result_df['trades_number'], errors='coerce').astype(float).pct_change()
 
         if timestamp == "expanded":
             result_df['timestamp_close'] = pd.to_datetime(result_df['timestamp_close'], unit='ms')
@@ -323,11 +385,11 @@ class AbstractDataProvider(ABC):
             result_df['timestamp_new'] = pd.to_numeric(result_df['timestamp']).astype(int) / 1000000000
             result_df['timestamp_close_new'] = pd.to_numeric(result_df['timestamp_close']).astype(int) / 1000000000
 
-        result_df = result_df.drop(columns=columns).fillna(0).replace([np.inf, -np.inf], 0).reset_index(drop=True)
+        result_df = result_df.drop(columns=columns_to_drop).fillna(0).replace([np.inf, -np.inf], 0).reset_index(drop=True)
 
         return result_df, prices, timestamps
     
-    def process_fidelity(self, df, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run, multiplier_input_to_run, timestamp, columns = ["timestamp","price","price_high","price_low","volume","timestamp_close"]):
+    def process_fidelity(self, df, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run, multiplier_input_to_run, timestamp, columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number"]):
         steps = df.shape[0]
 
         dfs = []
@@ -336,14 +398,11 @@ class AbstractDataProvider(ABC):
             dfs.append(pd.DataFrame())
             raw_dfs.append(pd.DataFrame())
         for i in range(0, multiplier_run):
-            values = {
-                'timestamp': [],
-                'timestamp_close': [],
-                'price': [],
-                'price_high': [],
-                'price_low': [],
-                'volume': []
-            }
+
+            values = {}
+            for c in columns:
+                values[c] = []
+
             mapping = self.get_current_mapping(df, i*multiplier_input_to_run, layer, fidelity_run)
 
             fidelity_steps = int((steps-fidelity_offset-i*multiplier_input_to_run)/multiplier_input)
@@ -355,9 +414,12 @@ class AbstractDataProvider(ABC):
                 values["timestamp"].append(part['timestamp'].values[0])
                 values["timestamp_close"].append(part['timestamp_close'].values[multiplier_input-1])
                 values["price"].append(part['price'].values[multiplier_input-1])
+                values["price_open"].append(part['price_open'].values[0][0])
                 values["price_high"].append(part['price_high'].max())
                 values["price_low"].append(part['price_low'].min())
                 values["volume"].append(part['volume'].sum())
+                values["asset_volume_quote"].append(part['asset_volume_quote'].sum())
+                values["trades_number"].append(part['trades_number'].sum())
                 
             raw_df = pd.DataFrame(values, columns=columns)
             result_df, _, _ = self.process_df_simple(raw_df.copy(), timestamp, columns)
@@ -365,6 +427,7 @@ class AbstractDataProvider(ABC):
             raw_dfs[mapping] = raw_df
 
             # print(raw_df.head())
+            # print(result_df.tail())
 
         return dfs, raw_dfs
 

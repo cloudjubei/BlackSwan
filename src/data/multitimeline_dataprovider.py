@@ -59,10 +59,15 @@ class MultiTimelineDataProvider(AbstractDataProvider):
             self.fidelity_dfs = []
             self.fidelity_raw_dfs = []
             raw_df, df, prices, timestamps = self.get_raw_data(path, "day_of_week")
+
             self.dfs = [df]
             self.timestamps = timestamps
             self.prices = prices
             self.raw_df = raw_df
+            self.raw_df_for_plotting = raw_df
+
+            self.signals_buy_sell = self.get_rewards_buy_sell(raw_df)
+            self.signals_buy_profitable, self.signals_buy_drawdown = self.get_rewards_buy(raw_df, config.buyreward_percent, config.buyreward_maxwait)
 
             if fidelity_input == "1m":
                 if fidelity_run == "5m":
@@ -115,12 +120,17 @@ class MultiTimelineDataProvider(AbstractDataProvider):
                 layer = layers[i]
                 if layer == fidelity_input:
                     self.fidelity_dfs.append(self.dfs) # maybe should be self.fidelity_dfs.append(self.dfs)
+                    if layer == fidelity_run:
+                        self.raw_df_for_plotting = self.raw_df.iloc[self.get_start_index()::self.divider_run]
+
                 else:
                     multiplier_run = int(self.multipliers[i]/self.divider_run)
                     fidelity_offset = self.fidelity_offset - (self.multipliers[i] * self.config.lookback_window_size)
                     dfs, raw_dfs = self.process_fidelity(raw_df, layer, fidelity_offset, self.multipliers[i], fidelity_run, multiplier_run, self.divider_run, "day_of_week")
                     self.fidelity_dfs.append(dfs)
                     self.fidelity_raw_dfs.append(raw_dfs)
+                    if layer == fidelity_run:
+                        self.raw_df_for_plotting = raw_dfs[0]
 
             self.steps = int((df.shape[0] - self.fidelity_offset)/self.divider_run)
         else:         
@@ -170,8 +180,7 @@ class MultiTimelineDataProvider(AbstractDataProvider):
             self.steps = self.dfs[0].shape[0] - self.starting_index - 1
 
     def get_raw_df_for_plotting(self):
-        print(self.raw_df.head())
-        return self.raw_df.iloc[self.get_start_index()::self.divider_run]
+        return self.raw_df_for_plotting
     
     def get_timesteps(self) -> int:
         return self.steps
@@ -257,10 +266,10 @@ class MultiTimelineDataProvider(AbstractDataProvider):
         return np.array(out)
     
     def get_signal_buy_sell(self, step: int) -> int:
-        return self.signals_buy_sell[step + self.get_start_index()]
+        return self.signals_buy_sell[step*self.divider_run + self.get_start_index()]
     
     def get_signal_buy_profitable(self, step: int) -> int:
-        return self.signals_buy_profitable[step + self.get_start_index()]
+        return self.signals_buy_profitable[step*self.divider_run + self.get_start_index()]
     
     def get_signal_buy_drawdown(self, step: int) -> int:
-        return self.signals_buy_drawdown[step + self.get_start_index()]
+        return self.signals_buy_drawdown[step*self.divider_run + self.get_start_index()]
