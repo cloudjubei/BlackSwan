@@ -120,11 +120,11 @@ def main(config: Config) -> None:
                     print(f'Run {run_count}/{run_count_total} Complete')
 
     # df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "$", "%", "Trade$", "CompoundTrade$", "Wins", "Losses", "Win%", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "#trades", "SLs", "SL$", "Multipliers"])
-    df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "F1", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Totals", "Multipliers"])
+    df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "F1", "Ratio", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Totals", "Multipliers"])
     df_results.to_csv(f'results_{time.time()}.csv', index=False)  
 
     # df_results = df_results.drop(columns=["Data", "Env", "%", "CompoundTrade$", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "SLs", "SL$", "Multipliers"])
-    df_results = df_results.drop(columns=["Data", "Env", "Acc%", "Prec%", "Rec%", "-Rec%", "Multipliers"])
+    df_results = df_results.drop(columns=["Data", "Env", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Multipliers"])
     pd.set_option('display.max_rows', None)  # None means unlimited rows
     # pd.set_option('display.max_columns', None)  # None means unlimited columns
     print(df_results)

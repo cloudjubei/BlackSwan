@@ -98,19 +98,19 @@ def get_envs_simple():
     return [env_dip_predict]
 
     # return [env_trade_all_tpsl_trailing0]
-    return [
-        env_trade_all_tpsl_trailing0, 
-        env_trade_all_tpsl_trailing1, 
-        env_trade_all_tpsl_trailing2, 
-        env_trade_all_tpsl_trailing3, 
-        env_trade_all_tpsl_trailing4, 
-        env_trade_all_tpsl_trailing5, 
-        env_trade_all_tpsl_trailing6, 
-        env_trade_all_tpsl_trailing7, 
-        env_trade_all_tpsl_trailing8, 
-        env_trade_all_tpsl_trailing9, 
-        env_trade_all_tpsl_trailing10,
-        env_trade_all_tpsl_trailing11]
+    # return [
+    #     env_trade_all_tpsl_trailing0, 
+    #     env_trade_all_tpsl_trailing1, 
+    #     env_trade_all_tpsl_trailing2, 
+    #     env_trade_all_tpsl_trailing3, 
+    #     env_trade_all_tpsl_trailing4, 
+    #     env_trade_all_tpsl_trailing5, 
+    #     env_trade_all_tpsl_trailing6, 
+    #     env_trade_all_tpsl_trailing7, 
+    #     env_trade_all_tpsl_trailing8, 
+    #     env_trade_all_tpsl_trailing9, 
+    #     env_trade_all_tpsl_trailing10,
+    #     env_trade_all_tpsl_trailing11]
     
 def get_envs_swaps():
     return [env_swap_all]

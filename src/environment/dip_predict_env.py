@@ -184,15 +184,16 @@ class DipPredictEnv(AbstractEnv):
     
     def get_run_state(self):        
 
-        accuracy = self.accuracies[-1]
-        precision = self.precisions[-1]
-        recall = self.recalls[-1]
-        negative_recall = self.negative_recalls[-1]
+        accuracy = self.accuracies[-1] if len(self.accuracies) > 0 else 0
+        precision = self.precisions[-1] if len(self.precisions) > 0 else 0
+        recall = self.recalls[-1] if len(self.recalls) > 0 else 0
+        negative_recall = self.negative_recalls[-1] if len(self.negative_recalls) > 0 else 0
+        dips_ratio = self.correct_dips/self.incorrect_dips if self.incorrect_dips > 0 else self.correct_dips
 
         f1_score = 2*precision*recall/(precision + recall) if precision + recall > 0 else 0
 
         avg_streak = sum(self.streaks) / len(self.streaks) if len(self.streaks) > 0 else 0
-        max_streak = max(self.streaks)
+        max_streak = max(self.streaks) if len(self.streaks) > 0 else 0
 
         rewards = ""
         for value in self.reward_multipliers.values():
@@ -200,6 +201,7 @@ class DipPredictEnv(AbstractEnv):
         return [
             self.total_reward,
             f1_score,
+            dips_ratio,
             accuracy,
             precision,
             recall,
@@ -242,21 +244,32 @@ class DipPredictEnv(AbstractEnv):
 # need to rethink whether anything other than dip predict makes sense
 # multi asset defo also makes sense
 
-# 1h  - max_wait=4  buy_percent=0.01  -> [0/3]-[0/2133]
-# 15m - max_wait=4  buy_percent=0.01  -> [2/101]-[143/8443]
-# 15m - max_wait=16 buy_percent=0.01  -> [8/101]-[359/8443]
-# 10m - max_wait=3  buy_percent=0.005 -> [9/90]-[736/12726] 0.022 
-# 10m - max_wait=2  buy_percent=0.001 -> [1764/2080]-[7625/10736] 0.308 
+# 1h  - max_wait=2  buy_percent=0.001 -> [2/384]-[1/1752] 0.010/2.00 ; [284/384]-[1092/1752] 0.323/0.260 ;
+# 1h  - max_wait=2  buy_percent=0.002 -> [116/254]-[596/1882] 0.240/0.195 ; [11/254]-[17/1882] 0.078/0.647; [2/254]-[0/1882] 0.016/2.000 ; [5/254]-[4/1882] 0.038/1.250 ; [52/254]-[72/1882] 0.275/0.722 ;
+# 1h  - max_wait=4  buy_percent=0.005 -> [1/26]-[75/2110] 0.013
 
-# 1h  max_wait=24 buy_percent=0.01 1/2
-# 1h  max_wait=12 buy_percent=0.01 1/2
-# 1h  max_wait=4 buy_percent=0.005 0/2
-# 10m max_wait=2 buy_percent=0.001 0/2
-# 10m max_wait=2 buy_percent=0.002 0/2
-# 10m max_wait=2 buy_percent=0.001 x BEST custom_net_arch 0/5
-# 5@5m  max_wait=3 12/16
-# 5@5m  max_wait=2 12/16
+# 10m - max_wait=2  buy_percent=0.001 -> [1764/2080]-[7625/10736] 0.308; [580/2080]-[2105/10736] 0.243 ; [705/2080]-[3008/10736] 0.243 ; [18/2080]-[16/10736] 0.017
+# 10m - max_wait=2  buy_percent=0.001 ["trpo-custom"] -> [176/2080]-[217/10736] 0.142/0.811 ; [350/2080]-[748/10736] 0.220/0.468 ;
+# 10m - max_wait=2  buy_percent=0.001 [8192,512] -> [4/2080]-[3/10736] 0.004/1.333 ;
+# 10m - max_wait=2  buy_percent=0.001 custom_net_arch -> [1588/2080]-[7055/10736] 0.296/0.225 ;
 
+# 10m - max_wait=2  buy_percent=0.002 -> [18/572]-[233/12244] 0.044
 
+# 5m  - max_wait=3  buy_percent=0.001 -> [4788/5736]-[14248/19896] 0.387/0.336 ; [60/5736]-[79/19896] 0.020/0.759 ;
+# 5m  - max_wait=2  buy_percent=0.001 -> [3584/4135]-[16201/21497] 0.300/0.221 ; [2051/4135]-[8372/21497] 0.282/0.245 ; [1258/4135]-[4244/21497] 0.261/0.296 ;
+
+# 1h  - max_wait=2  buy_percent=0.001 trpo
+# 1h  - max_wait=2  buy_percent=0.002 trpo
+# 1h  - max_wait=4  buy_percent=0.005 trpo
+# 1h  - max_wait=6  buy_percent=0.005 trpo
+# 1h  - max_wait=2  buy_percent=0.001
+# 1h  - max_wait=2  buy_percent=0.002
+# 1h  - max_wait=4  buy_percent=0.005
+# 1h  - max_wait=6  buy_percent=0.005
+# 1h  - max_wait=2  buy_percent=0.002 duel-dqn
+
+# 1h max_wait=4  buy_percent=0.005
+# 1h max_wait=12  buy_percent=0.01
+# 10m max_wait=3  buy_percent=0.005
 # 1m@1m max_wait=5 TODO
 # 1m@1m max_wait=3 TODO
