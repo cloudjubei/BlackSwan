@@ -76,24 +76,25 @@ def plot_actions_data_non_trade(env):
     accuracies = env.accuracies[:end_point]
 
     result_df = env.data_provider.get_raw_df_for_plotting()
-    # print(result_df.head())
+    buyreward_maxwait = env.data_provider.buyreward_maxwait
     
     result_df['open'] = result_df['price_open']
     result_df['close'] = result_df['price']
     result_df['low'] = result_df['price_low']
     result_df['high'] = result_df['price_high']
-    result_df = result_df[['timestamp', 'open', 'close', 'low', 'high', 'volume']].iloc[:-1].iloc[env.data_provider.get_lookback_window()-1:end_point]
+    result_df = result_df[['timestamp', 'open', 'close', 'low', 'high', 'volume', 'signal_buy_profitable']].iloc[:-1].iloc[:end_point]
     result_df['timestamp'] = pd.to_datetime(result_df['timestamp'], unit='ms')
     result_df.set_index('timestamp', inplace=True)
     
-    print('len of results:', len(result_df), ' len of actions: ', len(actions))
+    rewards_profitable = result_df['signal_buy_profitable'].values
 
-
+    result_df['rewards_profitable_strong'] = np.array([1 if a == 1 else np.nan for a in rewards_profitable]) * (result_df['low'] -200)
+    result_df['rewards_profitable_ok'] = np.array([1 if a >= 2 and a < buyreward_maxwait else np.nan for a in rewards_profitable]) * (result_df['low'] -200)
 
     result_df['rewards_pos'] = np.array([1 if a > 0 else np.nan for a in rewards])
     result_df['rewards_neg'] = np.array([1 if a < 0 else np.nan for a in rewards])
-    result_df['actions_ok'] = np.array([1 if a > 0 else np.nan for a in actions]) * result_df['rewards_pos'] * result_df['low']
-    result_df['actions_bad'] = np.array([1 if a > 0 else np.nan for a in actions]) * result_df['rewards_neg'] * result_df['high']
+    result_df['actions_ok'] = np.array([1 if a > 0 else np.nan for a in actions]) * result_df['rewards_pos'] * (result_df['close'] -50)
+    result_df['actions_bad'] = np.array([1 if a > 0 else np.nan for a in actions]) * result_df['rewards_neg'] * (result_df['close'] +50)
 
     # result_df['actions_ok'] = np.array([1 if a > 0 else np.nan for a in actions]) * result_df['low']
 
@@ -101,12 +102,14 @@ def plot_actions_data_non_trade(env):
     action_signals_bad = mpf.make_addplot(result_df['actions_bad'], type='scatter', markersize=100, marker='v', color='red', secondary_y=False)
     # reward_signals = mpf.make_addplot(rewards, color='purple', ylabel='Rewards', secondary_y=True)
     # accuracies_signals = mpf.make_addplot(accuracies, color='yellow', ylabel='Rewards', secondary_y=True)
+    reward_profitable_strong_signals = mpf.make_addplot(result_df['rewards_profitable_strong'], type='scatter', markersize=80, marker='^', color='purple', secondary_y=False)
+    reward_profitable_ok_signals = mpf.make_addplot(result_df['rewards_profitable_ok'], type='scatter', markersize=80, marker='^', color='yellow', secondary_y=False)
 
-    mpf.plot(result_df, type='candle', style='charles', title='Action Signals', ylabel='Price', addplot=[action_signals_ok, action_signals_bad])
-    # mpf.plot(result_df, type='candle', style='charles', title='Action Signals', ylabel='Price', addplot=[action_signals, reward_signals, accuracies_signals])
+    # mpf.plot(result_df, type='candle', style='charles', title='Action Signals', ylabel='Price', addplot=[action_signals_ok, action_signals_bad])
+    mpf.plot(result_df, type='candle', style='charles', title='Action Signals', ylabel='Price', addplot=[action_signals_ok, action_signals_bad, reward_profitable_strong_signals, reward_profitable_ok_signals])
 
 def plot_indicator(df, indicator, name):
-    result_df = df[['timestamp', 'price_open', 'price', 'price_low', 'price_high']].iloc[0:50]
+    result_df = df[['timestamp', 'price_open', 'price', 'price_low', 'price_high']].iloc[0:200]
 
     result_df['open'] = result_df['price_open']
     result_df['close'] = result_df['price']

@@ -121,9 +121,10 @@ class DipPredictEnv(AbstractEnv):
                 # return (profit_percentage - prev_profit_percentage) * self.reward_multipliers["combo_positionprofitpercentage"]
     
         profitable_steps = self.data_provider.get_signal_buy_profitable(self.current_step)
+        # print(f'step: {self.current_step} price: {self.current_price} signal_buy_profitable: {profitable_steps} action: {action}')
         # drawdown = self.data_provider.get_signal_buy_drawdown(self.current_step)
 
-        if profitable_steps <= self.data_provider.config.buyreward_maxwait:
+        if profitable_steps <= self.data_provider.buyreward_maxwait:
             self.total_dips_seen += 1
             if action == 1:
                 self.correct_dips += 1
@@ -237,39 +238,56 @@ class DipPredictEnv(AbstractEnv):
         plt.legend()
         plt.show()
 
+# 1h  - 1-0.002 694|1442  [7/694]-[3/1442]  0.020/2.333      
+# 1h  - 2-0.002 992|1144 [29/992]-[17/1144] 0.056/1.706
+# 1h  - 2-0.005 550|1586  [5/550]-[0/1586]  0.018/5.00
+# 1h  - 3-0.01  318|1818 [11/318]-[6/1818]  0.066/1.833 
+# 15m - 1-0.001 2727|5817 18/12-x/1.5 ;
+# 15m - 2-0.002 2653|5891 9/4-x/2.25 ; 33/19-x/1.737
+# 15m - 2-0.005  843|7701 3/0-x/3.0 ;
+# 15m - 4-0.01   479|8065 2/1-x/2.0 ;
+# 10m - 1-0.001 3589|9227 
+# 10m - 3-0.002 4212|8604 30/10-x/3.0 ;
+# 5m  - 1-0.001 
+# 5m  - 2-0.001 8815|16817 
 
-# reward for not doing anything should be 0 - combo_noaction
 
-# should add precision, recall, dips guessed etc as obs?
-# need to rethink whether anything other than dip predict makes sense
-# multi asset defo also makes sense
+# 0.001 => 10m ?
+# 0.002 => 30m ?
+# 0.005 => 1h ?
+# 0.01  => 4h ?
 
-# 1h  - max_wait=2  buy_percent=0.001 -> [2/384]-[1/1752] 0.010/2.00 ; [284/384]-[1092/1752] 0.323/0.260 ;
-# 1h  - max_wait=2  buy_percent=0.002 -> [116/254]-[596/1882] 0.240/0.195 ; [11/254]-[17/1882] 0.078/0.647; [2/254]-[0/1882] 0.016/2.000 ; [5/254]-[4/1882] 0.038/1.250 ; [52/254]-[72/1882] 0.275/0.722 ;
-# 1h  - max_wait=4  buy_percent=0.005 -> [1/26]-[75/2110] 0.013
 
-# 10m - max_wait=2  buy_percent=0.001 -> [1764/2080]-[7625/10736] 0.308; [580/2080]-[2105/10736] 0.243 ; [705/2080]-[3008/10736] 0.243 ; [18/2080]-[16/10736] 0.017
-# 10m - max_wait=2  buy_percent=0.001 ["trpo-custom"] -> [176/2080]-[217/10736] 0.142/0.811 ; [350/2080]-[748/10736] 0.220/0.468 ;
-# 10m - max_wait=2  buy_percent=0.001 [8192,512] -> [4/2080]-[3/10736] 0.004/1.333 ;
-# 10m - max_wait=2  buy_percent=0.001 custom_net_arch -> [1588/2080]-[7055/10736] 0.296/0.225 ;
 
-# 10m - max_wait=2  buy_percent=0.002 -> [18/572]-[233/12244] 0.044
+# 1m  -  max_wait=2*60  buy_percent=0.005 duel-dqn-custom 0/2
+# 5m  -  max_wait=1  buy_percent=0.001 duel-dqn-custom 0/2
+# 10m -  max_wait=1  buy_percent=0.001 duel-dqn-custom 0/2
+# 10m -  max_wait=2  buy_percent=0.002 duel-dqn-custom 0/2
+# 15m -  max_wait=3  buy_percent=0.005 duel-dqn-custom 0/2
+# 1h  - 3-0.01 TEST MIN
+# 1h  - 2-0.005 TEST MIN
 
-# 5m  - max_wait=3  buy_percent=0.001 -> [4788/5736]-[14248/19896] 0.387/0.336 ; [60/5736]-[79/19896] 0.020/0.759 ;
-# 5m  - max_wait=2  buy_percent=0.001 -> [3584/4135]-[16201/21497] 0.300/0.221 ; [2051/4135]-[8372/21497] 0.282/0.245 ; [1258/4135]-[4244/21497] 0.261/0.296 ;
 
-# 1h  - max_wait=2  buy_percent=0.001 trpo
-# 1h  - max_wait=2  buy_percent=0.002 trpo
-# 1h  - max_wait=4  buy_percent=0.005 trpo
-# 1h  - max_wait=6  buy_percent=0.005 trpo
-# 1h  - max_wait=2  buy_percent=0.001
-# 1h  - max_wait=2  buy_percent=0.002
-# 1h  - max_wait=4  buy_percent=0.005
-# 1h  - max_wait=6  buy_percent=0.005
-# 1h  - max_wait=2  buy_percent=0.002 duel-dqn
+# TODO: 1h -  max_wait=4  buy_percent=0.01 duel-dqn-custom 0/2
+# TODO: 15m -  max_wait=4  buy_percent=0.005 duel-dqn-custom 0/2
+# TODO: 15m -  max_wait=16  buy_percent=0.01 duel-dqn-custom 0/2
+# TODO: 10m -  max_wait=2  buy_percent=0.001 duel-dqn-custom 0/2
+# TODO: 10m -  max_wait=3  buy_percent=0.002 duel-dqn-custom 0/2
+# TODO: 5m  -  max_wait=2  buy_percent=0.002 duel-dqn-custom 0/2
 
-# 1h max_wait=4  buy_percent=0.005
-# 1h max_wait=12  buy_percent=0.01
-# 10m max_wait=3  buy_percent=0.005
-# 1m@1m max_wait=5 TODO
-# 1m@1m max_wait=3 TODO
+# check if adding more data improves things
+# TODO: lr x net_arch= [[8192,4096,512,256]],
+# TODO: lr x custom_net_arch [[4096,4096,4096,4096,4096,4096]]
+# indicators
+# extra data
+# trees
+
+# multi asset data
+# after, which commodity to invest in
+
+# more data?
+
+
+
+
+# learning_rate -> net_arch / model -> parameters

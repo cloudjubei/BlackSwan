@@ -87,10 +87,10 @@ def main(config: Config) -> None:
 
     for data_config in config.data_configs:
         print("Preparing train data...")
-        data_provider_train = create_provider(data_config, data_config.train_data_paths, data_config.fidelity_input, data_config.fidelity_run, data_config.layers)
+        data_provider_train = create_provider(data_config, data_config.train_data_paths, data_config.fidelity_input, data_config.fidelity_run, data_config.layers, data_config.buyreward_maxwait, data_config.buyreward_percent)
 
         print("Preparing test data...")
-        data_provider_test = create_provider(data_config, data_config.test_data_paths, data_config.fidelity_input_test, data_config.fidelity_run_test, data_config.layers_test)
+        data_provider_test = create_provider(data_config, data_config.test_data_paths, data_config.fidelity_input_test, data_config.fidelity_run_test, data_config.layers_test, data_config.buyreward_maxwait_test, data_config.buyreward_percent_test)
 
         for env_config in config.env_configs:
             print("Creating train environment...")
@@ -121,13 +121,15 @@ def main(config: Config) -> None:
 
     # df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "$", "%", "Trade$", "CompoundTrade$", "Wins", "Losses", "Win%", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "#trades", "SLs", "SL$", "Multipliers"])
     df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "F1", "Ratio", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Totals", "Multipliers"])
-    df_results.to_csv(f'results_{time.time()}.csv', index=False)  
+    results_name = f'results_{time.time()}.csv'
+    df_results.to_csv(results_name, index=False)  
 
     # df_results = df_results.drop(columns=["Data", "Env", "%", "CompoundTrade$", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "SLs", "SL$", "Multipliers"])
     df_results = df_results.drop(columns=["Data", "Env", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Multipliers"])
     pd.set_option('display.max_rows', None)  # None means unlimited rows
     # pd.set_option('display.max_columns', None)  # None means unlimited columns
     print(df_results)
+    print(f'results_name: {results_name}')
 
     return
 

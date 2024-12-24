@@ -114,7 +114,12 @@ class AbstractDataProvider(ABC):
         rewards_profitable.append(0)
         rewards_drawdown.append(0)
 
-        # plot_indicator(df, np.array(rewards_buy) - 5, "RewardsBuy")
+        # df_copy = df.copy()
+        # df_copy['rewards_profitable'] = rewards_profitable
+        # df_copy['rewards_drawdown'] = rewards_drawdown
+        # df_copy.to_csv(f'all_data.csv', index=False)  
+
+        # plot_indicator(df_copy, np.array(rewards_profitable) - 3, "RewardsBuy")
 
         return rewards_profitable, rewards_drawdown
 
@@ -285,7 +290,7 @@ class AbstractDataProvider(ABC):
 
         return result_df, prices, timestamps, rewards_buysell, rewards_buy_profitable, rewards_buy_drawdown
     
-    def get_raw_data(self, paths, timestamp = "none", columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","price_open","volume","asset_volume_quote","trades_number"]):
+    def get_raw_data(self, paths, timestamp = "none", columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number"]):
         dfs = []
 
         # "asset_volume_taker_base":"616.24854100","asset_volume_taker_quote":"2678216.40060401"
@@ -394,9 +399,11 @@ class AbstractDataProvider(ABC):
 
         dfs = []
         raw_dfs = []
+        prices = []
         for i in range(0, multiplier_run):
             dfs.append(pd.DataFrame())
             raw_dfs.append(pd.DataFrame())
+            prices.append([])
         for i in range(0, multiplier_run):
 
             values = {}
@@ -414,7 +421,7 @@ class AbstractDataProvider(ABC):
                 values["timestamp"].append(part['timestamp'].values[0])
                 values["timestamp_close"].append(part['timestamp_close'].values[multiplier_input-1])
                 values["price"].append(part['price'].values[multiplier_input-1])
-                values["price_open"].append(part['price_open'].values[0][0])
+                values["price_open"].append(part['price_open'].values[0])
                 values["price_high"].append(part['price_high'].max())
                 values["price_low"].append(part['price_low'].min())
                 values["volume"].append(part['volume'].sum())
@@ -422,14 +429,15 @@ class AbstractDataProvider(ABC):
                 values["trades_number"].append(part['trades_number'].sum())
                 
             raw_df = pd.DataFrame(values, columns=columns)
-            result_df, _, _ = self.process_df_simple(raw_df.copy(), timestamp, columns)
+            result_df, ps, _ = self.process_df_simple(raw_df.copy(), timestamp, columns)
             dfs[mapping] = result_df
             raw_dfs[mapping] = raw_df
+            prices[mapping] = ps
 
             # print(raw_df.head())
             # print(result_df.tail())
 
-        return dfs, raw_dfs
+        return dfs, raw_dfs, prices
 
     def get_current_mapping(self, df, step, layer, fidelity):
         date_time = self.get_timestamp_datetime(df, step)

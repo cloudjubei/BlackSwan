@@ -266,7 +266,7 @@ class CustomRainbowPolicy(RainbowPolicy):
         squash_output: bool = False,
     ) -> List[nn.Module]:
 
-        return CustomQNetwork.create_mlp_custom(input_dim, output_dim, net_arch, activation_fn, self.custom_net_arch).to(self.device)
+        return CustomQNetwork.create_mlp_custom(input_dim, output_dim, net_arch, activation_fn, self.custom_net_arch)#.to(self.device)
 
     def make_q_net(self) -> CustomQNetwork:
         # Make sure we always have separate networks for features extractors etc
