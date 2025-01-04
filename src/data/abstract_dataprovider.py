@@ -447,6 +447,8 @@ class AbstractDataProvider(ABC):
                 return date_time.weekday *60*24 + date_time.hour *60 + date_time.minute
             if layer == "1d":
                 return date_time.hour *60 + date_time.minute
+            if layer == "4h":
+                return (date_time.hour % 4) *60 + date_time.minute
             if layer == "1h":
                 return date_time.minute
             if layer == "30m":
@@ -463,6 +465,8 @@ class AbstractDataProvider(ABC):
                 return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 30 % (2*24*7))
             if layer == "1d":
                 return int((date_time.hour *60 + date_time.minute) / 30 % (2*24))
+            if layer == "4h":
+                return int((((date_time.hour % 4) *60) + date_time.minute) / 30 % (2*4))
             if layer == "1h":
                 return int((date_time.minute) / 30 % 2)
             return 0
@@ -471,6 +475,8 @@ class AbstractDataProvider(ABC):
                 return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 15 % (4*24*7))
             if layer == "1d":
                 return int((date_time.hour *60 + date_time.minute) / 15 % (4*24))
+            if layer == "4h":
+                return int((((date_time.hour % 4) *60) + date_time.minute) / 15 % (4*4))
             if layer == "1h":
                 return int((date_time.minute) / 15 % 4)
             if layer == "30m":
@@ -481,6 +487,8 @@ class AbstractDataProvider(ABC):
                 return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 10 % (6*24*7))
             if layer == "1d":
                 return int((date_time.hour *60 + date_time.minute) / 10 % (6*24))
+            if layer == "4h":
+                return int((((date_time.hour % 4) *60) + date_time.minute) / 10 % (6*4))
             if layer == "1h":
                 return int((date_time.minute) / 10 % 6)
             if layer == "30m":
@@ -491,6 +499,8 @@ class AbstractDataProvider(ABC):
                 return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 5 % (12*24*7))
             if layer == "1d":
                 return int((date_time.hour *60 + date_time.minute) / 5 % (12*24))
+            if layer == "4h":
+                return int((((date_time.hour % 4) *60) + date_time.minute) / 5 % (12*4))
             if layer == "1h":
                 return int((date_time.minute) / 5 % 12)
             if layer == "30m":

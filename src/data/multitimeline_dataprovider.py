@@ -79,6 +79,8 @@ class MultiTimelineDataProvider(AbstractDataProvider):
                     self.divider_run = 30
                 elif fidelity_run == "1h":
                     self.divider_run = 60
+                # elif fidelity_run == "4h":
+                #     self.divider_run = 60*4
                 # elif fidelity_run == "1d":
                 #     self.divider_run = 60*24
                 # elif fidelity_run == "1w":
@@ -99,6 +101,8 @@ class MultiTimelineDataProvider(AbstractDataProvider):
                         multiplier = 30
                     elif layers[i] == "1h":
                         multiplier = 60
+                    elif layers[i] == "4h":
+                        multiplier = 60*4
                     elif layers[i] == "1d":
                         multiplier = 60*24
                     elif layers[i] == "1w":

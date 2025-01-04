@@ -31,7 +31,7 @@ data_2017_to_2023vs2024_only_price_percent = DataConfig(
             # "binance/BTCUSDT-1m-2018-1.json", "binance/BTCUSDT-1m-2018-2.json", "binance/BTCUSDT-1m-2018-3.json", "binance/BTCUSDT-1m-2018-4.json", "binance/BTCUSDT-1m-2018-5.json", "binance/BTCUSDT-1m-2018-6.json", "binance/BTCUSDT-1m-2018-7.json", "binance/BTCUSDT-1m-2018-8.json", "binance/BTCUSDT-1m-2018-9.json", "binance/BTCUSDT-1m-2018-10.json", "binance/BTCUSDT-1m-2018-11.json", "binance/BTCUSDT-1m-2018-12.json",               
             # "binance/BTCUSDT-1m-2019-1.json", "binance/BTCUSDT-1m-2019-2.json", "binance/BTCUSDT-1m-2019-3.json", "binance/BTCUSDT-1m-2019-4.json", "binance/BTCUSDT-1m-2019-5.json", "binance/BTCUSDT-1m-2019-6.json", "binance/BTCUSDT-1m-2019-7.json", "binance/BTCUSDT-1m-2019-8.json", "binance/BTCUSDT-1m-2019-9.json", "binance/BTCUSDT-1m-2019-10.json", "binance/BTCUSDT-1m-2019-11.json", "binance/BTCUSDT-1m-2019-12.json",               
             # "binance/BTCUSDT-1m-2020-1.json", "binance/BTCUSDT-1m-2020-2.json", "binance/BTCUSDT-1m-2020-3.json", "binance/BTCUSDT-1m-2020-4.json", "binance/BTCUSDT-1m-2020-5.json", "binance/BTCUSDT-1m-2020-6.json", "binance/BTCUSDT-1m-2020-7.json", "binance/BTCUSDT-1m-2020-8.json", "binance/BTCUSDT-1m-2020-9.json", "binance/BTCUSDT-1m-2020-10.json", "binance/BTCUSDT-1m-2020-11.json", "binance/BTCUSDT-1m-2020-12.json",
-            # "binance/BTCUSDT-1m-2021-1.json", "binance/BTCUSDT-1m-2021-2.json", "binance/BTCUSDT-1m-2021-3.json", "binance/BTCUSDT-1m-2021-4.json", "binance/BTCUSDT-1m-2021-5.json", "binance/BTCUSDT-1m-2021-6.json", "binance/BTCUSDT-1m-2021-7.json", "binance/BTCUSDT-1m-2021-8.json", "binance/BTCUSDT-1m-2021-9.json", "binance/BTCUSDT-1m-2021-10.json", "binance/BTCUSDT-1m-2021-11.json", "binance/BTCUSDT-1m-2021-12.json",
+            "binance/BTCUSDT-1m-2021-1.json", "binance/BTCUSDT-1m-2021-2.json", "binance/BTCUSDT-1m-2021-3.json", "binance/BTCUSDT-1m-2021-4.json", "binance/BTCUSDT-1m-2021-5.json", "binance/BTCUSDT-1m-2021-6.json", "binance/BTCUSDT-1m-2021-7.json", "binance/BTCUSDT-1m-2021-8.json", "binance/BTCUSDT-1m-2021-9.json", "binance/BTCUSDT-1m-2021-10.json", "binance/BTCUSDT-1m-2021-11.json", "binance/BTCUSDT-1m-2021-12.json",
             "binance/BTCUSDT-1m-2022-1.json", "binance/BTCUSDT-1m-2022-2.json", "binance/BTCUSDT-1m-2022-3.json", "binance/BTCUSDT-1m-2022-4.json", "binance/BTCUSDT-1m-2022-5.json", "binance/BTCUSDT-1m-2022-6.json", "binance/BTCUSDT-1m-2022-7.json", "binance/BTCUSDT-1m-2022-8.json", "binance/BTCUSDT-1m-2022-9.json", "binance/BTCUSDT-1m-2022-10.json", "binance/BTCUSDT-1m-2022-11.json", "binance/BTCUSDT-1m-2022-12.json",
             "binance/BTCUSDT-1m-2023-1.json", "binance/BTCUSDT-1m-2023-2.json", "binance/BTCUSDT-1m-2023-3.json", "binance/BTCUSDT-1m-2023-4.json", "binance/BTCUSDT-1m-2023-5.json", "binance/BTCUSDT-1m-2023-6.json", "binance/BTCUSDT-1m-2023-7.json", "binance/BTCUSDT-1m-2023-8.json", "binance/BTCUSDT-1m-2023-9.json", "binance/BTCUSDT-1m-2023-10.json", "binance/BTCUSDT-1m-2023-11.json", "binance/BTCUSDT-1m-2023-12.json"
         ]
@@ -55,10 +55,10 @@ data_2017_to_2023vs2024_only_price_percent_32_1m_buyreward = DataConfig(id=data_
     fidelity_run= "1m",
     layers = ["1m", "1h", "1d"],
     layers_test = ["1m", "1h", "1d"],
-    buyreward_percent= 0.005,
-    buyreward_maxwait= 2*60,
-    buyreward_percent_test= 0.005,
-    buyreward_maxwait_test= 2*60,
+    buyreward_percent= 0.002,
+    buyreward_maxwait= 2*10,
+    buyreward_percent_test= 0.002,
+    buyreward_maxwait_test= 2*10,
 )
 data_2017_to_2023vs2024_only_price_percent_32_5m = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
     fidelity_run= "5m",
@@ -75,11 +75,11 @@ data_2017_to_2023vs2024_only_price_percent_32_at_5m_buyreward = DataConfig(id=da
     fidelity_run= "5m",
     layers = ["5m", "1h", "1d"],
     layers_test = ["5m", "1h", "1d"],
-    fidelity_run_test = "5m",
-    buyreward_percent= 0.001,
-    buyreward_maxwait= 1,
-    buyreward_percent_test= 0.001,
-    buyreward_maxwait_test= 1,
+    # fidelity_run_test = "5m",
+    buyreward_percent= 0.002,
+    buyreward_maxwait= 4,
+    buyreward_percent_test= 0.002,
+    buyreward_maxwait_test= 4*5,
 )
 
 data_2017_to_2023vs2024_only_price_percent_32_10m = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
@@ -97,12 +97,12 @@ data_2017_to_2023vs2024_only_price_percent_32_at_10m_buyreward = DataConfig(id=d
     fidelity_run= "10m",
     layers = ["10m", "1h", "1d"],
     layers_test = ["10m", "1h", "1d"],
-    fidelity_run_test = "10m",
+    # fidelity_run_test = "10m",
 
     buyreward_percent= 0.002,
     buyreward_maxwait= 2,
     buyreward_percent_test= 0.002,
-    buyreward_maxwait_test= 2,
+    buyreward_maxwait_test= 2*10,
 )
 data_2017_to_2023vs2024_only_price_percent_32_15m = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
     fidelity_run= "15m",
@@ -119,11 +119,11 @@ data_2017_to_2023vs2024_only_price_percent_32_at_15m_buyreward = DataConfig(id=d
     fidelity_run= "15m",
     layers = ["15m", "1h", "1d"],
     layers_test = ["15m", "1h", "1d"],
-    fidelity_run_test = "15m",
+    # fidelity_run_test = "15m",
     buyreward_percent= 0.005,
-    buyreward_maxwait= 3,
+    buyreward_maxwait= 4,
     buyreward_percent_test= 0.005,
-    buyreward_maxwait_test= 3,
+    buyreward_maxwait_test= 4*15,
 )
 
 data_2017_to_2023vs2024_only_price_percent_32_at_1h = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
@@ -138,9 +138,9 @@ data_2017_to_2023vs2024_only_price_percent_32_at_1h_buyreward = DataConfig(id=da
     layers_test = ["1h", "1d"],
     # fidelity_run_test = "1h",
     buyreward_percent= 0.005,
-    buyreward_maxwait= 2,
+    buyreward_maxwait= 4,
     buyreward_percent_test= 0.005,
-    buyreward_maxwait_test= 2*60
+    buyreward_maxwait_test= 4*60
 )
 data_2017_to_2023vs2024_only_price_percent_32_at_1d = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
     fidelity_run= "1h",
@@ -153,10 +153,10 @@ def get_datas_1h_1d():
     # return [data_2017_to_2023vs2024_only_price_percent]
     # return [data_2017_to_2023vs2024_only_price_percent_32]
     # return [data_2017_to_2023vs2024_only_price_percent_32_1m]
-    return [data_2017_to_2023vs2024_only_price_percent_32_1m_buyreward]
+    # return [data_2017_to_2023vs2024_only_price_percent_32_1m_buyreward]
     # return [data_2017_to_2023vs2024_only_price_percent_32_5m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_5m]
-    # return [data_2017_to_2023vs2024_only_price_percent_32_at_5m_buyreward]
+    return [data_2017_to_2023vs2024_only_price_percent_32_at_5m_buyreward]
     # return [data_2017_to_2023vs2024_only_price_percent_32_10m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_10m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_10m_buyreward]

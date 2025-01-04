@@ -647,7 +647,8 @@ model_rl_dip = ModelConfigSearch(
         reward_multiplier_combo_noaction= [0.01], # not-dip + no action
         # reward_multiplier_combo_noaction= [0.01, 0.001], # not-dip + no action
         reward_multiplier_combo_wrongaction= [-1], # dip + no action
-        reward_multiplier_combo_buy= [1], # dip + action
+        # reward_multiplier_combo_buy= [1], # dip + action
+        reward_multiplier_combo_buy= [10,5,2], # dip + action
         reward_multiplier_combo_sell= [-10], # not-dip + action
 
         reward_multiplier_combo_positionprofitpercentage= [10],

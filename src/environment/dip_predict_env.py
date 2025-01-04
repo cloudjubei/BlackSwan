@@ -238,42 +238,62 @@ class DipPredictEnv(AbstractEnv):
         plt.legend()
         plt.show()
 
-# 1h  - 1-0.002 694|1442  [7/694]-[3/1442]  0.020/2.333      
-# 1h  - 2-0.002 992|1144 [29/992]-[17/1144] 0.056/1.706
-# 1h  - 2-0.005 550|1586  [5/550]-[0/1586]  0.018/5.00
-# 1h  - 3-0.01  318|1818 [11/318]-[6/1818]  0.066/1.833 
-# 15m - 1-0.001 2727|5817 18/12-x/1.5 ;
-# 15m - 2-0.002 2653|5891 9/4-x/2.25 ; 33/19-x/1.737
-# 15m - 2-0.005  843|7701 3/0-x/3.0 ;
-# 15m - 4-0.01   479|8065 2/1-x/2.0 ;
-# 10m - 1-0.001 3589|9227 
-# 10m - 3-0.002 4212|8604 30/10-x/3.0 ;
-# 5m  - 1-0.001 
-# 5m  - 2-0.001 8815|16817 
+# 1h  - 1-0.002  694|1442    7/3   0.020/2.333      
+# 1h  - 2-0.002  992|1144   29/17  0.056/1.706
+# 1h  - 1-0.005  305|1831    2/1   0.013/2.000
+# TEST MIN     31706|96454  86/169 0.005/0.509
+# 1h  - 2-0.005  550|1586    5/0   0.018/5.00
+# TEST MIN     50083|78077 288/130 0.011/2.215   
+# 1h  - 3-0.005 
+# TEST MIN     61267|66893 405/246 0.013/1.646 
+# 1h  - 4-0.01   421|1715   10/2   0.046/5.000
+# TEST MIN     36213|91947  11/7   0.001/1.571
 
+# 15m - 1-0.001  2727|5817 18/12-x/1.5 ;
+# 15m - 2-0.002  2653|5891 9/4-x/2.25 ; 33/19-x/1.737
+# 15m - 4-0.005  x|x
+# TEST MIN     31706|96454  19/4   0.001/4.750 
+
+# 10m - 1-0.001 3589|9227   13/17-0.007/0.765
+# TEST MIN     55490|72670 160/156-0.006/1.026 
+# 10m - 2-0.002 44364|83796  88/114-0.004/0.772
+# + 2021                    122/55-0.005/2.218
+# + 2021 reward_multiplier_combo_buy= [10]  23516/32431-0.469/0.725
+# + 2020                  19740/26765-0.434/0.738  
+# + 2019                    272/330-0.012/0.824 
+# + 2018 bad
+# + 2017                     46/14-0.002/3.286
+# 10m - 3-0.003
+# TEST MIN     36532|91628 67/100-0.004/0.670
+
+# 5m  - 1-0.001 5492|20140 18/39-0.006/0.462       
+# 5m  - 2-0.001 8815|16817 
+# 5m  - 4-0.002 44364|83796
+# TEST MIN                  6221/7176-0.215/0.867
+
+# 1m  - 2*60-0.005 51806|76354 1959/1952-0.070/1.004    
 
 # 0.001 => 10m ?
-# 0.002 => 30m ?
-# 0.005 => 1h ?
+# 0.002 => 20m
+# 0.003 => 30m
+# 0.005 => 1h
 # 0.01  => 4h ?
 
 
 
-# 1m  -  max_wait=2*60  buy_percent=0.005 duel-dqn-custom 0/2
-# 5m  -  max_wait=1  buy_percent=0.001 duel-dqn-custom 0/2
-# 10m -  max_wait=1  buy_percent=0.001 duel-dqn-custom 0/2
-# 10m -  max_wait=2  buy_percent=0.002 duel-dqn-custom 0/2
-# 15m -  max_wait=3  buy_percent=0.005 duel-dqn-custom 0/2
-# 1h  - 3-0.01 TEST MIN
-# 1h  - 2-0.005 TEST MIN
+# 10m  - 2-0.002 TEST MIN + 2021 reward_multiplier_combo_buy= [2]
+# 5m   - 4-0.002 TEST MIN reward_multiplier_combo_buy= [10,5,2]
+# 
+# 5m  - 4-0.002 TEST MIN + 2019      
+# 5m  - 4-0.002 TEST MIN + 2020
+# 5m  - 4-0.002 TEST MIN + 2021
+# 5m  - 4-0.002 TEST MIN + 2017
 
-
-# TODO: 1h -  max_wait=4  buy_percent=0.01 duel-dqn-custom 0/2
-# TODO: 15m -  max_wait=4  buy_percent=0.005 duel-dqn-custom 0/2
-# TODO: 15m -  max_wait=16  buy_percent=0.01 duel-dqn-custom 0/2
-# TODO: 10m -  max_wait=2  buy_percent=0.001 duel-dqn-custom 0/2
-# TODO: 10m -  max_wait=3  buy_percent=0.002 duel-dqn-custom 0/2
-# TODO: 5m  -  max_wait=2  buy_percent=0.002 duel-dqn-custom 0/2
+# check lookback for one of these
+# TODO: check 0.01 with 1h,15m,10m,5m
+# TODO: check 0.005 with 1h,15m,10m,5m
+# TODO: check 0.001 with 10m,5m
+# TODO: check with 1m the above
 
 # check if adding more data improves things
 # TODO: lr x net_arch= [[8192,4096,512,256]],
@@ -281,6 +301,7 @@ class DipPredictEnv(AbstractEnv):
 # indicators
 # extra data
 # trees
+# making the data be fed 00:00->00:59 not 1h by 1h cos it's different to how humans see it
 
 # multi asset data
 # after, which commodity to invest in
