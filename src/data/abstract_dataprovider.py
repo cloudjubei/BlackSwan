@@ -444,7 +444,7 @@ class AbstractDataProvider(ABC):
 
         if fidelity == "1m":
             if layer == "1w":
-                return date_time.weekday *60*24 + date_time.hour *60 + date_time.minute
+                return date_time.weekday() *60*24 + date_time.hour *60 + date_time.minute
             if layer == "1d":
                 return date_time.hour *60 + date_time.minute
             if layer == "4h":
@@ -462,7 +462,7 @@ class AbstractDataProvider(ABC):
             return 0
         if fidelity == "30m":
             if layer == "1w":
-                return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 30 % (2*24*7))
+                return int((date_time.weekday() *60*24 + date_time.hour *60 + date_time.minute) / 30 % (2*24*7))
             if layer == "1d":
                 return int((date_time.hour *60 + date_time.minute) / 30 % (2*24))
             if layer == "4h":
@@ -472,7 +472,7 @@ class AbstractDataProvider(ABC):
             return 0
         if fidelity == "15m":
             if layer == "1w":
-                return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 15 % (4*24*7))
+                return int((date_time.weekday() *60*24 + date_time.hour *60 + date_time.minute) / 15 % (4*24*7))
             if layer == "1d":
                 return int((date_time.hour *60 + date_time.minute) / 15 % (4*24))
             if layer == "4h":
@@ -484,7 +484,7 @@ class AbstractDataProvider(ABC):
             return 0
         if fidelity == "10m":
             if layer == "1w":
-                return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 10 % (6*24*7))
+                return int((date_time.weekday() *60*24 + date_time.hour *60 + date_time.minute) / 10 % (6*24*7))
             if layer == "1d":
                 return int((date_time.hour *60 + date_time.minute) / 10 % (6*24))
             if layer == "4h":
@@ -496,7 +496,7 @@ class AbstractDataProvider(ABC):
             return 0
         if fidelity == "5m":
             if layer == "1w":
-                return int((date_time.weekday *60*24 + date_time.hour *60 + date_time.minute) / 5 % (12*24*7))
+                return int((date_time.weekday() *60*24 + date_time.hour *60 + date_time.minute) / 5 % (12*24*7))
             if layer == "1d":
                 return int((date_time.hour *60 + date_time.minute) / 5 % (12*24))
             if layer == "4h":
@@ -512,7 +512,7 @@ class AbstractDataProvider(ABC):
             return 0
         else:
             if layer == "1w":
-                return date_time.weekday *24 + date_time.hour
+                return date_time.weekday() *24 + date_time.hour
             if layer == "1d":
                 return date_time.hour % 24
             return 0

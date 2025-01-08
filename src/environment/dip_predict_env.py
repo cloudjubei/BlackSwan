@@ -256,24 +256,35 @@ class DipPredictEnv(AbstractEnv):
 
 # 10m - 1-0.001 3589|9227   13/17-0.007/0.765
 # TEST MIN     55490|72670 160/156-0.006/1.026 
-# 10m - 2-0.002 44364|83796  88/114-0.004/0.772
+
+
+# 10m - 3-0.003
+# TEST MIN     36532|91628 67/100-0.004/0.670
+
+
+# 5m  - 1-0.001 5492|20140 18/39-0.006/0.462       
+# 5m  - 2-0.001 8815|16817 
+
+
+# 0.002 => 20m  44364|83796
+# 10m - 2-0.002              
+#                            88/114-0.004/0.772
 # + 2021                    122/55-0.005/2.218
 # + 2021 reward_multiplier_combo_buy= [10]  23516/32431-0.469/0.725
 # + 2020                  19740/26765-0.434/0.738  
 # + 2019                    272/330-0.012/0.824 
 # + 2018 bad
 # + 2017                     46/14-0.002/3.286
-# 10m - 3-0.003
-# TEST MIN     36532|91628 67/100-0.004/0.670
-
-# 5m  - 1-0.001 5492|20140 18/39-0.006/0.462       
-# 5m  - 2-0.001 8815|16817 
-# 5m  - 4-0.002 44364|83796
-# TEST MIN                  6221/7176-0.215/0.867
+# 5m  - 4-0.002
+#                           6221/7176-0.215/0.867
+# + 2021                   15332/19635-0.387/0.781  
+# + 2020                    5094/5121-0.187/0.995
+# + 2019                    8181/11705-0.255/0.699
+# + 2017 bad
 
 # 1m  - 2*60-0.005 51806|76354 1959/1952-0.070/1.004    
 
-# 0.001 => 10m ?
+# 0.001 => 10m
 # 0.002 => 20m
 # 0.003 => 30m
 # 0.005 => 1h
@@ -281,23 +292,26 @@ class DipPredictEnv(AbstractEnv):
 
 
 
-# 10m  - 2-0.002 TEST MIN + 2021 reward_multiplier_combo_buy= [2]
+# 10m  - 2-0.002 TEST MIN + 2021 reward_multiplier_combo_buy= [5,10,20]    
 # 5m   - 4-0.002 TEST MIN reward_multiplier_combo_buy= [10,5,2]
-# 
-# 5m  - 4-0.002 TEST MIN + 2019      
-# 5m  - 4-0.002 TEST MIN + 2020
-# 5m  - 4-0.002 TEST MIN + 2021
-# 5m  - 4-0.002 TEST MIN + 2017
+# 5m   - 4-0.002 TEST MIN + 2020 reward_multiplier_combo_buy= [10,5,2]
+# 5m   - 4-0.002 TEST MIN  layers = ["5m", "1h", "1d", "1w"]
+# 5m   - 4-0.002 TEST MIN  layers = ["5m", "1h", "4h", "1d"]
+# 5m   - 4-0.002 TEST MIN + 2017? reward_multiplier_combo_buy= [10,5,2]
+
+# READY adding more fidelity to data
+# 5m   - 4-0.002 TEST MIN  layers = ["5m", "15m", "1h", "1d"]
+# 5m   - 4-0.002 TEST MIN  layers = ["5m", "15m", "1h", "4h", "1d", "1w"]
 
 # check lookback for one of these
-# TODO: check 0.01 with 1h,15m,10m,5m
 # TODO: check 0.005 with 1h,15m,10m,5m
-# TODO: check 0.001 with 10m,5m
+# TODO: check 0.01 with 1h,15m,10m,5m
 # TODO: check with 1m the above
 
 # check if adding more data improves things
 # TODO: lr x net_arch= [[8192,4096,512,256]],
 # TODO: lr x custom_net_arch [[4096,4096,4096,4096,4096,4096]]
+# TODO: a long net_arch with even more neurons but smaller size
 # indicators
 # extra data
 # trees

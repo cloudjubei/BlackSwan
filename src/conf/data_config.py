@@ -14,7 +14,7 @@ class DataConfig:
     buyreward_maxwait: int = 20
     fidelity_input: str = "1m" # possible ["1m", "1h", "1d"]
     fidelity_run: str = "1m"
-    layers: List[str] = field(default_factory=[])  # possible ["1h"], ["1h", "4h", "1d", "7d"], ["1m", "15m", "1h", "4h", "1d", "7d"]
+    layers: List[str] = field(default_factory=[])  # possible ["1h"], ["1h", "4h", "1d", "1w"], ["1m", "15m", "1h", "4h", "1d", "1w"]
     fidelity_input_test: str = "1m"
     fidelity_run_test: str = "1m"
     layers_test: List[str] = field(default_factory=[])
@@ -22,7 +22,7 @@ class DataConfig:
     buyreward_maxwait_test: int = 20
    
 data_2017_to_2023vs2024_only_price_percent = DataConfig(
-    id= "data_2017_to_2023vs2024_only_price_percent",
+    id= "data_2022_to_2023vs2024_only_price_percent",
     type="only_price_percent",
     train_data_paths= [
         [
@@ -31,13 +31,17 @@ data_2017_to_2023vs2024_only_price_percent = DataConfig(
             # "binance/BTCUSDT-1m-2018-1.json", "binance/BTCUSDT-1m-2018-2.json", "binance/BTCUSDT-1m-2018-3.json", "binance/BTCUSDT-1m-2018-4.json", "binance/BTCUSDT-1m-2018-5.json", "binance/BTCUSDT-1m-2018-6.json", "binance/BTCUSDT-1m-2018-7.json", "binance/BTCUSDT-1m-2018-8.json", "binance/BTCUSDT-1m-2018-9.json", "binance/BTCUSDT-1m-2018-10.json", "binance/BTCUSDT-1m-2018-11.json", "binance/BTCUSDT-1m-2018-12.json",               
             # "binance/BTCUSDT-1m-2019-1.json", "binance/BTCUSDT-1m-2019-2.json", "binance/BTCUSDT-1m-2019-3.json", "binance/BTCUSDT-1m-2019-4.json", "binance/BTCUSDT-1m-2019-5.json", "binance/BTCUSDT-1m-2019-6.json", "binance/BTCUSDT-1m-2019-7.json", "binance/BTCUSDT-1m-2019-8.json", "binance/BTCUSDT-1m-2019-9.json", "binance/BTCUSDT-1m-2019-10.json", "binance/BTCUSDT-1m-2019-11.json", "binance/BTCUSDT-1m-2019-12.json",               
             # "binance/BTCUSDT-1m-2020-1.json", "binance/BTCUSDT-1m-2020-2.json", "binance/BTCUSDT-1m-2020-3.json", "binance/BTCUSDT-1m-2020-4.json", "binance/BTCUSDT-1m-2020-5.json", "binance/BTCUSDT-1m-2020-6.json", "binance/BTCUSDT-1m-2020-7.json", "binance/BTCUSDT-1m-2020-8.json", "binance/BTCUSDT-1m-2020-9.json", "binance/BTCUSDT-1m-2020-10.json", "binance/BTCUSDT-1m-2020-11.json", "binance/BTCUSDT-1m-2020-12.json",
-            "binance/BTCUSDT-1m-2021-1.json", "binance/BTCUSDT-1m-2021-2.json", "binance/BTCUSDT-1m-2021-3.json", "binance/BTCUSDT-1m-2021-4.json", "binance/BTCUSDT-1m-2021-5.json", "binance/BTCUSDT-1m-2021-6.json", "binance/BTCUSDT-1m-2021-7.json", "binance/BTCUSDT-1m-2021-8.json", "binance/BTCUSDT-1m-2021-9.json", "binance/BTCUSDT-1m-2021-10.json", "binance/BTCUSDT-1m-2021-11.json", "binance/BTCUSDT-1m-2021-12.json",
+            # "binance/BTCUSDT-1m-2021-1.json", "binance/BTCUSDT-1m-2021-2.json", "binance/BTCUSDT-1m-2021-3.json", "binance/BTCUSDT-1m-2021-4.json", "binance/BTCUSDT-1m-2021-5.json", "binance/BTCUSDT-1m-2021-6.json", "binance/BTCUSDT-1m-2021-7.json", "binance/BTCUSDT-1m-2021-8.json", "binance/BTCUSDT-1m-2021-9.json", "binance/BTCUSDT-1m-2021-10.json", "binance/BTCUSDT-1m-2021-11.json", "binance/BTCUSDT-1m-2021-12.json",
             "binance/BTCUSDT-1m-2022-1.json", "binance/BTCUSDT-1m-2022-2.json", "binance/BTCUSDT-1m-2022-3.json", "binance/BTCUSDT-1m-2022-4.json", "binance/BTCUSDT-1m-2022-5.json", "binance/BTCUSDT-1m-2022-6.json", "binance/BTCUSDT-1m-2022-7.json", "binance/BTCUSDT-1m-2022-8.json", "binance/BTCUSDT-1m-2022-9.json", "binance/BTCUSDT-1m-2022-10.json", "binance/BTCUSDT-1m-2022-11.json", "binance/BTCUSDT-1m-2022-12.json",
             "binance/BTCUSDT-1m-2023-1.json", "binance/BTCUSDT-1m-2023-2.json", "binance/BTCUSDT-1m-2023-3.json", "binance/BTCUSDT-1m-2023-4.json", "binance/BTCUSDT-1m-2023-5.json", "binance/BTCUSDT-1m-2023-6.json", "binance/BTCUSDT-1m-2023-7.json", "binance/BTCUSDT-1m-2023-8.json", "binance/BTCUSDT-1m-2023-9.json", "binance/BTCUSDT-1m-2023-10.json", "binance/BTCUSDT-1m-2023-11.json", "binance/BTCUSDT-1m-2023-12.json"
         ]
     ],
     test_data_paths= [
-        ["binance/BTCUSDT-1m-2024-1.json", "binance/BTCUSDT-1m-2024-2.json", "binance/BTCUSDT-1m-2024-3.json", "binance/BTCUSDT-1m-2024-4.json"],
+        [
+            "binance/BTCUSDT-1m-2024-1.json", "binance/BTCUSDT-1m-2024-2.json", "binance/BTCUSDT-1m-2024-3.json", "binance/BTCUSDT-1m-2024-4.json",
+            # "binance/BTCUSDT-1m-2024-5.json", "binance/BTCUSDT-1m-2024-6.json", "binance/BTCUSDT-1m-2024-7.json", "binance/BTCUSDT-1m-2024-8.json",
+            # "binance/BTCUSDT-1m-2024-9.json", "binance/BTCUSDT-1m-2024-10.json", "binance/BTCUSDT-1m-2024-11.json", "binance/BTCUSDT-1m-2024-12.json",
+         ],
     ],
     fidelity_run= "1h",
     layers = ["1h", "1d"],
@@ -73,8 +77,21 @@ data_2017_to_2023vs2024_only_price_percent_32_at_5m = DataConfig(id=data_2017_to
 )
 data_2017_to_2023vs2024_only_price_percent_32_at_5m_buyreward = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
     fidelity_run= "5m",
-    layers = ["5m", "1h", "1d"],
-    layers_test = ["5m", "1h", "1d"],
+    # layers = ["5m", "1h", "1d"],
+    # layers_test = ["5m", "1h", "1d"],
+
+    # layers = ["5m", "1h", "1d", "1w"],
+    # layers_test = ["5m", "1h", "1d", "1w"],
+    # layers = ["5m", "1h", "4h", "1d"],
+    # layers_test = ["5m", "1h", "4h", "1d"],
+    layers = ["5m", "15m", "1h", "1d"],
+    layers_test = ["5m", "15m", "1h", "1d"],
+    # layers = ["5m", "15m", "1h", "4h", "1d"],
+    # layers_test = ["5m", "15m", "1h", "4h", "1d"],  
+
+    # layers = ["5m", "15m", "1h", "4h", "1d", "1w"],
+    # layers_test = ["5m", "15m", "1h", "4h", "1d", "1w"],                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+
     # fidelity_run_test = "5m",
     buyreward_percent= 0.002,
     buyreward_maxwait= 4,
