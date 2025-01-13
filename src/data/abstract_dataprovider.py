@@ -515,6 +515,8 @@ class AbstractDataProvider(ABC):
                 return date_time.weekday() *24 + date_time.hour
             if layer == "1d":
                 return date_time.hour % 24
+            if layer == "4h":
+                return date_time.hour % 4
             return 0
             
 

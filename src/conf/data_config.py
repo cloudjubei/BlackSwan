@@ -57,12 +57,14 @@ data_2017_to_2023vs2024_only_price_percent_32_1m = DataConfig(id=data_2017_to_20
 )
 data_2017_to_2023vs2024_only_price_percent_32_1m_buyreward = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
     fidelity_run= "1m",
-    layers = ["1m", "1h", "1d"],
-    layers_test = ["1m", "1h", "1d"],
+    # layers = ["1m", "1h", "1d"],
+    # layers_test = ["1m", "1h", "1d"],
+    layers = ["1m", "5m", "15m", "1h", "4h", "1d"],
+    layers_test = ["1m", "5m", "15m", "1h", "4h", "1d"],  
     buyreward_percent= 0.002,
-    buyreward_maxwait= 2*10,
+    buyreward_maxwait= 20,
     buyreward_percent_test= 0.002,
-    buyreward_maxwait_test= 2*10,
+    buyreward_maxwait_test= 20
 )
 data_2017_to_2023vs2024_only_price_percent_32_5m = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
     fidelity_run= "5m",
@@ -79,15 +81,8 @@ data_2017_to_2023vs2024_only_price_percent_32_at_5m_buyreward = DataConfig(id=da
     fidelity_run= "5m",
     # layers = ["5m", "1h", "1d"],
     # layers_test = ["5m", "1h", "1d"],
-
-    # layers = ["5m", "1h", "1d", "1w"],
-    # layers_test = ["5m", "1h", "1d", "1w"],
-    # layers = ["5m", "1h", "4h", "1d"],
-    # layers_test = ["5m", "1h", "4h", "1d"],
-    layers = ["5m", "15m", "1h", "1d"],
-    layers_test = ["5m", "15m", "1h", "1d"],
-    # layers = ["5m", "15m", "1h", "4h", "1d"],
-    # layers_test = ["5m", "15m", "1h", "4h", "1d"],  
+    layers = ["5m", "15m", "1h", "4h", "1d"],
+    layers_test = ["5m", "15m", "1h", "4h", "1d"],  
 
     # layers = ["5m", "15m", "1h", "4h", "1d", "1w"],
     # layers_test = ["5m", "15m", "1h", "4h", "1d", "1w"],                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
@@ -151,13 +146,13 @@ data_2017_to_2023vs2024_only_price_percent_32_at_1h = DataConfig(id=data_2017_to
 )
 data_2017_to_2023vs2024_only_price_percent_32_at_1h_buyreward = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
     fidelity_run= "1h",
-    layers = ["1h", "1d"],
-    layers_test = ["1h", "1d"],
+    layers = ["1h", "4h", "1d"],
+    layers_test = ["1h", "4h", "1d"],
     # fidelity_run_test = "1h",
     buyreward_percent= 0.005,
-    buyreward_maxwait= 4,
+    buyreward_maxwait= 1,
     buyreward_percent_test= 0.005,
-    buyreward_maxwait_test= 4*60
+    buyreward_maxwait_test= 1*60
 )
 data_2017_to_2023vs2024_only_price_percent_32_at_1d = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
     fidelity_run= "1h",
@@ -173,7 +168,7 @@ def get_datas_1h_1d():
     # return [data_2017_to_2023vs2024_only_price_percent_32_1m_buyreward]
     # return [data_2017_to_2023vs2024_only_price_percent_32_5m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_5m]
-    return [data_2017_to_2023vs2024_only_price_percent_32_at_5m_buyreward]
+    # return [data_2017_to_2023vs2024_only_price_percent_32_at_5m_buyreward]
     # return [data_2017_to_2023vs2024_only_price_percent_32_10m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_10m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_10m_buyreward]
@@ -181,7 +176,7 @@ def get_datas_1h_1d():
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_15m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_15m_buyreward]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_1h]
-    # return [data_2017_to_2023vs2024_only_price_percent_32_at_1h_buyreward]
+    return [data_2017_to_2023vs2024_only_price_percent_32_at_1h_buyreward]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_1d]
 
 def get_datas_1m_1h_1d():

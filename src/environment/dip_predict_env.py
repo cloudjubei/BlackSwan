@@ -270,13 +270,18 @@ class DipPredictEnv(AbstractEnv):
 # 10m - 2-0.002              
 #                            88/114-0.004/0.772
 # + 2021                    122/55-0.005/2.218
+# reward_multiplier_combo_buy= [5] 11954/16013-0.331/0.747 
 # + 2021 reward_multiplier_combo_buy= [10]  23516/32431-0.469/0.725
 # + 2020                  19740/26765-0.434/0.738  
 # + 2019                    272/330-0.012/0.824 
 # + 2018 bad
 # + 2017                     46/14-0.002/3.286
 # 5m  - 4-0.002
-#                           6221/7176-0.215/0.867
+#                           3522/3645-0.137/0.966 -> NEW reward_multiplier_combo_buy=5
+# ["5m", "1h", "1d", "1w"]  2016/3371-0.266/0.598
+# ["5m", "1h", "4h", "1d"] 16608/20886-0.406/0.795  
+# ["5m", "15m", "1h", "1d"] 19172/23649-0.440/0.811  
+# ["5m", "15m", "1h", "4h", "1d"] 14090/17006-0.373/0.829   -> NEW reward_multiplier_combo_buy=5
 # + 2021                   15332/19635-0.387/0.781  
 # + 2020                    5094/5121-0.187/0.995
 # + 2019                    8181/11705-0.255/0.699
@@ -284,6 +289,7 @@ class DipPredictEnv(AbstractEnv):
 
 # 1m  - 2*60-0.005 51806|76354 1959/1952-0.070/1.004    
 
+# when reward_multiplier_combo_buy is 5, F1 is higher, when it's 1 -> Ratio is higher
 # 0.001 => 10m
 # 0.002 => 20m
 # 0.003 => 30m
@@ -292,21 +298,22 @@ class DipPredictEnv(AbstractEnv):
 
 
 
-# 10m  - 2-0.002 TEST MIN + 2021 reward_multiplier_combo_buy= [5,10,20]    
-# 5m   - 4-0.002 TEST MIN reward_multiplier_combo_buy= [10,5,2]
-# 5m   - 4-0.002 TEST MIN + 2020 reward_multiplier_combo_buy= [10,5,2]
-# 5m   - 4-0.002 TEST MIN  layers = ["5m", "1h", "1d", "1w"]
-# 5m   - 4-0.002 TEST MIN  layers = ["5m", "1h", "4h", "1d"]
+# 5m   - 4-0.002 TEST MIN  layers = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=1
+# 5m   - 4-0.002 TEST MIN + 2020 layers = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=5
+# 5m   - 4-0.002 TEST MIN + 2020 layers = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=1
+# 5m   - 4-0.002 TEST MIN + 2019  layers = ["5m", "15m", "1h", "4h", "1d", "1w"]
 # 5m   - 4-0.002 TEST MIN + 2017? reward_multiplier_combo_buy= [10,5,2]
+# 1h   - 1-0.005 TEST MIN
+# 1h   - 1-0.005 TEST MIN + 2020
 
-# READY adding more fidelity to data
-# 5m   - 4-0.002 TEST MIN  layers = ["5m", "15m", "1h", "1d"]
-# 5m   - 4-0.002 TEST MIN  layers = ["5m", "15m", "1h", "4h", "1d", "1w"]
+# TODO:
+# 1h   - 1-0.005 TEST MIN reward_multiplier_combo_buy=[20,10,5]
+# 5m   - 12-0.005 TEST MIN
+# 5m   - 12-0.005 TEST MIN + 2020
 
 # check lookback for one of these
-# TODO: check 0.005 with 1h,15m,10m,5m
-# TODO: check 0.01 with 1h,15m,10m,5m
-# TODO: check with 1m the above
+# TODO: check 0.005 with 5m
+# TODO: check 0.01 with 1h,5m
 
 # check if adding more data improves things
 # TODO: lr x net_arch= [[8192,4096,512,256]],
