@@ -620,7 +620,7 @@ model_rl_dip = ModelConfigSearch(
         net_arch= [[8192,512]],
         custom_net_arch= [
             ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
-            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
             # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
             # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
             # ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
@@ -650,7 +650,7 @@ model_rl_dip = ModelConfigSearch(
         reward_multiplier_combo_buy= [1], # dip + action
         # reward_multiplier_combo_buy= [5], # dip + action
         # reward_multiplier_combo_buy= [10], # dip + action
-        # TODO reward_multiplier_combo_buy= [20], # dip + action
+        # reward_multiplier_combo_buy= [20,10,5], # dip + action
         reward_multiplier_combo_sell= [-10], # not-dip + action
 
         reward_multiplier_combo_positionprofitpercentage= [10],

@@ -89,9 +89,9 @@ data_2017_to_2023vs2024_only_price_percent_32_at_5m_buyreward = DataConfig(id=da
 
     # fidelity_run_test = "5m",
     buyreward_percent= 0.002,
-    buyreward_maxwait= 4,
+    buyreward_maxwait= 12,
     buyreward_percent_test= 0.002,
-    buyreward_maxwait_test= 4*5,
+    buyreward_maxwait_test= 12*5,
 )
 
 data_2017_to_2023vs2024_only_price_percent_32_10m = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
@@ -107,14 +107,14 @@ data_2017_to_2023vs2024_only_price_percent_32_at_10m = DataConfig(id=data_2017_t
 )
 data_2017_to_2023vs2024_only_price_percent_32_at_10m_buyreward = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
     fidelity_run= "10m",
-    layers = ["10m", "1h", "1d"],
-    layers_test = ["10m", "1h", "1d"],
+    layers = ["10m", "1h", "4h", "1d"],
+    layers_test = ["10m", "1h", "4h", "1d"],
     # fidelity_run_test = "10m",
 
-    buyreward_percent= 0.002,
-    buyreward_maxwait= 2,
-    buyreward_percent_test= 0.002,
-    buyreward_maxwait_test= 2*10,
+    buyreward_percent= 0.005,
+    buyreward_maxwait= 6,
+    buyreward_percent_test= 0.005,
+    buyreward_maxwait_test= 6*10,
 )
 data_2017_to_2023vs2024_only_price_percent_32_15m = DataConfig(id=data_2017_to_2023vs2024_only_price_percent.id, train_data_paths=data_2017_to_2023vs2024_only_price_percent.train_data_paths, test_data_paths=data_2017_to_2023vs2024_only_price_percent.test_data_paths, type=data_2017_to_2023vs2024_only_price_percent.type, lookback_window_size=32,
     fidelity_run= "15m",
@@ -171,12 +171,12 @@ def get_datas_1h_1d():
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_5m_buyreward]
     # return [data_2017_to_2023vs2024_only_price_percent_32_10m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_10m]
-    # return [data_2017_to_2023vs2024_only_price_percent_32_at_10m_buyreward]
+    return [data_2017_to_2023vs2024_only_price_percent_32_at_10m_buyreward]
     # return [data_2017_to_2023vs2024_only_price_percent_32_15m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_15m]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_15m_buyreward]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_1h]
-    return [data_2017_to_2023vs2024_only_price_percent_32_at_1h_buyreward]
+    # return [data_2017_to_2023vs2024_only_price_percent_32_at_1h_buyreward]
     # return [data_2017_to_2023vs2024_only_price_percent_32_at_1d]
 
 def get_datas_1m_1h_1d():
