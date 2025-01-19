@@ -257,24 +257,25 @@ class DipPredictEnv(AbstractEnv):
 # 0.005 => 1h
 # 0.01  => 4h ?
 
+# 10m  - 6-0.005 TEST MIN + 2020 layers = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
+# 10m  - 6-0.005 + 2020 [79/31706]-[46/96454]
 
 
-# 10m  - 6-0.005 TEST MIN = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy=1
-# 5m   - 4-0.002 TEST MIN + 2020 layers = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=5
-# 5m   - 4-0.002 TEST MIN + 2020 layers = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=1
-# 5m   - 4-0.002 TEST MIN + 2017? reward_multiplier_combo_buy= [10,5,2]
-# 5m   - 12-0.005 TEST MIN  reward_multiplier_combo_buy=1
-# 5m   - 12-0.005 TEST MIN reward_multiplier_combo_buy= [20,10,5]
-# 5m   - 12-0.005 TEST MIN + 2020  reward_multiplier_combo_buy=1
+# 15m  - 4-0.005 TEST MIN = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
+# 10m  - 6-0.005 TEST MIN = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
+# 5m   - 12-0.05 TEST MIN = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
+# 5m   - 12-0.05 TEST MIN + 2020 layers = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
 
-# check lookback for one of these
-# TODO: 10m  - 6-0.005 TEST MIN = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2]
-# TODO: 15m  - 4-0.005 TEST MIN = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
+# TODO: READY
+# 15m  - 4-0.005 TEST MIN + 2020 = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
+
 
 # TODO: 5m  - 48-0.01 TEST MIN = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
 # TODO: 10m  - 24-0.01 TEST MIN = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
 # TODO: 15m  - 16-0.01 TEST MIN = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
-# TODO: 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
+
+# check lookback for one of these
+# TODO: 15m  - 4-0.005 TEST MIN = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
 
 # check if adding more data improves things
 # TODO: lr x net_arch= [[8192,4096,512,256]],
