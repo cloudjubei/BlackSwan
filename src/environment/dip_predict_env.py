@@ -255,27 +255,21 @@ class DipPredictEnv(AbstractEnv):
 # 0.002 => 20m
 # 0.003 => 30m
 # 0.005 => 1h
-# 0.01  => 4h ?
+# 0.01  => 4h
 
-# 10m  - 6-0.005 TEST MIN + 2020 layers = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
-# 10m  - 6-0.005 + 2020 [79/31706]-[46/96454]
+# 1m   - 240-0.01 TEST MIN = ["1m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1]
+# 1m   - 240-0.01 TEST MIN = ["1m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [5]
+# 1m   - 240-0.01 TEST MIN = ["1m", "10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [5]
+# 5m   - 48-0.01 TEST MIN + 2020 = ["5m", "10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1]
 
+# READY:
+# 1m   - 240-0.01 TEST MIN = ["1m", "10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1]
+# 1m   - 240-0.01 TEST MIN = ["1m", "5m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1]
+# 1m   - 240-0.01 TEST MIN = ["1m", "5m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [5]
 
-# 15m  - 4-0.005 TEST MIN = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
-# 10m  - 6-0.005 TEST MIN = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
-# 5m   - 12-0.05 TEST MIN = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
-# 5m   - 12-0.05 TEST MIN + 2020 layers = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
-
-# TODO: READY
-# 15m  - 4-0.005 TEST MIN + 2020 = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=[5,1]
-
-
-# TODO: 5m  - 48-0.01 TEST MIN = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
-# TODO: 10m  - 24-0.01 TEST MIN = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
-# TODO: 15m  - 16-0.01 TEST MIN = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
+# CONSOLIDATE with MAC!!!
 
 # check lookback for one of these
-# TODO: 15m  - 4-0.005 TEST MIN = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
 
 # check if adding more data improves things
 # TODO: lr x net_arch= [[8192,4096,512,256]],
