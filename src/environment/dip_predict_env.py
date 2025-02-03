@@ -257,15 +257,10 @@ class DipPredictEnv(AbstractEnv):
 # 0.005 => 1h
 # 0.01  => 4h
 
-# 1m   - 240-0.01 TEST MIN = ["1m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1]
-# 1m   - 240-0.01 TEST MIN = ["1m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [5]
-# 1m   - 240-0.01 TEST MIN = ["1m", "10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [5]
-# 5m   - 48-0.01 TEST MIN + 2020 = ["5m", "10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1]
 
-# READY:
-# 1m   - 240-0.01 TEST MIN = ["1m", "10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1]
 # 1m   - 240-0.01 TEST MIN = ["1m", "5m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1]
 # 1m   - 240-0.01 TEST MIN = ["1m", "5m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [5]
+# 1m   - 240-0.01 TEST MIN = ["1m", "5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1]
 
 # CONSOLIDATE with MAC!!!
 
