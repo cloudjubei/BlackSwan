@@ -258,6 +258,8 @@ class DipPredictEnv(AbstractEnv):
 # 0.01  => 4h ?
 
 
+# rl_reppo 8192]512 Batcd-Liner-actin-Dropt-Noisr-Dropt-actin-Liner data_2022_to_2023 1h]4h]1d_32_0~01_4 - BEST: 0.444
+# rl_reppo 8192]512 Batcd-Liner-actin-Dropt-Noisr-Dropt-actin-Liner data_2020_to_2023 1h]4h]1d_32_0~01_4 - BEST: 64/0-64.0/0.004 920/816-1.127/0.048
 
 # 10m  - 6-0.005 TEST MIN = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy=1
 # 5m   - 4-0.002 TEST MIN + 2020 layers = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy=5
@@ -267,30 +269,39 @@ class DipPredictEnv(AbstractEnv):
 # 5m   - 12-0.005 TEST MIN reward_multiplier_combo_buy= [20,10,5]
 # 5m   - 12-0.005 TEST MIN + 2020  reward_multiplier_combo_buy=1
 
-# check lookback for one of these
-# TODO: 10m  - 6-0.005 TEST MIN = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2]
-# TODO: 15m  - 4-0.005 TEST MIN = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Ratio          -> 0.016  1.000    [289/36213]-[289/91947] <- A
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Top            -> 0.264  0.792   [6832/36213]-[8630/91947]
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Top_Signal     -> 0.004  4.562     [73/36213]-[16/91947]  <- A
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom_Ratio   -> 0.441  0.394  [36213/36213]-[91947/91947]
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom         -> 0.310  0.625   [9397/36213]-[15046/91947]
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom_Ratio   -> 0.270  0.559   [7859/36213]-[14056/91947]
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom_Signal  -> 0.291  0.805   [7801/36213]-[9688/91947] <- B
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom_Ratio/2 -> 0.010  2.382    [181/36213]-[76/91947] <- A+
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom/2 -> 0
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom_Signal/2-> 0.063  1.058  [1221/36213]-[1154/91947] <- A
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom_Ratio/2 + Pi_Cycle_Bottom_Signal/2 + Pi_Cycle_Top_Signal + Pi_Cycle_Ratio -> 0.001 27.000    [27/36213]-[0/91947] ++ 0.010  4.302  [185/36213]-[43/91947]
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [5] + Pi_Cycle_Bottom_Ratio/2 + Pi_Cycle_Bottom_Signal/2 + Pi_Cycle_Top_Signal + Pi_Cycle_Ratio -> 0.002 31.000        [31/36213]-[1/91947]
 
-# TODO: 5m  - 48-0.01 TEST MIN = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
-# TODO: 10m  - 24-0.01 TEST MIN = ["10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
-# TODO: 15m  - 16-0.01 TEST MIN = ["15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
-# TODO: 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [10,5,2,1]
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] x reppo + Pi_Cycle_Bottom_Ratio/2 + Pi_Cycle_Bottom_Signal/2 + Pi_Cycle_Top_Signal + Pi_Cycle_Ratio ->   39/18 - 2.167/0.002
 
-# check if adding more data improves things
-# TODO: lr x net_arch= [[8192,4096,512,256]],
-# TODO: lr x custom_net_arch [[4096,4096,4096,4096,4096,4096]]
-# TODO: a long net_arch with even more neurons but smaller size
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"]->  -36807.480 0.012  1.123      [219/36213]-[195/91947]
+
+# 1h  - 4-0.01 TEST MIN = ["1h", "4h", "1d"] reward_multiplier_combo_buy= [1] x custom_net_arch + Pi_Cycle_Bottom_Ratio/2 + Pi_Cycle_Bottom_Signal/2 + Pi_Cycle_Top_Signal + Pi_Cycle_Ratio
+# 0.003 46.000        [46/36213]-[0/91947]
+# results_name: results_1737985959.43754.csv
+
+
+# READY:   
+# 5m  - 48-0.01 TEST MIN = ["5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom_Ratio/2 + Pi_Cycle_Bottom_Signal/2 + Pi_Cycle_Top_Signal + Pi_Cycle_Ratio 
+# 1m  - 240-0.01 TEST MIN = ["1m", "10m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom_Ratio/2 + Pi_Cycle_Bottom_Signal/2 + Pi_Cycle_Top_Signal + Pi_Cycle_Ratio 
+# 1m  - 240-0.01 TEST MIN = ["1m", "5m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom_Ratio/2 + Pi_Cycle_Bottom_Signal/2 + Pi_Cycle_Top_Signal + Pi_Cycle_Ratio 
+# 1m  - 240-0.01 TEST MIN = ["1m", "15m", "1h", "4h", "1d"] reward_multiplier_combo_buy= [1] + Pi_Cycle_Bottom_Ratio/2 + Pi_Cycle_Bottom_Signal/2 + Pi_Cycle_Top_Signal + Pi_Cycle_Ratio 
+
 # indicators
-# extra data
 # trees
-# making the data be fed 00:00->00:59 not 1h by 1h cos it's different to how humans see it
+# extra data
+# try 1m for one
 
 # multi asset data
 # after, which commodity to invest in
 
-# more data?
-
-
-
-
-# learning_rate -> net_arch / model -> parameters

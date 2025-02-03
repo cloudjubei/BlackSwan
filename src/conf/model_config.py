@@ -100,57 +100,33 @@ class ModelRLConfig:
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
 @dataclass
-class ModelLSTMConfigSearch:
-    # loss_fn: List[str] = field(default_factory=[]), # possible ["bce", "mse", "r2", "sqm"]
+class ModelRegressionConfigSearch:
+    model_name: List[str] = field(default_factory=[]), # possible ["mlp"]
+    
+    loss_fn: List[str] = field(default_factory=[]), # possible ["bce", "mse", "r2", "sqm"]
+
     learning_rate: List[float] = field(default_factory=[]) 
     weight_decay: List[float] = field(default_factory=[]) 
-    episodes: List[int] = field(default_factory=[])
 
-    hidden_size: List[int] = field(default_factory=[])
-    layers: List[int] = field(default_factory=[])
-    lstm_dropout: List[float] = field(default_factory=[]) 
-    extra_dropout: List[float] = field(default_factory=[]) 
-    first_activation: List[str] = field(default_factory=[]), # possible ["relu", "lrelu", "sigmoid"]
-    last_activation: List[str] = field(default_factory=[]), # possible ["relu", "lrelu", "sigmoid"]
+    activation_fn: List[str] = field(default_factory=[])
+    net_arch: List[List[int]] = field(default_factory=[])
+    custom_net_arch: List[List[str]] = field(default_factory=[])
+
+    episodes: List[int] = field(default_factory=[])
 @dataclass
-class ModelLSTMConfig:
+class ModelRegressionConfig:
+    model_name: str = 'mlp'
+    
     loss_fn: str = 'mse'
+    
     learning_rate: float = 0.0001
     weight_decay: float = 0.0001
+
+    activation_fn: str = 'ReLU'
+    net_arch: List[int] = field(default_factory=[])
+    custom_net_arch: List[str] = field(default_factory=[])
+
     episodes: int = 1
-
-    hidden_size: int = 16
-    layers: int = 1
-    lstm_dropout: float = 0.5
-    extra_dropout: float = 0.5
-    first_activation: str = 'lrelu'
-    last_activation: str = 'sigmoid'
-
-    progress_bar: bool = True
-    checkpoints_folder: str = 'checkpoints'
-    checkpoint_to_load: str | None = None
-@dataclass
-class ModelMLPConfigSearch:
-    # loss_fn: List[str] = field(default_factory=[]), # possible ["bce", "mse", "r2", "sqm"]
-    learning_rate: List[float] = field(default_factory=[]) 
-    weight_decay: List[float] = field(default_factory=[]) 
-    episodes: List[int] = field(default_factory=[])
-
-    hidden_dim1: List[int] = field(default_factory=[])
-    hidden_dim2: List[int] = field(default_factory=[])
-    first_activation: List[str] = field(default_factory=[]), # possible ["relu", "lrelu", "sigmoid"]
-    last_activation: List[str] = field(default_factory=[]), # possible ["relu", "lrelu", "sigmoid"]
-@dataclass
-class ModelMLPConfig:
-    loss_fn: str = 'mse'
-    learning_rate: float = 0.0001
-    weight_decay: float = 0.0001
-    episodes: int = 1
-
-    hidden_dim1: int = 64
-    hidden_dim2: int = 32
-    first_activation: str = 'relu'
-    last_activation: str = 'relu'
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
@@ -191,8 +167,7 @@ class ModelTechnicalConfig:
 class ModelConfigSearch:
     model_type: str # possible ["hodl", "rl", "technical", "time"]
     model_rl: ModelRLConfigSearch | None = None
-    model_lstm: ModelLSTMConfigSearch | None = None
-    model_mlp: ModelMLPConfigSearch | None = None
+    model_regression: ModelRegressionConfigSearch | None = None
     model_technical: ModelTechnicalConfigSearch | None = None
     model_time: ModelTimeConfigSearch | None = None
 @dataclass
@@ -201,13 +176,12 @@ class ModelConfig:
     iterations_to_pick_best: int = 10
     # iterations_to_pick_best: int = 1
     model_rl: ModelRLConfig | None = None
-    model_lstm: ModelLSTMConfig | None = None
-    model_mlp: ModelMLPConfig | None = None
+    model_regression: ModelRegressionConfig | None = None
     model_technical: ModelTechnicalConfig | None = None
     model_time: ModelTimeConfig | None = None
     
     def is_deep(self) -> bool:
-        return self.model_type == "rl"
+        return self.model_type == "rl" or self.model_type == "regression"
     def is_hodl(self) -> bool:
         return self.model_type == "hodl"
     
@@ -575,10 +549,15 @@ model_rl = ModelConfigSearch(
 model_rl_dip = ModelConfigSearch(
     model_type= "rl",
     model_rl= ModelRLConfigSearch(
-        model_name= ["duel-dqn-custom"],
+        # model_name= ["duel-dqn-custom"],
         # model_name= ["munchausen-dqn-custom"],
         # model_name= ["qrdqn-custom"],
 
+
+        # model_name= ["agent57"],
+        # model_name= ["ensemble"],
+
+        model_name= ["ppo-custom"],
         # model_name= ["reppo-custom"],
         # model_name= ["trpo-custom"],
         # model_name= ["duel-dqn-custom-lstm"], # works well
@@ -620,7 +599,8 @@ model_rl_dip = ModelConfigSearch(
         net_arch= [[8192,512]],
         custom_net_arch= [
             ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
-            ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+
             # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
             # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
             # ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
@@ -650,7 +630,7 @@ model_rl_dip = ModelConfigSearch(
         reward_multiplier_combo_buy= [1], # dip + action
         # reward_multiplier_combo_buy= [5], # dip + action
         # reward_multiplier_combo_buy= [10], # dip + action
-        # reward_multiplier_combo_buy= [20,10,5], # dip + action
+        # reward_multiplier_combo_buy= [5,1], # dip + action
         reward_multiplier_combo_sell= [-10], # not-dip + action
 
         reward_multiplier_combo_positionprofitpercentage= [10],
@@ -669,7 +649,57 @@ model_rl_dip = ModelConfigSearch(
         reward_multiplier_combo_hold_profit= [10],
         reward_multiplier_combo_hold_drawdown= [0.0001],
 
-        # checkpoint_to_load= 'rl_munchausen-dqn-custom_dip_0~0001_1000_512_100000_0~99_RMSprop_CELU_8192]512_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1734351613~7001207'
+        # checkpoint_to_load= ''
+
+        # checkpoint_to_load= 'rl_ppo-custom_dip_0~0001_1000_512_100000_0~99_RMSprop_CELU_8192]512_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1737186456~8192582' # 1.983 5 reward_multiplier_combo_buy <- this is actually good
+        # checkpoint_to_load= 'rl_ppo-custom_dip_0~0001_1000_512_100000_0~99_RMSprop_CELU_8192]512_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1737212864~755411' # 1.506  1 reward_multiplier_combo_buy <- this is actually good
+        # checkpoint_to_load= 'rl_ppo-custom_dip_0~0001_1000_512_100000_0~99_RMSprop_CELU_8192]512_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1737221206~8029308' # 14.750 1 reward_multiplier_combo_buy <- this is actually good
+    )
+)
+
+model_regression_dip = ModelConfigSearch(
+    model_type= "regression",
+    model_rl= ModelRLConfigSearch(
+        model_name= ["mlp"],
+        loss_fn= ["mse"],
+
+        reward_model= ["dip"],
+
+        learning_rate= [0.0001],
+        # learning_rate= [0.1, 0.0001],
+        weight_decay= [0.0001],
+
+        activation_fn= ['CELU'],
+
+        net_arch= [[8192,512]],
+        custom_net_arch= [
+            ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
+            # ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        ],
+        # net_arch= [[8192,4096,512,256]],
+        # custom_net_arch= [
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "activation_fn", "NoisyLinear", "activation_fn", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        # ],
+        # net_arch= [[4096,4096,4096,4096,4096,4096]],
+        # custom_net_arch= [
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "weight_norm", "activation_fn", "Linear", "Dropout", "activation_fn", "Linear"],
+        #     ["BatchNorm1d", "weight_norm2", "activation_fn", "Dropout", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "activation_fn", "weight_norm2", "Dropout", "activation_fn", "weight_norm2"],
+        #     ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "Dropout", "activation_fn", "weight_norm"],
+        #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "activation_fn", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+        # ],
+        
+        episodes= [1],
+
+        # checkpoint_to_load= 'rl_ppo-custom_dip_0~0001_1000_512_100000_0~99_RMSprop_CELU_8192]512_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1737186456~8192582'
     )
 )
 
@@ -817,7 +847,8 @@ def get_models_simple():
 
 def get_models_rl():
     # return [model_hodl, model_rl]
-    return [model_rl_dip]
+    return [model_hodl, model_regression_dip]
+    # return [model_rl_dip]
 
 def get_models_all():
     return [model_hodl]

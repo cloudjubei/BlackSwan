@@ -310,15 +310,6 @@ class AbstractDataProvider(ABC):
         prices = result_df["price"].values
         timestamps = ((pd.to_datetime(result_df["timestamp_close"]).astype('int64') // 10**6) + 1).to_numpy()
 
-        #1 Empty 5/15
-        #2 Empty duel-dqn 2/15
-        #3 total_volume 7/15
-        #4 total_volume + volumes-max 7/15
-        #5 total_volume + price-max|avg 7/15
-        #6 total_volume + price-max|avg + price_z_score 1/3
-
-        # TODO: check 1d vs 1y vs 1m vs 1w
-        
         result_df['price_z_score_1d'] = (result_df['price'] - result_df['price'].rolling(1440).mean()) / result_df['price'].rolling(1440).std()
         result_df['price_z_score_1m'] = (result_df['price'] - result_df['price'].rolling(43200).mean()) / result_df['price'].rolling(43200).std()
         result_df['price_z_score_1y'] = (result_df['price'] - result_df['price'].rolling(525600).mean()) / result_df['price'].rolling(525600).std()
@@ -330,37 +321,38 @@ class AbstractDataProvider(ABC):
         result_df['price_to_avg_1m'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=43200).mean(), errors='coerce').astype(float)
         result_df['price_to_avg_1y'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=525600).mean(), errors='coerce').astype(float)
 
-        # result_df['volume_avg_1d'] = result_df['volume'].rolling(window=1440).mean()
-        # result_df['volume_avg_1m'] = result_df['volume'].rolling(window=43200).mean()
-        # result_df['volume_avg_1y'] = result_df['volume'].rolling(window=525600).mean()
-        # result_df['volume_max_1d'] = result_df['volume'].rolling(window=1440).max()
-        # result_df['volume_max_1m'] = result_df['volume'].rolling(window=43200).max()
-        # result_df['volume_max_1y'] = result_df['volume'].rolling(window=525600).max()
+        # adding data:
+        # Pi_Cycle_Top_Signal  
+        # Pi_Cycle_Bottom_Ratio
+        # Pi_Cycle_Bottom
+        # Pi_Cycle_Bottom_Signal
 
-        # result_df['volume_quote_avg_1d'] = result_df['asset_volume_quote'].rolling(window=1440).mean()
-        # result_df['volume_quote_avg_1m'] = result_df['asset_volume_quote'].rolling(window=43200).mean()
-        # result_df['volume_quote_avg_1y'] = result_df['asset_volume_quote'].rolling(window=525600).mean()
-        # result_df['volume_quote_max_1d'] = result_df['asset_volume_quote'].rolling(window=1440).max()
-        # result_df['volume_quote_max_1m'] = result_df['asset_volume_quote'].rolling(window=43200).max()
-        # result_df['volume_quote_max_1y'] = result_df['asset_volume_quote'].rolling(window=525600).max()
+        # add indicators
+
+
+        result_df['SMA111'] = result_df['price'].rolling(window=111).mean()
+        result_df['SMA350'] = result_df['price'].rolling(window=350).mean()
+        result_df['SMA350_x2'] = result_df['SMA350'] * 2
+        result_df['Pi_Cycle_Top'] = result_df['SMA111'] > result_df['SMA350_x2']
+        result_df['Pi_Cycle_Top_Ratio'] = (result_df['SMA111'] / result_df['SMA350_x2']).astype(float).fillna(0)
+        result_df['Pi_Cycle_Top_Signal'] = (result_df['Pi_Cycle_Top'] & ~result_df['Pi_Cycle_Top'].shift(1).fillna(False)).astype(int)
+
+        result_df['SMA471'] = result_df['price'].rolling(window=471).mean()
+        result_df['EMA150'] = result_df['price'].ewm(span=150, adjust=False).mean()
+        result_df['SMA471_/2'] = result_df['SMA471'] / 2
+        result_df['Pi_Cycle_Bottom'] = result_df['EMA150'] < result_df['SMA471_/2']
+        result_df['Pi_Cycle_Bottom_Ratio'] = (result_df['SMA471_/2'] / result_df['EMA150']).astype(float).fillna(0)
+        result_df['Pi_Cycle_Bottom_Signal'] = (result_df['Pi_Cycle_Bottom'] & ~result_df['Pi_Cycle_Bottom'].shift(1).fillna(False)).astype(int)
 
         result_df['total_volume'] = result_df['volume'] + result_df['asset_volume_quote']
 
         columns_to_drop = [] + columns
         columns_to_drop = columns_to_drop + ['total_volume'] 
-        
-        # result_df['volume_to_max_1d'] = pd.to_numeric(result_df['volume'] / result_df['volume_max_1d'], errors='coerce').astype(float)
-        # result_df['volume_to_max_1m'] = pd.to_numeric(result_df['volume'] / result_df['volume_max_1m'], errors='coerce').astype(float)
-        # result_df['volume_to_max_1y'] = pd.to_numeric(result_df['volume'] / result_df['volume_max_1y'], errors='coerce').astype(float)
-        # result_df['volume_to_avg_1d'] = pd.to_numeric(result_df['volume'] / result_df['volume_avg_1d'], errors='coerce').astype(float)
-        # result_df['volume_to_avg_1m'] = pd.to_numeric(result_df['volume'] / result_df['volume_avg_1m'], errors='coerce').astype(float)
-        # result_df['volume_to_avg_1y'] = pd.to_numeric(result_df['volume'] / result_df['volume_avg_1y'], errors='coerce').astype(float)
-        # result_df['volume_quote_to_max_1d'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_max_1d'], errors='coerce').astype(float)
-        # result_df['volume_quote_to_max_1m'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_max_1m'], errors='coerce').astype(float)
-        # result_df['volume_quote_to_max_1y'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_max_1y'], errors='coerce').astype(float)
-        # result_df['volume_quote_to_avg_1d'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_avg_1d'], errors='coerce').astype(float)
-        # result_df['volume_quote_to_avg_1m'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_avg_1m'], errors='coerce').astype(float)
-        # result_df['volume_quote_to_avg_1y'] = pd.to_numeric(result_df['asset_volume_quote'] / result_df['volume_quote_avg_1y'], errors='coerce').astype(float)
+        # columns_to_drop = columns_to_drop + ['volume_avg_1d', 'volume_avg_1m', 'volume_avg_1y', 'volume_max_1d', 'volume_max_1m', 'volume_max_1y']
+        # columns_to_drop = columns_to_drop + ['volume_quote_avg_1d', 'volume_quote_avg_1m', 'volume_quote_avg_1y', 'volume_quote_max_1d', 'volume_quote_max_1m', 'volume_quote_max_1y']
+        columns_to_drop = columns_to_drop + ['SMA111', 'SMA350', 'SMA350_x2', 'Pi_Cycle_Top']
+        columns_to_drop = columns_to_drop + ['SMA471', 'SMA471_/2', 'EMA150', 'Pi_Cycle_Bottom']
+
 
         result_df['total_volume_percent'] = pd.to_numeric(result_df['total_volume'], errors='coerce').astype(float).pct_change()
         result_df['total_volume_to_max_1d'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=1440).max(), errors='coerce').astype(float)

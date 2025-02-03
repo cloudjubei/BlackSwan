@@ -224,7 +224,7 @@ class RainbowDQNAgent:
 
         return loss.item()
         
-    def learn(self, total_timesteps: int, progress_bar: bool = False, log_interval: int = 200):
+    def learn(self, total_timesteps: int, progress_bar: bool = True, log_interval: int = 200):
         """Train the agent."""
         self.is_test = False
         

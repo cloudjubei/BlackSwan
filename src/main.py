@@ -22,7 +22,6 @@ def run_training(config: Config, model: AbstractModel, env: AbstractEnv, data_pr
     # TODO:
     # capture time
     env.setup(model.get_reward_model(), model.get_reward_multipliers())
-    # env.reset()
 
     model.train(env)    
 
@@ -115,17 +114,19 @@ def main(config: Config) -> None:
                         run_model(config, model_config, data_provider_train, env_train, env_test, result_states)
                         # if (not model_config.is_hodl()):
                         #     plot_actions_data_non_trade(env_test)
-                            # plot_actions_data(env_test)
+                        #     plot_actions_data(env_test)
                     
                     print(f'Run {run_count}/{run_count_total} Complete')
 
     # df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "$", "%", "Trade$", "CompoundTrade$", "Wins", "Losses", "Win%", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "#trades", "SLs", "SL$", "Multipliers"])
-    df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "F1", "Ratio", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Totals", "Multipliers"])
+    # df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "F1", "Ratio", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Totals", "Multipliers"])
+    df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "F1", "Ratio", "Acc%", "Prec%", "Rec%", "-Rec%", "Totals", "Multipliers"])
     results_name = f'results_{time.time()}.csv'
-    df_results.to_csv(results_name, index=False)  
+    df_results.to_csv(results_name, index=False)
 
     # df_results = df_results.drop(columns=["Data", "Env", "%", "CompoundTrade$", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "SLs", "SL$", "Multipliers"])
-    df_results = df_results.drop(columns=["Data", "Env", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Multipliers"])
+    # df_results = df_results.drop(columns=["Data", "Env", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Multipliers"])
+    df_results = df_results.drop(columns=["Data", "Env", "Acc%", "Prec%", "Rec%", "-Rec%", "Multipliers"])
     pd.set_option('display.max_rows', None)  # None means unlimited rows
     # pd.set_option('display.max_columns', None)  # None means unlimited columns
     print(df_results)

@@ -1,6 +1,7 @@
 from src.conf.data_config import DataConfig
 from src.data.abstract_dataprovider import AbstractDataProvider
 from src.environment.dip_predict_env import DipPredictEnv
+from src.environment.regression_predict_env import RegressionPredictEnv
 from src.environment.trend_predict_env import TrendPredictEnv
 from .swap_crypto_env import SwapCryptoEnv
 from .trade_all_crypto_env import TradeAllCryptoEnv
@@ -17,4 +18,6 @@ def create_environment(config: EnvConfig, data_provider: AbstractDataProvider, d
         return TrendPredictEnv(config, data_provider, device)
     elif config.type == "dip_predict":
         return DipPredictEnv(config, data_provider, device)
+    elif config.type == "regression_predict":
+        return RegressionPredictEnv(config, data_provider, device)
     raise ValueError("{config.type} - env not supported")

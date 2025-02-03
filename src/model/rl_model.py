@@ -1,8 +1,10 @@
 import numpy as np
+import stable_baselines3
 from src.model.abstract_model import BaseRLModel
 from src.conf.model_config import ModelConfig, ModelRLConfig
 from src.environment.abstract_env import AbstractEnv
 from stable_baselines3.common.base_class import BaseAlgorithm
+from stable_baselines3.common.callbacks import ProgressBarCallback
 import os
 
 # based on https://stable-baselines3.readthedocs.io/en/master/modules/base.html
@@ -24,8 +26,16 @@ class RLModel(BaseRLModel):
         self.rl_model.save(path)
         print(f"Saved RL model to {path}")
 
-    def test(self, env: AbstractEnv, deterministic: bool = True):
+    def test(self, env: AbstractEnv, deterministic: bool = True, progress_bar: bool = True):
         obs, _ = env.reset()
+
+        if progress_bar:
+            fake_model = stable_baselines3.dqn.DQN(env=env, policy='MlpPolicy')
+            progress = ProgressBarCallback()
+            progress.init_callback(fake_model)
+            progress.num_timesteps = env.get_timesteps()
+            progress.on_training_start({"total_timesteps": progress.num_timesteps}, {})
+            self.progress = progress
 
         if self.rl_config.model_name == "reppo":
             lstm_states = None
@@ -35,14 +45,25 @@ class RLModel(BaseRLModel):
                 action, lstm_states = self.rl_model.predict(obs, state=lstm_states, episode_start=episode_starts, deterministic=deterministic)
                 obs, rewards, done, finished_early, info = env.step(action)
                 episode_starts = done
+
                 if done:
                     break
+
+                if progress_bar:
+                    self.progress.on_step()
         else:
             while True:
                 (action, extra_info) = self.rl_model.predict(obs, deterministic=deterministic)
                 obs, reward, done, finished_early, info = env.step(action)
+
                 if done:
                     break
+                
+                if progress_bar:
+                    self.progress.on_step()
+
+        if progress_bar:
+            self.progress.on_training_end()
 
     def predict(self, env: AbstractEnv, deterministic: bool = True):
         (action, extra_info) = self.rl_model.predict(env.last_obs, deterministic=deterministic)

@@ -42,6 +42,11 @@ env_dip_predict = EnvConfig(
     type= "dip_predict",
     observations_contain= []
 )
+env_regression_predict = EnvConfig(
+    type= "regression_predict",
+    observations_contain= []
+)
+
 # PROMISING
 # 0.02|0.02|0.01
 # 0.02|0.02|0.005
@@ -95,7 +100,8 @@ env_trade_amount_1 = EnvConfig(
 
 def get_envs_simple():
     # return [env_trend_predict]
-    return [env_dip_predict]
+    # return [env_dip_predict]
+    return [env_regression_predict]
 
     # return [env_trade_all_tpsl_trailing0]
     # return [

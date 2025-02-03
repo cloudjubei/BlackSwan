@@ -9,7 +9,10 @@ import sbx.core
 import sbx.dqn
 import sbx.ppo
 from src.conf.model_config import ModelConfigSearch, ModelConfig, ModelTechnicalConfig, ModelTimeConfig, ModelRLConfig, ModelLSTMConfig, ModelMLPConfig
+from src.model.custom.agent57.agent57 import Agent57
+from src.model.custom.customqnetwork import CustomQNetwork
 from src.model.custom.dgwo import DGWO
+from src.model.custom.ensemble.ensemble import EnsembleModel
 from src.model.custom.policies import CustomActorCriticPolicy, CustomDQNPolicy, CustomDuelingDQNPolicy, CustomQRDQNPolicy, CustomRainbowPolicy, CustomRecurrentActorCriticPolicy
 from src.model.custom.policy_iqn import CustomIQNPolicy
 from src.model.dqn_lstm_policy import LSTMFCE
@@ -21,6 +24,7 @@ from src.model.munchhausen_dqn.munchhausen_dqn import MunchausenDQN
 from src.model.rainbow.rainbow_dqn_agent import RainbowDQNAgent
 from src.model.rainbow_dqn.prioritized_replay_buffer import PrioritizedReplayBuffer
 from src.model.rainbow_dqn.rainbow_dqn import RainbowDQN
+from src.model.regression_model import RegressionModel
 from src.model.rl_model import RLModel
 from src.model.time_strategy_model import TimeStrategyModel
 from src.model.technical_strategy_model import TechnicalStrategyModel
@@ -133,6 +137,8 @@ def create_model(config: ModelConfig, env: AbstractEnv, device: str):
         return HodlModel(config)
     if config.model_type == "rl":
         return create_rl_model(config, env, device)
+    if config.model_type == "regression":
+        return create_regression_model(config, env, device)
     elif config.model_type == "time":
         return TimeStrategyModel(config)
     elif config.model_type == "technical":
@@ -224,7 +230,6 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
     
     elif config.model_rl.model_name == "trpo":
         print(f"Loading TRPO - Trust Region Policy Optimization model")
-
         rl_model = TRPO(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=config.model_rl.target_update_interval, batch_size= config.model_rl.batch_size, 
                        gamma= config.model_rl.gamma, 
                        policy_kwargs= {
@@ -287,6 +292,49 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                         # #    "activation_fn": activation_fns[config.model_rl.activation_fn], # <-- doesn't yet work properly
                         # #    "net_arch": config.model_rl.net_arch, # <-- doesn't yet work properly
                        })
+        
+    elif config.model_rl.model_name == "ensemble":
+        ensemble = []
+        for _ in range(4):
+            ensemble.append(DuelingDQN(policy=CustomDuelingDQNPolicy, env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                       tau= config.model_rl.tau, 
+                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                       learning_starts=config.model_rl.learning_starts,
+                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                            #    "eps": config.model_rl.optimizer_eps,
+                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                            #    "alpha": config.model_rl.optimizer_alpha,
+                            #    "momentum": config.model_rl.optimizer_momentum,
+                            #    "centered": config.model_rl.optimizer_centered,
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch
+                       }))
+        rl_model = EnsembleModel(ensemble)
+
+    elif config.model_rl.model_name == "agent57":
+        rl_model = Agent57(env=env, policy=CustomDQNPolicy, learning_rate= config.model_rl.learning_rate, buffer_size= config.model_rl.buffer_size, learning_starts= config.model_rl.learning_starts, target_update_interval= config.model_rl.target_update_interval,
+            policy_kwargs= {
+                "normalize_images": False,
+                "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                "optimizer_kwargs": {
+                #    "eps": config.model_rl.optimizer_eps,
+                #    "weight_decay": config.model_rl.optimizer_weight_decay,
+                #    "alpha": config.model_rl.optimizer_alpha,
+                #    "momentum": config.model_rl.optimizer_momentum,
+                #    "centered": config.model_rl.optimizer_centered,
+                },
+                "activation_fn": activation_fns[config.model_rl.activation_fn],
+                "net_arch": config.model_rl.net_arch,
+                "custom_net_arch": config.model_rl.custom_net_arch
+        })
     elif config.model_rl.model_name == "rainbow-dqn-old":
         seed = 777
         rl_model = RainbowDQNAgent(env, memory_size= config.model_rl.buffer_size, batch_size= config.model_rl.batch_size, target_update=config.model_rl.target_update_interval, seed= seed)
@@ -814,3 +862,41 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
         return RLModel(config, rl_model)
     
     raise ValueError(f'{config.model_rl.model_name} - rl model not supported')
+
+def create_regression_model(config: ModelConfig, env: AbstractEnv, device: str):
+    regression_model = None
+
+    if config.model_regression.model_name == "mlp":
+        print(f"Loading MLP model")
+        print(f'env last obs.shape: {env.last_obs.shape[0]} env.action_space.shape: {env.action_space.shape[0]}')
+
+        # features_dim = len(env.last_obs)
+        features_dim = env.last_obs.shape[0]
+        # features_dim = spaces.utils.flatdim(observation_space)
+        action_dim = env.action_space.shape[0]
+        mlp = CustomQNetwork.create_mlp_custom(features_dim, action_dim, config.model_rl.net_arch, activation_fns[config.model_rl.activation_fn], config.model_rl.custom_net_arch)
+        regression_model = torch.nn.Sequential(*mlp)
+
+                    #    learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+                    #    buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+                    #    tau= config.model_rl.tau, 
+                    #    exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
+                    #    learning_starts=config.model_rl.learning_starts,
+                    #    train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
+                    #    target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
+                    #    policy_kwargs= {
+                    #        "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                    #    })
+
+    if regression_model is not None:
+    #     if config.model_regression.checkpoint_to_load is not None:
+    #         path = os.path.join(config.model_regression.checkpoints_folder, config.model_regression.checkpoint_to_load)
+    #         regression_model = regression_model.load(path)
+            
+    #     regression_model.set_logger(Logger(
+    #         folder=None,
+    #         output_formats=[HumanOutputFormat(sys.stdout)],
+    #     ))
+        return RegressionModel(config, regression_model)
+    
+    raise ValueError(f'{config.model_regression.model_name} - regression model not supported')
