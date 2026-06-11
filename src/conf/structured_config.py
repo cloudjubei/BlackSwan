@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from omegaconf import DictConfig, OmegaConf
 from typing import List
 from src.conf.data_config import DataConfig, get_datas_1h_1d, get_datas_1m_1h_1d
-from src.conf.model_config import ModelConfigSearch, get_models_all, get_models_simple, get_models_rl
+from src.conf.model_config import ModelConfigSearch, get_models_all, get_models_simple, get_models_deep
 from src.conf.env_config import EnvConfig, get_envs_all, get_envs_simple, get_envs_swaps
 
 @dataclass
@@ -16,7 +16,9 @@ class Config:
     user: str = "cloudjubei"
     experiment_name: str = "hiperparams"
     run_name: str = "test"
-    device: str = "auto" #"mps"
+    # device: str = "auto" #"mps"
+    # device: str = "mps"
+    device: str = "cpu"
 
     data_configs: List[DataConfig] = field(default_factory=List)
     env_configs: List[EnvConfig] = field(default_factory=List)
@@ -39,4 +41,4 @@ class Config:
 # or directly via class
     
 cs = ConfigStore.instance()
-cs.store(name="config_simple", node=Config(run_name= "test-simple_rl_vlong", data_configs= get_datas_1h_1d(), model_configs=get_models_rl(), env_configs=get_envs_simple()))
+cs.store(name="config_simple", node=Config(run_name= "test-simple", data_configs= get_datas_1h_1d(), model_configs=get_models_deep(), env_configs=get_envs_simple()))

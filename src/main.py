@@ -7,7 +7,7 @@ from src.conf.structured_config import Config
 from src.conf.data_config import DataConfig
 from src.conf.model_config import ModelConfig
 from src.data.data_factory import create_provider
-from src.data.data_utils import fill_missing_timestamps, plot_actions_data, plot_actions_data_non_trade
+from src.data.data_utils import fill_missing_timestamps, plot_actions_data, plot_actions_data_non_trade, plot_actions_data_regression
 from src.environment.env_factory import create_environment
 from src.model.model_factory import create_model, get_model_combinations
 from src.environment.abstract_env import AbstractEnv
@@ -39,6 +39,7 @@ def run_testing(config: Config, model: AbstractModel, env: AbstractEnv, determin
     # TODO:
     # capture time
     env.setup(model.get_reward_model(), model.get_reward_multipliers())
+
     model.test(env, deterministic)
 
     if config.show_render:
@@ -113,20 +114,22 @@ def main(config: Config) -> None:
                         print(f'Iteration {i+1}/{max_iterations}')
                         run_model(config, model_config, data_provider_train, env_train, env_test, result_states)
                         # if (not model_config.is_hodl()):
-                        #     plot_actions_data_non_trade(env_test)
-                        #     plot_actions_data(env_test)
+                        #     plot_actions_data_regression(env_test)
+                        #     # plot_actions_data_non_trade(env_test)
+                        #     # plot_actions_data(env_test)
+                        #     break
                     
                     print(f'Run {run_count}/{run_count_total} Complete')
 
     # df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "$", "%", "Trade$", "CompoundTrade$", "Wins", "Losses", "Win%", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "#trades", "SLs", "SL$", "Multipliers"])
     # df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "Rewards", "F1", "Ratio", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Totals", "Multipliers"])
-    df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "F1", "Ratio", "Acc%", "Prec%", "Rec%", "-Rec%", "Totals", "Multipliers"])
+    df_results = pd.DataFrame(result_states, columns=["Data", "Env", "Name", "F1", "Ratio", "Acc%", "Prec%", "Rec%", "-Rec%", "Totals"])
     results_name = f'results_{time.time()}.csv'
     df_results.to_csv(results_name, index=False)
 
     # df_results = df_results.drop(columns=["Data", "Env", "%", "CompoundTrade$", "Avg$Win", "Max$Win", "Min$Win", "Avg$Loss", "Max$Loss", "Min$Loss", "Avg$Trade", "Fees$", "Volume$", "SLs", "SL$", "Multipliers"])
     # df_results = df_results.drop(columns=["Data", "Env", "Acc%", "Prec%", "Rec%", "-Rec%", "AvgStreak", "MaxStreak", "Multipliers"])
-    df_results = df_results.drop(columns=["Data", "Env", "Acc%", "Prec%", "Rec%", "-Rec%", "Multipliers"])
+    df_results = df_results.drop(columns=["Data", "Env", "Acc%", "Prec%", "Rec%", "-Rec%"])
     pd.set_option('display.max_rows', None)  # None means unlimited rows
     # pd.set_option('display.max_columns', None)  # None means unlimited columns
     print(df_results)

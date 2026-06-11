@@ -26,16 +26,18 @@ class   RegressionPredictEnv(AbstractEnv):
         x_values = []
         y_values = []
         for i in range(self.max_steps):
-            xs = data_provider.get_values(i)
+            xs = data_provider.get_values(i).flatten()
             x_values.append(xs)
             signal_buy_profitable = data_provider.get_signal_buy_profitable(i)
             y = 0 if signal_buy_profitable >= data_provider.buyreward_maxwait else 1
             y_values.append(y)
 
-        print("YS is: ")
-        print(y_values)
 
-        self.dataloader = DataLoader(TensorDataset(torch.tensor(x_values, device= self.device), torch.tensor(x_values, device= self.device)), batch_size= 32, shuffle= False)
+        # self.dataloader = DataLoader(TensorDataset(torch.from_numpy(np.stack(x_values)), torch.from_numpy(np.stack(y_values))), batch_size= env_config.batch_size, shuffle= False)
+        self.dataloader = DataLoader(TensorDataset(torch.tensor(x_values, dtype=torch.float32, device= self.device), torch.tensor(y_values, dtype=torch.float32, device= self.device)), batch_size= env_config.batch_size, shuffle= False)
+        # self.dataloader = DataLoader(TensorDataset(torch.tensor(np.ndarray(x_values), dtype=torch.float32, device= self.device), torch.tensor(np.ndarray(y_values), dtype=torch.float32, device= self.device)), batch_size= env_config.batch_size, shuffle= False)
+
+        self.reset()
 
     def reset(self, seed: int = None, options: dict[str, Any] = None):
         super().reset(seed=seed)
@@ -48,16 +50,41 @@ class   RegressionPredictEnv(AbstractEnv):
         self.correct_neg = 0 
         self.incorrect_neg = 0
 
-        return [], {}
+        self.predictions = []
+        self.actuals = []
+
+        self.last_obs = self.get_next_observation()
+
+        return self.last_obs, {}
     
-    # Action space: 0 = Nothing, 1 = Dip
     def create_action_space(self) -> spaces.Discrete:
         return spaces.Discrete(2)
+    
+    def get_next_observation(self) -> np.ndarray:
+
+        out = self.data_provider.get_values(self.current_step)
+        
+        lookback_window_size = self.data_provider.get_lookback_window()
+
+        if lookback_window_size > 1:
+            out = out.flatten()
+
+        return out
+    
+    def step(self, action):
+        self.current_step += 1
+
+        done = (self.current_step >= self.get_timesteps())
+
+        return [], 0, done, False, {}
 
     def get_dataloader(self) -> DataLoader:
         return self.dataloader
     
     def store_result(self, prediction, actual):
+        self.predictions += prediction
+        self.actuals += actual
+
         actual_correct = (actual == 1)
         actual_incorrect = (actual == 0)
         prediction_correct = (prediction == 1)
@@ -100,38 +127,7 @@ class   RegressionPredictEnv(AbstractEnv):
             precision,
             recall,
             negative_recall,
-            f'[{self.correct_pos}/{self.correct_neg}]-[{self.total_correct}/{self.total_incorrect}]'
-        ]
-
-    def get_run_state(self):        
-
-        accuracy = self.accuracies[-1] if len(self.accuracies) > 0 else 0
-        precision = self.precisions[-1] if len(self.precisions) > 0 else 0
-        recall = self.recalls[-1] if len(self.recalls) > 0 else 0
-        negative_recall = self.negative_recalls[-1] if len(self.negative_recalls) > 0 else 0
-        dips_ratio = self.correct_dips/self.incorrect_dips if self.incorrect_dips > 0 else self.correct_dips
-
-        f1_score = 2*precision*recall/(precision + recall) if precision + recall > 0 else 0
-
-        avg_streak = sum(self.streaks) / len(self.streaks) if len(self.streaks) > 0 else 0
-        max_streak = max(self.streaks) if len(self.streaks) > 0 else 0
-
-        rewards = ""
-        for value in self.reward_multipliers.values():
-            rewards += f'{"%.3f" % value};'
-        return [
-            self.total_reward,
-            f1_score,
-            dips_ratio,
-            accuracy,
-            precision,
-            recall,
-            negative_recall,
-            avg_streak,
-            max_streak,
-            f'[{self.correct_dips}/{self.total_dips_seen}]-[{self.incorrect_dips}/{self.total_nondips_seen}]',
-            # self.current_step-1,
-            rewards
+            f'[{self.correct_pos}/{self.incorrect_pos}]-[{self.total_correct}/{self.total_incorrect}]'
         ]
 
     def render(self):
@@ -139,3 +135,23 @@ class   RegressionPredictEnv(AbstractEnv):
 
     def render_profits(self):
         return
+    
+
+# 2021 -> 0.116  1.590    [2321/1460]-[36108/92052]
+# 2020 -> 0.008 11.333       [136/12]-[36108/92052]
+# 2019 -> 0.009  2.683       [161/60]-[36108/92052]
+# 2018 -> 0.022  1.120      [412/368]-[36108/92052]
+#      -> 0.010  1.255      [187/149]-[36108/92052]
+
+# 15m + 0.01
+# 15m + 0.005
+# 10m + 0.01
+# 10m + 0.005
+# 10m + 0.003
+# 10m + 0.002
+# 5m + 0.002
+# 5m + 0.005
+
+# TODO:
+# 5m + 0.003
+# 5m + 0.01

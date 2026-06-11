@@ -271,7 +271,7 @@ class MultiTimelineDataProvider(AbstractDataProvider):
                     out.append(v)
 
         try:
-            return np.array(out)
+            return np.array(out)#.flatten() # TODO: try out flatten
         except:
             print('GOT ERROR for np.array(out) self.config.lookback_window_size: ', self.config.lookback_window_size, ' step: ', step, ' start_index: ', self.get_start_index())
             print('v:')

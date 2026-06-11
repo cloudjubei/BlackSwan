@@ -12,6 +12,7 @@ class EnvConfig:
     trailing_take_profit: float | None = None
     stop_loss: float | None = None
     no_sell_action: bool = False
+    batch_size: int = 32
     
 env_swap_all = EnvConfig(
     type= "swap",
@@ -44,7 +45,8 @@ env_dip_predict = EnvConfig(
 )
 env_regression_predict = EnvConfig(
     type= "regression_predict",
-    observations_contain= []
+    observations_contain= [],
+    batch_size= 32
 )
 
 # PROMISING

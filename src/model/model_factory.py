@@ -8,7 +8,7 @@ import sbx.common.type_aliases
 import sbx.core
 import sbx.dqn
 import sbx.ppo
-from src.conf.model_config import ModelConfigSearch, ModelConfig, ModelTechnicalConfig, ModelTimeConfig, ModelRLConfig, ModelLSTMConfig, ModelMLPConfig
+from src.conf.model_config import ModelConfigSearch, ModelConfig, ModelTechnicalConfig, ModelTimeConfig, ModelRLConfig, ModelRegressionConfig
 from src.model.custom.agent57.agent57 import Agent57
 from src.model.custom.customqnetwork import CustomQNetwork
 from src.model.custom.dgwo import DGWO
@@ -99,6 +99,21 @@ activation_fns = {
     "Softplus" : torch.nn.Softplus,
     "Softsign" : torch.nn.Softsign
 }
+loss_fns = {
+    "mse" : torch.nn.MSELoss,
+    "l1" : torch.nn.L1Loss,
+    "huber" : torch.nn.HuberLoss,
+    "kldiv" : torch.nn.KLDivLoss,
+    "smoothl1" : torch.nn.SmoothL1Loss,
+    "bce" : torch.nn.BCELoss,
+    "bcelogits" : torch.nn.BCEWithLogitsLoss,
+    "nll" : torch.nn.NLLLoss,
+    "poissonnll" : torch.nn.PoissonNLLLoss,
+    "softmargin" : torch.nn.SoftMarginLoss,
+    "crossentropy" : torch.nn.CrossEntropyLoss,
+    "cosine" : torch.nn.CosineEmbeddingLoss,
+    "ctc" : torch.nn.CTCLoss
+}
 
 def get_combo(combo, keys, non_list_values):
     result = {key: value for key, value in zip(keys, combo)}
@@ -115,6 +130,13 @@ def get_model_combinations(config: ModelConfigSearch) -> List[ModelConfig]:
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="rl", model_rl=ModelRLConfig(**get_combo(c, list_keys, non_lists))), combinations))
+    if config.model_type == "regression":
+        data = config.model_regression
+        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
+        list_values = [value for value in data.values() if type(value) == ListConfig]
+        non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
+        combinations = itertools.product(*list_values)
+        return list(map(lambda c: ModelConfig(model_type="regression", model_regression=ModelRegressionConfig(**get_combo(c, list_keys, non_lists))), combinations))
     elif config.model_type == "technical":
         data = config.model_technical
         list_keys = [key for key, value in data.items() if type(value) == ListConfig]
@@ -868,35 +890,33 @@ def create_regression_model(config: ModelConfig, env: AbstractEnv, device: str):
 
     if config.model_regression.model_name == "mlp":
         print(f"Loading MLP model")
-        print(f'env last obs.shape: {env.last_obs.shape[0]} env.action_space.shape: {env.action_space.shape[0]}')
 
-        # features_dim = len(env.last_obs)
-        features_dim = env.last_obs.shape[0]
-        # features_dim = spaces.utils.flatdim(observation_space)
-        action_dim = env.action_space.shape[0]
-        mlp = CustomQNetwork.create_mlp_custom(features_dim, action_dim, config.model_rl.net_arch, activation_fns[config.model_rl.activation_fn], config.model_rl.custom_net_arch)
-        regression_model = torch.nn.Sequential(*mlp)
+        features_dim = len(env.last_obs)
+        action_dim = 1
+        # action_dim = int(env.action_space.n)
+        mlp = CustomQNetwork.create_mlp_custom(features_dim, action_dim, config.model_regression.net_arch, activation_fns[config.model_regression.activation_fn], config.model_regression.custom_net_arch)
+        # mlp.append(torch.nn.Sigmoid())
+        regression_model = torch.nn.Sequential(*mlp).to(device)
 
-                    #    learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
-                    #    buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
+        # regression_model
+
+                    #    buffer_size= config.model_rl.buffer_size, 
+                    # 
+                    #   gamma= config.model_rl.gamma, 
                     #    tau= config.model_rl.tau, 
                     #    exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
                     #    learning_starts=config.model_rl.learning_starts,
                     #    train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
                     #    target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
-                    #    policy_kwargs= {
-                    #        "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                    #    })
 
     if regression_model is not None:
-    #     if config.model_regression.checkpoint_to_load is not None:
-    #         path = os.path.join(config.model_regression.checkpoints_folder, config.model_regression.checkpoint_to_load)
-    #         regression_model = regression_model.load(path)
+        if config.model_regression.checkpoint_to_load is not None:
+            path = os.path.join(config.model_regression.checkpoints_folder, config.model_regression.checkpoint_to_load)
+            regression_model.load_state_dict(torch.load(path))
             
-    #     regression_model.set_logger(Logger(
-    #         folder=None,
-    #         output_formats=[HumanOutputFormat(sys.stdout)],
-    #     ))
-        return RegressionModel(config, regression_model)
+        optimizer = optimizer_classes[config.model_regression.optimizer_class](regression_model.parameters(), lr=config.model_regression.learning_rate)
+        loss_fn = loss_fns[config.model_regression.loss_fn](reduction= config.model_regression.loss_fn_reduction)
+        return RegressionModel(config, regression_model, optimizer, loss_fn)
+
     
     raise ValueError(f'{config.model_regression.model_name} - regression model not supported')

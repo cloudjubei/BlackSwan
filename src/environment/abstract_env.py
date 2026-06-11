@@ -21,7 +21,7 @@ class AbstractEnv(gymnasium.Env):
 
     # observations_contain: List[str]
     def get_id(self) -> str:
-        return f'{self.env_config.type}_{self.env_config.amount}_{len(self.env_config.observations_contain)}_-{self.env_config.transaction_fee * 100 if self.env_config.transaction_fee is not None else 0}%_TP{self.env_config.take_profit if self.env_config.take_profit is not None else 0}_TR{self.env_config.trailing_take_profit if self.env_config.trailing_take_profit is not None else 0}_SL{self.env_config.stop_loss if self.env_config.stop_loss is not None else 0}'.replace('.', '~').replace('|', ']')
+        return f'{self.env_config.type}_{self.env_config.amount}_{len(self.env_config.observations_contain)}_-{self.env_config.transaction_fee * 100 if self.env_config.transaction_fee is not None else 0}%_TP{self.env_config.take_profit if self.env_config.take_profit is not None else 0}_TR{self.env_config.trailing_take_profit if self.env_config.trailing_take_profit is not None else 0}_SL{self.env_config.stop_loss if self.env_config.stop_loss is not None else 0}_B{self.env_config.batch_size}'.replace('.', '~').replace('|', ']')
 
     def get_timesteps(self) -> int:
         return self.data_provider.get_timesteps()
@@ -29,6 +29,7 @@ class AbstractEnv(gymnasium.Env):
     def setup(self, reward_model: str, multipliers):
         self.reward_model = reward_model
         self.reward_multipliers = multipliers
+        self.reset()
 
     def get_price(self, step: int) -> float:
         return self.data_provider.get_price(step)

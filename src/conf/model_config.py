@@ -99,62 +99,57 @@ class ModelRLConfig:
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+
 @dataclass
-class ModelLSTMConfigSearch:
-    # loss_fn: List[str] = field(default_factory=[]), # possible ["bce", "mse", "r2", "sqm"]
+class ModelRegressionConfigSearch:
+    model_name: List[str] = field(default_factory=[]) # possible ["mlp"]
+    
+    loss_fn: List[str] = field(default_factory=[]) # possible ["mse", "l1", "kldiv", "smoothl1"]
+    loss_fn_reduction: List[str] = field(default_factory=[]) # possible ["none", "mean"]
+
     learning_rate: List[float] = field(default_factory=[]) 
     weight_decay: List[float] = field(default_factory=[]) 
+
+    optimizer_class: List[str] = field(default_factory=[])
+    optimizer_eps: List[float] = field(default_factory=[]) 
+    optimizer_weight_decay: List[float] = field(default_factory=[]) 
+    optimizer_centered: List[bool] = field(default_factory=[])
+    optimizer_alpha: List[float] = field(default_factory=[]) 
+    optimizer_momentum: List[float] = field(default_factory=[]) 
+    activation_fn: List[str] = field(default_factory=[])
+    net_arch: List[List[int]] = field(default_factory=[])
+    custom_net_arch: List[List[str]] = field(default_factory=[])
+
     episodes: List[int] = field(default_factory=[])
-
-    hidden_size: List[int] = field(default_factory=[])
-    layers: List[int] = field(default_factory=[])
-    lstm_dropout: List[float] = field(default_factory=[]) 
-    extra_dropout: List[float] = field(default_factory=[]) 
-    first_activation: List[str] = field(default_factory=[]), # possible ["relu", "lrelu", "sigmoid"]
-    last_activation: List[str] = field(default_factory=[]), # possible ["relu", "lrelu", "sigmoid"]
-@dataclass
-class ModelLSTMConfig:
-    loss_fn: str = 'mse'
-    learning_rate: float = 0.0001
-    weight_decay: float = 0.0001
-    episodes: int = 1
-
-    hidden_size: int = 16
-    layers: int = 1
-    lstm_dropout: float = 0.5
-    extra_dropout: float = 0.5
-    first_activation: str = 'lrelu'
-    last_activation: str = 'sigmoid'
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
 @dataclass
-class ModelMLPConfigSearch:
-    # loss_fn: List[str] = field(default_factory=[]), # possible ["bce", "mse", "r2", "sqm"]
-    learning_rate: List[float] = field(default_factory=[]) 
-    weight_decay: List[float] = field(default_factory=[]) 
-    episodes: List[int] = field(default_factory=[])
-
-    hidden_dim1: List[int] = field(default_factory=[])
-    hidden_dim2: List[int] = field(default_factory=[])
-    first_activation: List[str] = field(default_factory=[]), # possible ["relu", "lrelu", "sigmoid"]
-    last_activation: List[str] = field(default_factory=[]), # possible ["relu", "lrelu", "sigmoid"]
-@dataclass
-class ModelMLPConfig:
+class ModelRegressionConfig:
+    model_name: str = 'mlp'
     loss_fn: str = 'mse'
+    loss_fn_reduction: str = 'mean'
+    
     learning_rate: float = 0.0001
     weight_decay: float = 0.0001
-    episodes: int = 1
 
-    hidden_dim1: int = 64
-    hidden_dim2: int = 32
-    first_activation: str = 'relu'
-    last_activation: str = 'relu'
+    optimizer_class: str = 'Adam'
+    optimizer_eps: float = 0.00000001
+    optimizer_weight_decay: float = 0
+    optimizer_centered: bool = False
+    optimizer_alpha: float = 0.99
+    optimizer_momentum: float = 0
+    activation_fn: str = 'ReLU'
+    net_arch: List[int] = field(default_factory=[])
+    custom_net_arch: List[str] = field(default_factory=[])
+
+    episodes: int = 1
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+
 @dataclass
 class ModelTimeConfigSearch:
     time_buy: List[int] = field(default_factory=[1200])
@@ -190,9 +185,8 @@ class ModelTechnicalConfig:
 @dataclass
 class ModelConfigSearch:
     model_type: str # possible ["hodl", "rl", "technical", "time"]
-    model_rl: ModelRLConfigSearch | None = None
-    model_lstm: ModelLSTMConfigSearch | None = None
-    model_mlp: ModelMLPConfigSearch | None = None
+    model_rl: ModelRLConfigSearch | None = None    
+    model_regression: ModelRegressionConfigSearch | None = None
     model_technical: ModelTechnicalConfigSearch | None = None
     model_time: ModelTimeConfigSearch | None = None
 @dataclass
@@ -201,13 +195,12 @@ class ModelConfig:
     iterations_to_pick_best: int = 10
     # iterations_to_pick_best: int = 1
     model_rl: ModelRLConfig | None = None
-    model_lstm: ModelLSTMConfig | None = None
-    model_mlp: ModelMLPConfig | None = None
+    model_regression: ModelRegressionConfig | None = None
     model_technical: ModelTechnicalConfig | None = None
     model_time: ModelTimeConfig | None = None
     
     def is_deep(self) -> bool:
-        return self.model_type == "rl"
+        return self.model_type == "rl" or self.model_type == "regression"
     def is_hodl(self) -> bool:
         return self.model_type == "hodl"
     
@@ -672,7 +665,48 @@ model_rl_dip = ModelConfigSearch(
         # checkpoint_to_load= 'rl_munchausen-dqn-custom_dip_0~0001_1000_512_100000_0~99_RMSprop_CELU_8192]512_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1734351613~7001207'
     )
 )
+model_regression_dip = ModelConfigSearch(
+    model_type= "regression",
+    model_regression= ModelRegressionConfigSearch(
+        model_name= ["mlp"],
+        # loss_fn= ["bce"],
+        loss_fn= ["bcelogits"],
 
+        loss_fn_reduction= ["mean"],    
+
+        # env_model= ["dip"],
+
+        learning_rate= [0.0001],
+        # learning_rate= [0.00005, 0.0001, 0.0002, 0.0005],
+        weight_decay= [0.0001],
+
+        optimizer_class = ['RMSprop'],
+        
+        optimizer_eps = [0.5],
+        optimizer_weight_decay = [0.00000001],
+        optimizer_centered = [True],
+        optimizer_alpha = [0.9],
+        optimizer_momentum = [0.0001], 
+
+        activation_fn= ['CELU'],
+
+        net_arch= [[8192,512]],
+        custom_net_arch= [
+            # ["BatchNorm1d", "weight_norm", "Dropout", "weight_norm", "Dropout", "weight_norm"],
+            ["BatchNorm1d", "weight_norm", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "weight_norm"],
+
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "NoisyLinear", "Dropout", "activation_fn", "Linear"],
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "spectral_norm2", "Dropout", "activation_fn", "Linear"],  
+            # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "weight_norm", "Dropout", "activation_fn", "Linear"],
+            # ["BatchNorm1d", "spectral_norm", "activation_fn", "Dropout", "spectral_norm", "Dropout", "activation_fn", "Linear"],
+        ],
+        
+        episodes= [1],
+
+        # checkpoint_to_load= 'regression_mlp_0~0001_RMSprop_CELU_bce_mean_8192]512_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1738791360~2078998'
+        # checkpoint_to_load= 'regression_mlp_0~0001_RMSprop_CELU_bce_mean_8192]512_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1738791371~330339'
+    )
+)
 
 model_hodl = ModelConfigSearch(
     model_type= "hodl"
@@ -815,9 +849,10 @@ class ModelRLConfig:
 def get_models_simple():
     return [model_hodl, model_time_test, model_technical_kallmanfilter_test, model_technical_bollinger_test]
 
-def get_models_rl():
+def get_models_deep():
     # return [model_hodl, model_rl]
-    return [model_rl_dip]
+    return [model_regression_dip]
+    # return [model_rl_dip]
 
 def get_models_all():
     return [model_hodl]
