@@ -1,0 +1,188 @@
+{
+  "name": "blackswan",
+  "recordType": "blackswan-run",
+  "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
+  "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
+  "objective": {
+    "name": "sharpe",
+    "direction": "max"
+  },
+  "levers": {
+    "model_name": {
+      "type": "choice",
+      "choices": [
+        "reppo-custom",
+        "trpo-custom",
+        "ppo-custom",
+        "duel-dqn-custom",
+        "duel-dqn-custom-lstm",
+        "munchausen-dqn-custom",
+        "qrdqn-custom",
+        "dqn",
+        "ppo",
+        "a2c",
+        "hodl"
+      ],
+      "default": "reppo-custom"
+    },
+    "reward_model": {
+      "type": "choice",
+      "choices": [
+        "combo_all2",
+        "combo_all",
+        "combo",
+        "combo2",
+        "profit_all2",
+        "profit_percentage3"
+      ],
+      "default": "combo_all2"
+    },
+    "learning_rate": {
+      "type": "number",
+      "default": 0.0001,
+      "range": [
+        5e-05,
+        0.001
+      ]
+    },
+    "gamma": {
+      "type": "number",
+      "default": 0.99,
+      "range": [
+        0.1,
+        0.999
+      ]
+    },
+    "batch_size": {
+      "type": "choice",
+      "choices": [
+        128,
+        512,
+        4096
+      ],
+      "default": 512
+    },
+    "buffer_size": {
+      "type": "number",
+      "default": 100000,
+      "range": [
+        1000,
+        1000000
+      ]
+    },
+    "learning_starts": {
+      "type": "number",
+      "default": 1000,
+      "range": [
+        10,
+        50000
+      ]
+    },
+    "net_arch": {
+      "type": "choice",
+      "choices": [
+        "8192,512",
+        "512,64",
+        "512,128,32",
+        "512,256,64,32",
+        "4096,2048,256,128"
+      ],
+      "default": "8192,512"
+    },
+    "optimizer_class": {
+      "type": "choice",
+      "choices": [
+        "RMSprop",
+        "AdamW",
+        "NAdam",
+        "Adam"
+      ],
+      "default": "RMSprop"
+    },
+    "activation_fn": {
+      "type": "choice",
+      "choices": [
+        "CELU",
+        "LogSigmoid",
+        "PReLU",
+        "ReLU6",
+        "Softsign"
+      ],
+      "default": "CELU"
+    },
+    "episodes": {
+      "type": "number",
+      "default": 1,
+      "range": [
+        1,
+        10
+      ]
+    },
+    "timeframe": {
+      "type": "choice",
+      "choices": [
+        "1d",
+        "1h"
+      ],
+      "default": "1d"
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.001,
+      "range": [
+        0,
+        0.01
+      ]
+    },
+    "stop_loss": {
+      "type": "number",
+      "default": 0.02,
+      "range": [
+        0,
+        0.1
+      ]
+    },
+    "take_profit": {
+      "type": "number",
+      "default": 0,
+      "range": [
+        0,
+        0.05
+      ]
+    },
+    "trailing_take_profit": {
+      "type": "number",
+      "default": 0,
+      "range": [
+        0,
+        0.01
+      ]
+    },
+    "no_sell_action": {
+      "type": "boolean",
+      "default": false
+    },
+    "device": {
+      "type": "choice",
+      "choices": [
+        "cpu",
+        "mps",
+        "cuda"
+      ],
+      "default": "cpu"
+    },
+    "seed": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "eta": {
+    "unitsLever": "episodes"
+  },
+  "data": [],
+  "resources": {
+    "gpu": false,
+    "memory": "8g",
+    "cpus": 4
+  }
+}
