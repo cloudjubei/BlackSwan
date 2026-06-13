@@ -1,0 +1,149 @@
+{
+  "name": "blackswan-dip",
+  "recordType": "blackswan-dip-run",
+  "run": ".venv/bin/python -m trainer.run_dip --config-json {configPath} --summary-out {summaryOut}",
+  "calibrate": ".venv/bin/python -m trainer.run_dip --calibrate --summary-out {summaryOut}",
+  "objective": {
+    "name": "f1",
+    "direction": "max"
+  },
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": [
+        "BTCUSDT"
+      ],
+      "default": "BTCUSDT",
+      "description": "Which coin to classify on. Only BTCUSDT has 1d/1h data today."
+    },
+    "loss_fn": {
+      "type": "choice",
+      "choices": [
+        "bcelogits",
+        "bce",
+        "mse",
+        "l1",
+        "smoothl1"
+      ],
+      "default": "bcelogits",
+      "description": "Training loss. bcelogits = binary cross-entropy on logits (the classifier default)."
+    },
+    "learning_rate": {
+      "type": "number",
+      "default": 0.0001,
+      "range": [
+        5e-05,
+        0.001
+      ],
+      "description": "Optimizer step size. ~0.0001 is the tuned default."
+    },
+    "episodes": {
+      "type": "number",
+      "default": 10,
+      "range": [
+        1,
+        50
+      ],
+      "description": "Training passes over the data. 1 episode underfit badly (degenerate all-negative); ~10 learns well."
+    },
+    "batch_size": {
+      "type": "choice",
+      "choices": [
+        32,
+        64,
+        128
+      ],
+      "default": 32,
+      "description": "Samples per gradient update."
+    },
+    "buyreward_maxwait": {
+      "type": "number",
+      "default": 5,
+      "range": [
+        1,
+        30
+      ],
+      "description": "How many bars ahead a profitable buy must occur for a sample to count as a positive ('dip')."
+    },
+    "buyreward_percent": {
+      "type": "number",
+      "default": 0.02,
+      "range": [
+        0.005,
+        0.1
+      ],
+      "description": "The profit threshold (fraction) that counts as a profitable buy — sets how rare positives are."
+    },
+    "pos_weight": {
+      "type": "number",
+      "default": 0,
+      "range": [
+        0,
+        50
+      ],
+      "description": "Class weight for the positive (dip) class in the loss. 0 = auto-balance from class frequencies; 1 = none; >1 up-weights dips."
+    },
+    "decision_threshold": {
+      "type": "number",
+      "default": 0.5,
+      "range": [
+        0.05,
+        0.95
+      ],
+      "description": "Probability cutoff for predicting a dip (default 0.5). Lower catches more dips (higher recall, lower precision)."
+    },
+    "net_arch": {
+      "type": "choice",
+      "choices": [
+        "8192,512",
+        "512,64",
+        "2048,256,64"
+      ],
+      "default": "8192,512",
+      "description": "Hidden-layer sizes of the MLP classifier."
+    },
+    "activation_fn": {
+      "type": "choice",
+      "choices": [
+        "CELU",
+        "ReLU6",
+        "PReLU"
+      ],
+      "default": "CELU",
+      "description": "Neuron activation function."
+    },
+    "device": {
+      "type": "choice",
+      "choices": [
+        "cpu",
+        "mps",
+        "cuda"
+      ],
+      "default": "cpu",
+      "description": "Compute device: cpu, mps (Apple GPU), or cuda (NVIDIA GPU)."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Random seed. Same seed reproduces a run exactly; different seeds measure variance."
+    }
+  },
+  "quickStart": {
+    "label": "Quick start (fast 1d dip)",
+    "fixed": {
+      "net_arch": "512,64",
+      "episodes": 5,
+      "batch_size": 32,
+      "device": "cpu"
+    }
+  },
+  "eta": {
+    "unitsLever": "episodes"
+  },
+  "data": [],
+  "resources": {
+    "gpu": false,
+    "memory": "8g",
+    "cpus": 4
+  }
+}

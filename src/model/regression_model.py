@@ -77,7 +77,8 @@ class RegressionModel(AbstractModel):
             # probabilities = torch.softmax(probabilities, dim=1)
             # outputs = torch.argmax(probabilities, dim=1)
             probabilities = torch.sigmoid(logits)
-            outputs = (probabilities > 0.5).int()
+            threshold = getattr(self.config.model_regression, "decision_threshold", 0.5)
+            outputs = (probabilities > threshold).int()
 
             # print(probabilities)
 

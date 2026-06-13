@@ -20,7 +20,9 @@ class RLModel(BaseRLModel):
         
         for i in range(0, self.rl_config.episodes):
             print(f"TRAINING EPISODE {i+1}/{self.rl_config.episodes}")
-            self.rl_model.learn(total_timesteps=timesteps, progress_bar=self.rl_config.progress_bar, log_interval=1000)
+            # Only the first episode resets the step counter; later episodes continue it so
+            # learning_starts is paid once and the exploration schedule anneals across all episodes.
+            self.rl_model.learn(total_timesteps=timesteps, progress_bar=self.rl_config.progress_bar, log_interval=1000, reset_num_timesteps=(i == 0))
 
         path = os.path.join(self.rl_config.checkpoints_folder, self.id)
         self.rl_model.save(path)

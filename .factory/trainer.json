@@ -4,7 +4,7 @@
   "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
   "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
   "objective": {
-    "name": "sharpe",
+    "name": "traded_return",
     "direction": "max"
   },
   "levers": {
@@ -23,7 +23,8 @@
         "a2c",
         "hodl"
       ],
-      "default": "reppo-custom"
+      "default": "reppo-custom",
+      "description": "The RL algorithm / policy. '-custom' variants use tuned network internals; 'hodl' is the buy-and-hold control."
     },
     "reward_model": {
       "type": "choice",
@@ -35,7 +36,8 @@
         "profit_all2",
         "profit_percentage3"
       ],
-      "default": "combo_all2"
+      "default": "combo_all",
+      "description": "Which reward function shapes behaviour. The combo_* family weight profit, drawdown and action-quality differently — each is a distinct approach (intentionally kept separate)."
     },
     "learning_rate": {
       "type": "number",
@@ -43,7 +45,8 @@
       "range": [
         5e-05,
         0.001
-      ]
+      ],
+      "description": "Optimizer step size. Too high diverges, too low learns slowly. ~0.0001 is the tuned default."
     },
     "gamma": {
       "type": "number",
@@ -51,7 +54,8 @@
       "range": [
         0.1,
         0.999
-      ]
+      ],
+      "description": "Discount factor for future reward (0–1). Higher = more far-sighted."
     },
     "batch_size": {
       "type": "choice",
@@ -60,7 +64,8 @@
         512,
         4096
       ],
-      "default": 512
+      "default": 512,
+      "description": "Samples per gradient update. Larger is steadier but slower."
     },
     "buffer_size": {
       "type": "number",
@@ -68,15 +73,17 @@
       "range": [
         1000,
         1000000
-      ]
+      ],
+      "description": "Replay-buffer capacity — how many past steps the agent can learn from."
     },
     "learning_starts": {
       "type": "number",
-      "default": 1000,
+      "default": 20000,
       "range": [
         10,
         50000
-      ]
+      ],
+      "description": "Steps of random exploration before learning begins (fills the buffer). 20000 was best in past runs."
     },
     "net_arch": {
       "type": "choice",
@@ -87,7 +94,8 @@
         "512,256,64,32",
         "4096,2048,256,128"
       ],
-      "default": "8192,512"
+      "default": "512,64",
+      "description": "Hidden-layer sizes of the policy network. Small nets (e.g. 512,64) won in past runs; the big 8192,512 overfit and lost."
     },
     "optimizer_class": {
       "type": "choice",
@@ -97,7 +105,8 @@
         "NAdam",
         "Adam"
       ],
-      "default": "RMSprop"
+      "default": "RMSprop",
+      "description": "Gradient optimizer. RMSprop was the tuned choice."
     },
     "activation_fn": {
       "type": "choice",
@@ -108,7 +117,8 @@
         "ReLU6",
         "Softsign"
       ],
-      "default": "CELU"
+      "default": "CELU",
+      "description": "Neuron activation function. CELU was the tuned choice."
     },
     "episodes": {
       "type": "number",
@@ -116,7 +126,16 @@
       "range": [
         1,
         10
-      ]
+      ],
+      "description": "How many passes over the training data. Too few underfits; the exploration schedule now anneals across episodes."
+    },
+    "asset": {
+      "type": "choice",
+      "choices": [
+        "BTCUSDT"
+      ],
+      "default": "BTCUSDT",
+      "description": "Which coin to train on. Only BTCUSDT has 1d/1h data today; altcoins need backfill (the data mine)."
     },
     "timeframe": {
       "type": "choice",
@@ -124,7 +143,8 @@
         "1d",
         "1h"
       ],
-      "default": "1d"
+      "default": "1d",
+      "description": "Bar size. 1d = fast single-layer path; 1h = the richer multi-layer path. Minute data behaved like noise for the RL models."
     },
     "transaction_fee": {
       "type": "number",
@@ -132,7 +152,8 @@
       "range": [
         0,
         0.01
-      ]
+      ],
+      "description": "Per-trade fee fraction applied to each trade (models real cost; discourages churn)."
     },
     "stop_loss": {
       "type": "number",
@@ -140,7 +161,8 @@
       "range": [
         0,
         0.1
-      ]
+      ],
+      "description": "Auto-close a losing position at this drawdown fraction (0 = off)."
     },
     "take_profit": {
       "type": "number",
@@ -148,7 +170,8 @@
       "range": [
         0,
         0.05
-      ]
+      ],
+      "description": "Auto-close a winning position at this gain fraction (0 = off)."
     },
     "trailing_take_profit": {
       "type": "number",
@@ -156,11 +179,13 @@
       "range": [
         0,
         0.01
-      ]
+      ],
+      "description": "Trailing take-profit fraction that follows the price up (0 = off)."
     },
     "no_sell_action": {
       "type": "boolean",
-      "default": false
+      "default": false,
+      "description": "Remove the explicit sell action — exits happen only via TP/SL. Performed well in past runs."
     },
     "device": {
       "type": "choice",
@@ -169,13 +194,204 @@
         "mps",
         "cuda"
       ],
-      "default": "cpu"
+      "default": "cpu",
+      "description": "Compute device: cpu, mps (Apple GPU), or cuda (NVIDIA GPU)."
     },
     "seed": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Random seed. The same seed reproduces a run exactly; different seeds measure variance."
     }
   },
+  "quickStart": {
+    "label": "Quick start (fast 1d DQN)",
+    "fixed": {
+      "model_name": "dqn",
+      "net_arch": "512,64",
+      "timeframe": "1d",
+      "episodes": 1,
+      "batch_size": 128,
+      "device": "cpu"
+    }
+  },
+  "presets": [
+    {
+      "label": "▶ Exp 1 · 1d family triage (model × seed, fast)",
+      "sweep": { "model_name": ["reppo-custom", "trpo-custom", "duel-dqn-custom", "dqn"] },
+      "fixed": {
+        "timeframe": "1d",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "episodes": 1,
+        "device": "cpu"
+      },
+      "seeds": 2,
+      "thesis": "1d family triage (post-QW1/QW2)",
+      "thesisTarget": "model_name"
+    },
+    {
+      "label": "▶ Exp 2 · 1h winners re-baseline (post-features)",
+      "sweep": { "model_name": ["reppo-custom", "trpo-custom"] },
+      "fixed": {
+        "timeframe": "1h",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "device": "cpu"
+      },
+      "seeds": 4,
+      "thesis": "1h winners re-baseline (post-QW1/QW2)",
+      "thesisTarget": "model_name"
+    },
+    {
+      "label": "▶ Exp 3 · Trade-frequency frontier (stop_loss)",
+      "sweep": { "stop_loss": [0, 0.02, 0.05] },
+      "fixed": {
+        "timeframe": "1h",
+        "model_name": "reppo-custom",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "device": "cpu"
+      },
+      "seeds": 2,
+      "thesis": "trade-frequency frontier",
+      "thesisTarget": "stop_loss"
+    },
+    {
+      "label": "▶ Exp 4 · Net capacity re-test (net_arch)",
+      "sweep": { "net_arch": ["512,64", "512,256,64,32", "8192,512"] },
+      "fixed": {
+        "timeframe": "1h",
+        "model_name": "reppo-custom",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "device": "cpu"
+      },
+      "seeds": 2,
+      "thesis": "net capacity post-features",
+      "thesisTarget": "net_arch"
+    },
+    {
+      "label": "TRPO-custom · 512,64 (~+60%)",
+      "fixed": {
+        "model_name": "trpo-custom",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "timeframe": "1h",
+        "device": "cpu"
+      }
+    },
+    {
+      "label": "Duel-DQN-custom · 512,256,64,32 (~+60%)",
+      "fixed": {
+        "model_name": "duel-dqn-custom",
+        "net_arch": "512,256,64,32",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "timeframe": "1h",
+        "device": "cpu"
+      }
+    },
+    {
+      "label": "TRPO-custom · 512,128,32 (~+50%)",
+      "fixed": {
+        "model_name": "trpo-custom",
+        "net_arch": "512,128,32",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "timeframe": "1h",
+        "device": "cpu"
+      }
+    },
+    {
+      "label": "Reppo-custom · 512,64 (~+50%, win 67%)",
+      "fixed": {
+        "model_name": "reppo-custom",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "timeframe": "1h",
+        "device": "cpu"
+      }
+    },
+    {
+      "label": "Duel-DQN-custom-LSTM · 512,256,64,32 (~+50%)",
+      "fixed": {
+        "model_name": "duel-dqn-custom-lstm",
+        "net_arch": "512,256,64,32",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "timeframe": "1h",
+        "device": "cpu"
+      }
+    },
+    {
+      "label": "Duel-DQN-custom · 512,128,32 (~+30%, win 80%)",
+      "fixed": {
+        "model_name": "duel-dqn-custom",
+        "net_arch": "512,128,32",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "timeframe": "1h",
+        "device": "cpu"
+      }
+    },
+    {
+      "label": "Buy & hold (control)",
+      "fixed": {
+        "model_name": "hodl",
+        "timeframe": "1h"
+      }
+    }
+  ],
   "eta": {
     "unitsLever": "episodes"
   },

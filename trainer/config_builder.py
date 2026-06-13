@@ -27,17 +27,21 @@ _TRAIN_PAIRS = [(y, m) for y in range(2020, 2024) for m in range(1, 13)]
 _TEST_PAIRS = [(2024, m) for m in range(1, 5)]
 
 
-def _daily_files(pairs):
-    files = [f"binance/{_SYMBOL}-1d-{y}-{m}.json" for (y, m) in pairs]
+def _daily_files(pairs, symbol=_SYMBOL):
+    files = [f"binance/{symbol}-1d-{y}-{m}.json" for (y, m) in pairs]
     return [f for f in files if os.path.exists(f)]
 
 
-def require_data_present():
-    """Fail fast with a clear message when the Binance klines aren't on disk."""
-    if not _daily_files(_TRAIN_PAIRS) or not _daily_files(_TEST_PAIRS):
+def require_data_present(cfg=None):
+    """Fail fast with a clear message when the chosen asset's klines aren't on disk."""
+    cfg = cfg or {}
+    symbol = str(cfg.get("asset", _SYMBOL))
+    if not _daily_files(_TRAIN_PAIRS, symbol) or not _daily_files(_TEST_PAIRS, symbol):
+        from trainer.data_inventory import available_assets
+
         raise SystemExit(
-            "binance/ klines missing — pull the dataset into the BlackSwan repo "
-            "(the Model Trainer runs this project in place)."
+            f"binance/ 1d klines for {symbol} missing — only assets with daily files "
+            f"are runnable at 1d. Available at 1d: {available_assets('1d')}."
         )
 
 
@@ -48,8 +52,14 @@ def _parse_net_arch(value):
 
 
 def build_data_config(cfg):
+    asset = str(cfg.get("asset", _SYMBOL))
     timeframe = str(cfg.get("timeframe", "1d"))
     if timeframe == "1h":
+        if asset != _SYMBOL:
+            raise SystemExit(
+                f"{asset} has no 1h dataset on disk — 1h is {_SYMBOL}-only until "
+                f"altcoin klines are added (deferred to the data mine)."
+            )
         # The repo's tuned 1h instance: 1m source files, downsampled layers.
         return OmegaConf.structured(
             copy.deepcopy(data_2017_to_2023vs2024_only_price_percent_32_at_1h)
@@ -59,9 +69,9 @@ def build_data_config(cfg):
     # exploratory). The "1h" timeframe is the research-grade path (lookback 32).
     return OmegaConf.structured(
         DataConfig(
-            id=f"{_SYMBOL}-1d-2020to2023vs2024q1",
-            train_data_paths=[_daily_files(_TRAIN_PAIRS)],
-            test_data_paths=[_daily_files(_TEST_PAIRS)],
+            id=f"{asset}-1d-2020to2023vs2024q1",
+            train_data_paths=[_daily_files(_TRAIN_PAIRS, asset)],
+            test_data_paths=[_daily_files(_TEST_PAIRS, asset)],
             lookback_window_size=1,
             type=str(cfg.get("data_type", "only_price_percent")),
             timestamp="none",
@@ -125,6 +135,9 @@ def build_model_config(cfg):
     rl.buffer_size = [int(cfg.get("buffer_size", 100000))]
     rl.learning_starts = [int(cfg.get("learning_starts", 1000))]
     rl.episodes = [int(cfg.get("episodes", 1))]
+    rl.seed = int(cfg["seed"]) if cfg.get("seed") is not None else None
+    if cfg.get("checkpoint_to_load"):
+        rl.checkpoint_to_load = str(cfg["checkpoint_to_load"])
     if "net_arch" in cfg:
         rl.net_arch = [_parse_net_arch(cfg["net_arch"])]
     if "optimizer_class" in cfg:

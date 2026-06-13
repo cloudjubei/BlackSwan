@@ -50,6 +50,7 @@ class ModelRLConfigSearch:
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+    seed: int | None = None
 @dataclass
 class ModelRLConfig:
     model_name: str
@@ -99,6 +100,7 @@ class ModelRLConfig:
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+    seed: int | None = None
 
 @dataclass
 class ModelRegressionConfigSearch:
@@ -125,6 +127,9 @@ class ModelRegressionConfigSearch:
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+    seed: int | None = None
+    pos_weight: float = 0.0
+    decision_threshold: float = 0.5
 @dataclass
 class ModelRegressionConfig:
     model_name: str = 'mlp'
@@ -149,6 +154,9 @@ class ModelRegressionConfig:
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+    seed: int | None = None
+    pos_weight: float = 0.0
+    decision_threshold: float = 0.5
 
 @dataclass
 class ModelTimeConfigSearch:
@@ -845,6 +853,7 @@ class ModelRLConfig:
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+    seed: int | None = None
 
 def get_models_simple():
     return [model_hodl, model_time_test, model_technical_kallmanfilter_test, model_technical_bollinger_test]

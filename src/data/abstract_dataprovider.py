@@ -141,6 +141,10 @@ class AbstractDataProvider(ABC):
         rewards_buysell = self.get_rewards_buy_sell(result_df)
         rewards_buy_profitable, rewards_buy_drawdown = self.get_rewards_buy(result_df, buyreward_percent, buyreward_maxwait)
 
+        # QW2: taker (aggressor) buy pressure — bounded [0,1], computed before the raw volume/taker
+        # columns are dropped below so the order-flow signal survives into the feature set.
+        result_df['taker_buy_ratio'] = (pd.to_numeric(result_df['asset_volume_taker_base'], errors='coerce') / pd.to_numeric(result_df['volume'], errors='coerce')).clip(lower=0, upper=1)
+
         if type != "standard" and type != "solo_price" and type != "only_price":
             result_df['price_percent'] = pd.to_numeric(result_df['price'], errors='coerce').astype(float).pct_change()
             
@@ -262,7 +266,7 @@ class AbstractDataProvider(ABC):
 
         result_df = result_df.drop(columns=['timestamp'])
         result_df = result_df.drop(columns=['price_open', 'indicators'])
-        result_df = result_df.drop(columns=['asset_volume_quote', 'trades_number', 'asset_volume_taker_base', 'asset_volume_taker_quote']) # for now lets ignore these
+        result_df = result_df.drop(columns=['asset_volume_quote', 'trades_number', 'asset_volume_taker_base', 'asset_volume_taker_quote']) # raw cols dropped; taker_buy_ratio (above) retains the order-flow signal
 
         for col in result_df.keys():
             if col == 'timestamp_close' or col == 'timestamp':
@@ -290,11 +294,11 @@ class AbstractDataProvider(ABC):
 
         return result_df, prices, timestamps, rewards_buysell, rewards_buy_profitable, rewards_buy_drawdown
     
-    def get_raw_data(self, paths, timestamp = "none", columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number"]):
+    def get_raw_data(self, paths, timestamp = "none", columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number","asset_volume_taker_base"]):
         dfs = []
 
-        # "asset_volume_taker_base":"616.24854100","asset_volume_taker_quote":"2678216.40060401"
-        
+        # asset_volume_taker_base carried through for the QW2 taker_buy_ratio feature.
+
         for path in paths:
             df = pd.read_json(path)
             dfs.append(df)
@@ -310,16 +314,28 @@ class AbstractDataProvider(ABC):
         prices = result_df["price"].values
         timestamps = ((pd.to_datetime(result_df["timestamp_close"]).astype('int64') // 10**6) + 1).to_numpy()
 
-        result_df['price_z_score_1d'] = (result_df['price'] - result_df['price'].rolling(1440).mean()) / result_df['price'].rolling(1440).std()
-        result_df['price_z_score_1m'] = (result_df['price'] - result_df['price'].rolling(43200).mean()) / result_df['price'].rolling(43200).std()
-        result_df['price_z_score_1y'] = (result_df['price'] - result_df['price'].rolling(525600).mean()) / result_df['price'].rolling(525600).std()
-        
-        result_df['price_to_max_1d'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=1440).max(), errors='coerce').astype(float)
-        result_df['price_to_max_1m'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=43200).max(), errors='coerce').astype(float)
-        result_df['price_to_max_1y'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=525600).max(), errors='coerce').astype(float)
-        result_df['price_to_avg_1d'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=1440).mean(), errors='coerce').astype(float)
-        result_df['price_to_avg_1m'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=43200).mean(), errors='coerce').astype(float)
-        result_df['price_to_avg_1y'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=525600).mean(), errors='coerce').astype(float)
+        # The _1d/_1m/_1y windows below are fixed time horizons (1 day / 1 month / 1 year), but
+        # the bars reaching this method may be 1m, 1h or 1d (single-layer or process_fidelity
+        # aggregates). Infer minutes-per-bar from the spacing between consecutive bar closes and
+        # scale the windows so the horizons hold at any fidelity. Without this, e.g. rolling(1440)
+        # on 1h bars spans 60 days, leaving every row NaN -> fillna(0) -> a signal-less zero column.
+        close_ms = pd.to_datetime(result_df['timestamp_close']).astype('int64') // 10**6
+        bar_span_ms = close_ms.diff().median()
+        minutes_per_bar = max(1, int(round(bar_span_ms / 60000.0))) if pd.notna(bar_span_ms) else 1
+        w_1d = max(2, round(1440 / minutes_per_bar))
+        w_1m = max(2, round(43200 / minutes_per_bar))
+        w_1y = max(2, round(525600 / minutes_per_bar))
+
+        result_df['price_z_score_1d'] = (result_df['price'] - result_df['price'].rolling(w_1d).mean()) / result_df['price'].rolling(w_1d).std()
+        result_df['price_z_score_1m'] = (result_df['price'] - result_df['price'].rolling(w_1m).mean()) / result_df['price'].rolling(w_1m).std()
+        result_df['price_z_score_1y'] = (result_df['price'] - result_df['price'].rolling(w_1y).mean()) / result_df['price'].rolling(w_1y).std()
+
+        result_df['price_to_max_1d'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1d).max(), errors='coerce').astype(float)
+        result_df['price_to_max_1m'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1m).max(), errors='coerce').astype(float)
+        result_df['price_to_max_1y'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1y).max(), errors='coerce').astype(float)
+        result_df['price_to_avg_1d'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1d).mean(), errors='coerce').astype(float)
+        result_df['price_to_avg_1m'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1m).mean(), errors='coerce').astype(float)
+        result_df['price_to_avg_1y'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1y).mean(), errors='coerce').astype(float)
 
         # adding data:
         # Pi_Cycle_Top_Signal  
@@ -355,9 +371,9 @@ class AbstractDataProvider(ABC):
 
 
         result_df['total_volume_percent'] = pd.to_numeric(result_df['total_volume'], errors='coerce').astype(float).pct_change()
-        result_df['total_volume_to_max_1d'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=1440).max(), errors='coerce').astype(float)
-        result_df['total_volume_to_max_1m'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=43200).max(), errors='coerce').astype(float)
-        result_df['total_volume_to_max_1y'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=525600).max(), errors='coerce').astype(float)
+        result_df['total_volume_to_max_1d'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=w_1d).max(), errors='coerce').astype(float)
+        result_df['total_volume_to_max_1m'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=w_1m).max(), errors='coerce').astype(float)
+        result_df['total_volume_to_max_1y'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=w_1y).max(), errors='coerce').astype(float)
 
         result_df['price_percent'] = pd.to_numeric(result_df['price'], errors='coerce').astype(float).pct_change()
         result_df['price_high_percent'] = pd.to_numeric(result_df['price_high']/result_df['price'] - 1, errors='coerce').astype(float)
@@ -365,6 +381,16 @@ class AbstractDataProvider(ABC):
         result_df['volume_percent'] = pd.to_numeric(result_df['volume'], errors='coerce').astype(float).pct_change()
         result_df['volume_quote_percent'] = pd.to_numeric(result_df['asset_volume_quote'], errors='coerce').astype(float).pct_change()
         result_df['trades_number_percent'] = pd.to_numeric(result_df['trades_number'], errors='coerce').astype(float).pct_change()
+
+        # QW2: taker (aggressor) buy pressure — the fraction of base volume that was taker-buy. Already
+        # present in every kline but previously dropped. Bounded [0,1] so it sits safely in the [-1,1]
+        # observation space. Aggregates correctly: process_fidelity sums taker-base and volume, so the
+        # ratio of the sums is the period's true taker-buy share. Guarded so a caller-supplied `columns`
+        # list without the taker column still yields a consistent (neutral 0) feature instead of crashing.
+        if 'asset_volume_taker_base' in result_df.columns:
+            result_df['taker_buy_ratio'] = (pd.to_numeric(result_df['asset_volume_taker_base'], errors='coerce') / pd.to_numeric(result_df['volume'], errors='coerce')).clip(lower=0, upper=1)
+        else:
+            result_df['taker_buy_ratio'] = 0.0
 
         if timestamp == "expanded":
             result_df['timestamp_close'] = pd.to_datetime(result_df['timestamp_close'], unit='ms')
@@ -386,7 +412,7 @@ class AbstractDataProvider(ABC):
 
         return result_df, prices, timestamps
     
-    def process_fidelity(self, df, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run, multiplier_input_to_run, timestamp, columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number"]):
+    def process_fidelity(self, df, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run, multiplier_input_to_run, timestamp, columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number","asset_volume_taker_base"]):
         steps = df.shape[0]
 
         dfs = []
@@ -419,6 +445,7 @@ class AbstractDataProvider(ABC):
                 values["volume"].append(part['volume'].sum())
                 values["asset_volume_quote"].append(part['asset_volume_quote'].sum())
                 values["trades_number"].append(part['trades_number'].sum())
+                values["asset_volume_taker_base"].append(part['asset_volume_taker_base'].sum())
                 
             raw_df = pd.DataFrame(values, columns=columns)
             result_df, ps, _ = self.process_df_simple(raw_df.copy(), timestamp, columns)

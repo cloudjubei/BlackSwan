@@ -33,6 +33,9 @@ class   RegressionPredictEnv(AbstractEnv):
             y_values.append(y)
 
 
+        self.n_positive = sum(1 for y in y_values if y == 1)
+        self.n_negative = len(y_values) - self.n_positive
+
         # self.dataloader = DataLoader(TensorDataset(torch.from_numpy(np.stack(x_values)), torch.from_numpy(np.stack(y_values))), batch_size= env_config.batch_size, shuffle= False)
         self.dataloader = DataLoader(TensorDataset(torch.tensor(x_values, dtype=torch.float32, device= self.device), torch.tensor(y_values, dtype=torch.float32, device= self.device)), batch_size= env_config.batch_size, shuffle= False)
         # self.dataloader = DataLoader(TensorDataset(torch.tensor(np.ndarray(x_values), dtype=torch.float32, device= self.device), torch.tensor(np.ndarray(y_values), dtype=torch.float32, device= self.device)), batch_size= env_config.batch_size, shuffle= False)

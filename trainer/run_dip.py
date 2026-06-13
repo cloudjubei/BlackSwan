@@ -1,80 +1,51 @@
-"""Trainer-conformant CLI for BlackSwan (trading line).
+"""Trainer-conformant CLI for BlackSwan's dip/regression line (f1 objective).
 
-  python -m trainer.run --config-json <path> --summary-out <path>
-  python -m trainer.run --calibrate --summary-out <path>
+  python -m trainer.run_dip --config-json <path> --summary-out <path>
+  python -m trainer.run_dip --calibrate --summary-out <path>
 
-Runs ONE (data, env, model) configuration end-to-end, reusing the unchanged
-src/ machinery, and writes a thefactory RunSummary. The Model Trainer sweeps
-levers + seeds across many of these; this entry never runs the src.main sweep
-and never touches Hydra.
+Trains the tuned dip MLP (``model_regression``) on the binary "will the next buy be
+profitable?" label and writes a thefactory RunSummary scored on f1. Reuses the
+unchanged src/ machinery and the trading line's seed/progress/write helpers; never
+runs the src.main sweep and never touches Hydra.
 """
 
 import argparse
 import datetime
 import json
 import os
-import random
 import sys
 import time
-
-import numpy as np
 
 from src.data.data_factory import create_provider
 from src.environment.env_factory import create_environment
 from src.model.model_factory import create_model
 
-from trainer import config_builder, summary as summary_mod
+from trainer import dip
+from trainer.run import _progress, _seed_everything, _write
 
 # A deliberately tiny configuration for --calibrate (one short 1d episode).
 _CALIBRATE_CFG = {
-    "model_name": "dqn",
-    "reward_model": "combo_all2",
+    "loss_fn": "bcelogits",
     "learning_rate": 0.0001,
-    "gamma": 0.99,
-    "batch_size": 64,
-    "buffer_size": 5000,
-    "learning_starts": 50,
-    "net_arch": "64,64",
     "episodes": 1,
-    "timeframe": "1d",
+    "batch_size": 32,
+    "buyreward_maxwait": 5,
+    "buyreward_percent": 0.02,
     "device": "cpu",
 }
 
 
-def _progress(phase, **extra):
-    """Emit a structured sub-phase marker the Model Trainer parses for live progress."""
-    print("@@PROGRESS " + json.dumps({"phase": phase, **extra}), flush=True)
-
-
-def _seed_everything(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    try:
-        import torch
-
-        torch.manual_seed(seed)
-    except Exception:
-        pass
-    try:
-        from stable_baselines3.common.utils import set_random_seed
-
-        set_random_seed(seed)
-    except Exception:
-        pass
-
-
 def _run_one(cfg):
-    """Build → train → deterministic test; return (env_test, run_state, model, is_rl, train_seconds)."""
-    config_builder.require_data_present(cfg)
+    """Build → train → test the dip classifier; return (env_test, run_state, model, train_seconds)."""
+    dip.require_data_present(cfg)
     device = str(cfg.get("device", "cpu"))
     if "seed" in cfg:
         _seed_everything(int(cfg["seed"]))
 
     _progress("loading")
-    is_rl = not config_builder.is_hodl(cfg)
-    data_cfg = config_builder.build_data_config(cfg)
-    env_cfg = config_builder.build_env_config(cfg)
-    model_cfg = config_builder.build_model_config(cfg)
+    data_cfg = dip.build_data_config(cfg)
+    env_cfg = dip.build_env_config(cfg)
+    model_cfg = dip.build_model_config(cfg)
 
     provider_train = create_provider(
         data_cfg,
@@ -98,27 +69,20 @@ def _run_one(cfg):
     env_test = create_environment(env_cfg, provider_test, device)
     model = create_model(model_cfg, env_train, device)
 
-    env_train.setup(model.get_reward_model(), model.get_reward_multipliers())
     started = time.time()
     if not model.is_pretrained():
-        _progress("train", total=env_train.get_timesteps() * int(cfg.get("episodes", 1)))
+        _progress("train", total=int(cfg.get("episodes", 1)))
         model.train(env_train)
     train_seconds = time.time() - started
 
-    env_test.setup(model.get_reward_model(), model.get_reward_multipliers())
-    _progress("test", total=env_test.get_timesteps())
+    _progress("test")
     model.test(env_test, True)
     _progress("summarize")
-    return env_test, env_test.get_run_state(), model, is_rl, train_seconds
-
-
-def _write(path, payload):
-    with open(path, "w") as f:
-        json.dump(payload, f)
+    return env_test, env_test.get_run_state(), model, train_seconds
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="trainer.run")
+    parser = argparse.ArgumentParser(prog="trainer.run_dip")
     parser.add_argument("--config-json")
     parser.add_argument("--summary-out", required=True)
     parser.add_argument("--calibrate", action="store_true")
@@ -139,8 +103,8 @@ def main(argv=None):
         cfg["checkpoint_to_load"] = args.resume_from
 
     ran_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    env_test, state, model, is_rl, train_seconds = _run_one(cfg)
-    out = summary_mod.build_summary(env_test, state, cfg, model, ran_at, is_rl)
+    env_test, state, model, train_seconds = _run_one(cfg)
+    out = dip.build_summary(env_test, state, cfg, model, ran_at)
 
     if args.calibrate:
         episodes = int(cfg.get("episodes", 1))
@@ -152,7 +116,7 @@ def main(argv=None):
 
     _write(args.summary_out, out)
     print(
-        f"objective(traded_return)={out['objective']:.4f} status={out['health']['status']} -> {args.summary_out}"
+        f"objective(f1)={out['objective']:.4f} status={out['health']['status']} -> {args.summary_out}"
     )
     return 0
 

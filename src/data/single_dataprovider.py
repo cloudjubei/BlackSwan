@@ -17,6 +17,8 @@ class SingleDataProvider(AbstractDataProvider):
         self.signals_buy_sell = buy_sells
         self.signals_buy_profitable = rewards_buy_profitable
         self.signals_buy_drawdown = rewards_buy_drawdown
+        self.buyreward_maxwait = config.buyreward_maxwait
+        self.buyreward_percent = config.buyreward_percent
 
     def get_timesteps(self) -> int:
         return self.df.shape[0] - self.get_start_index() - 1

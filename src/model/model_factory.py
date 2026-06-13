@@ -358,7 +358,7 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                 "custom_net_arch": config.model_rl.custom_net_arch
         })
     elif config.model_rl.model_name == "rainbow-dqn-old":
-        seed = 777
+        seed = config.model_rl.seed if config.model_rl.seed is not None else 777
         rl_model = RainbowDQNAgent(env, memory_size= config.model_rl.buffer_size, batch_size= config.model_rl.batch_size, target_update=config.model_rl.target_update_interval, seed= seed)
     elif config.model_rl.model_name == "iqn":
         rl_model = IQN(env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
@@ -881,15 +881,33 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
             folder=None,
             output_formats=[HumanOutputFormat(sys.stdout)],
         ))
+        if config.model_rl.seed is not None and hasattr(rl_model, "set_random_seed"):
+            rl_model.set_random_seed(config.model_rl.seed)
         return RLModel(config, rl_model)
     
     raise ValueError(f'{config.model_rl.model_name} - rl model not supported')
+
+def _resolve_pos_weight(reg, env, device):
+    """The BCE positive-class weight: an explicit ``pos_weight`` (>0) wins, else the
+    training class ratio n_neg/n_pos (auto-balance when 0/unset). None → unweighted."""
+    configured = getattr(reg, "pos_weight", 0.0) or 0.0
+    if configured > 0:
+        return torch.tensor([float(configured)], device=device)
+    n_pos = getattr(env, "n_positive", 0)
+    n_neg = getattr(env, "n_negative", 0)
+    if n_pos > 0 and n_neg > 0:
+        return torch.tensor([n_neg / n_pos], device=device)
+    return None
+
 
 def create_regression_model(config: ModelConfig, env: AbstractEnv, device: str):
     regression_model = None
 
     if config.model_regression.model_name == "mlp":
         print(f"Loading MLP model")
+
+        if config.model_regression.seed is not None:
+            torch.manual_seed(config.model_regression.seed)
 
         features_dim = len(env.last_obs)
         action_dim = 1
@@ -915,7 +933,12 @@ def create_regression_model(config: ModelConfig, env: AbstractEnv, device: str):
             regression_model.load_state_dict(torch.load(path))
             
         optimizer = optimizer_classes[config.model_regression.optimizer_class](regression_model.parameters(), lr=config.model_regression.learning_rate)
-        loss_fn = loss_fns[config.model_regression.loss_fn](reduction= config.model_regression.loss_fn_reduction)
+        loss_kwargs = {"reduction": config.model_regression.loss_fn_reduction}
+        if config.model_regression.loss_fn == "bcelogits":
+            pos_weight = _resolve_pos_weight(config.model_regression, env, device)
+            if pos_weight is not None:
+                loss_kwargs["pos_weight"] = pos_weight
+        loss_fn = loss_fns[config.model_regression.loss_fn](**loss_kwargs)
         return RegressionModel(config, regression_model, optimizer, loss_fn)
 
     
