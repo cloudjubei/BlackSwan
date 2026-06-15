@@ -331,11 +331,24 @@ class BaseCryptoEnv(AbstractEnv):
         self.drawdowns.append(self._calculate_drawdown())
 
     def update_reward(self):
-        reward = self._calculate_reward()
+        reward = self._calculate_reward() - self._turnover_penalty()
         self.total_reward += reward
         self.rewards.append(self.total_reward)
         self.rewards_history.append(reward)
         return reward
+
+    def _turnover_penalty(self):
+        # RB4: turnover/fee-aware reward VARIANT. The combo rewards already see the realized fee
+        # (it shrinks net worth), but a single trade's fee is tiny per step, so nothing discourages
+        # churn — the "trade often" objective can be gamed by over-trading. The `*_fee` variants add
+        # an explicit per-trade penalty scaled by the fee rate, so the agent is pushed to trade WELL,
+        # not just often. Tunable via the `combo_fee_penalty` multiplier; zero for every other reward.
+        if self.reward_model != "combo_all_fee":
+            return 0.0
+        if not self.actions_made or not self.actions_made[-1]:
+            return 0.0
+        weight = self.reward_multipliers.get("combo_fee_penalty", 1.0)
+        return self.transaction_fee_multiplier * weight
 
     def step(self, action):
         # make sure action is one value
@@ -427,7 +440,7 @@ class BaseCryptoEnv(AbstractEnv):
             
             return hold_reward1 + hold_reward2 + wrong_action_reward
 
-        if self.reward_model == "combo_all" or self.reward_model == "combo_all2":
+        if self.reward_model == "combo_all" or self.reward_model == "combo_all2" or self.reward_model == "combo_all_fee":
             if self.actions_made[-1]: # just made an action
                 if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # has made a sell action or SL/TP triggered
                     sell_net_worth = self.sells[-1]
@@ -567,7 +580,7 @@ class BaseCryptoEnv(AbstractEnv):
             (total_won + total_lost)/total_trades if total_trades > 0 else 0,
             -fees,
             volume,
-            (len(self.buys) + len(self.sells))/2,
+            total_trades,
             # self.current_step-1,
             len(self.trades_sl),
             sum(self.trades_sl),

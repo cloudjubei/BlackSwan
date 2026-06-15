@@ -14,17 +14,14 @@ import os
 
 from omegaconf import OmegaConf
 
-from src.conf.data_config import (
-    DataConfig,
-    data_2017_to_2023vs2024_only_price_percent_32_at_1h,
-)
+from src.conf.data_config import DataConfig
 from src.conf.env_config import EnvConfig
 from src.conf.model_config import ModelConfigSearch, model_rl
 from src.model.model_factory import get_model_combinations
 
 _SYMBOL = "BTCUSDT"
 _TRAIN_PAIRS = [(y, m) for y in range(2020, 2024) for m in range(1, 13)]
-_TEST_PAIRS = [(2024, m) for m in range(1, 5)]
+_TEST_PAIRS = [(2024, m) for m in range(1, 13)]
 
 
 def _daily_files(pairs, symbol=_SYMBOL):
@@ -60,9 +57,24 @@ def build_data_config(cfg):
                 f"{asset} has no 1h dataset on disk — 1h is {_SYMBOL}-only until "
                 f"altcoin klines are added (deferred to the data mine)."
             )
-        # The repo's tuned 1h instance: 1m source files, downsampled layers.
+        from trainer.derive_cache import ensure_derived
+
         return OmegaConf.structured(
-            copy.deepcopy(data_2017_to_2023vs2024_only_price_percent_32_at_1h)
+            DataConfig(
+                id=f"{asset}-1h-derived-2020to2023vs2024",
+                train_data_paths=[ensure_derived(asset, _TRAIN_PAIRS, "1h")],
+                test_data_paths=[ensure_derived(asset, _TEST_PAIRS, "1h")],
+                lookback_window_size=32,
+                type=str(cfg.get("data_type", "only_price_percent")),
+                use_indicators=bool(cfg.get("use_indicators", False)),
+                timestamp="day_of_week",
+                fidelity_input="1h",
+                fidelity_run="1h",
+                layers=["1h", "1d"],
+                fidelity_input_test="1h",
+                fidelity_run_test="1h",
+                layers_test=["1h", "1d"],
+            )
         )
     # The env's lookback>1 observation path requires the multi-layer provider;
     # the single-layer daily path therefore runs with lookback 1 (fast,
@@ -74,6 +86,7 @@ def build_data_config(cfg):
             test_data_paths=[_daily_files(_TEST_PAIRS, asset)],
             lookback_window_size=1,
             type=str(cfg.get("data_type", "only_price_percent")),
+            use_indicators=bool(cfg.get("use_indicators", False)),
             timestamp="none",
             fidelity_input="1d",
             fidelity_run="1d",
@@ -129,6 +142,7 @@ def build_model_config(cfg):
         # The tuned custom_net_arch tokens only apply to the *-custom models.
         rl.custom_net_arch = [[]]
     rl.reward_model = [str(cfg.get("reward_model", "combo_all2"))]
+    rl.reward_multiplier_combo_noaction = [float(cfg.get("combo_noaction", 0))]
     rl.learning_rate = [float(cfg.get("learning_rate", 0.0001))]
     rl.gamma = [float(cfg.get("gamma", 0.99))]
     rl.batch_size = [int(cfg.get("batch_size", 512))]

@@ -3,6 +3,7 @@
   "recordType": "blackswan-run",
   "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
   "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
+  "evaluate": ".venv/bin/python -m trainer.run --evaluate --config-json {configPath} --summary-out {summaryOut}",
   "objective": {
     "name": "traded_return",
     "direction": "max"
@@ -31,13 +32,20 @@
       "choices": [
         "combo_all2",
         "combo_all",
+        "combo_all_fee",
         "combo",
         "combo2",
         "profit_all2",
         "profit_percentage3"
       ],
       "default": "combo_all",
-      "description": "Which reward function shapes behaviour. The combo_* family weight profit, drawdown and action-quality differently — each is a distinct approach (intentionally kept separate)."
+      "description": "Which reward function shapes behaviour. The combo_* family weight profit, drawdown and action-quality differently — each is a distinct approach (intentionally kept separate). combo_all_fee = combo_all plus an explicit per-trade turnover penalty (discourages churn; pairs with the trade-aware objective)."
+    },
+    "combo_noaction": {
+      "type": "choice",
+      "choices": [0, -1],
+      "default": 0,
+      "description": "Reward multiplier applied to price moves while the agent is FLAT (no position). Default 0 = direction-neutral (a flat agent is neither rewarded nor punished for which way price moves). -1 bakes a synthetic-short incentive (rewards price falling while flat) — kept as a deliberate variant to probe, NOT the default, since the agent is long-only."
     },
     "learning_rate": {
       "type": "number",
@@ -145,6 +153,11 @@
       ],
       "default": "1d",
       "description": "Bar size. 1d = fast single-layer path; 1h = the richer multi-layer path. Minute data behaved like noise for the RL models."
+    },
+    "use_indicators": {
+      "type": "boolean",
+      "default": false,
+      "description": "Add a curated set of precomputed indicators (RSI/Williams/Stochastic/Choppiness + tanh-squashed meanReversion/turbulence/OBV) as features. Only takes effect on 1d (those klines carry the indicators; the 1m source feeding 1h does not yet — that needs the data mine)."
     },
     "transaction_fee": {
       "type": "number",
@@ -281,6 +294,27 @@
       "seeds": 2,
       "thesis": "net capacity post-features",
       "thesisTarget": "net_arch"
+    },
+    {
+      "label": "▶ Exp 5 · Indicators on/off — 1h (RB1)",
+      "sweep": { "use_indicators": [false, true] },
+      "fixed": {
+        "timeframe": "1h",
+        "model_name": "reppo-custom",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "device": "cpu"
+      },
+      "seeds": 4,
+      "thesis": "indicators on/off (1h, RB1)",
+      "thesisTarget": "use_indicators"
     },
     {
       "label": "TRPO-custom · 512,64 (~+60%)",

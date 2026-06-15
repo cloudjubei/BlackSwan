@@ -9,6 +9,7 @@ class DataConfig:
     lookback_window_size: int = 1
     type: str = "only_price_percent" # possible ["standard", "solo_price_percent", "only_price_percent", "all_percents"]
     indicator: str = "none"
+    use_indicators: bool = False
     timestamp: str = "day_of_week" # possible ["none",  "expanded", "day_of_week"]
     buyreward_percent: float = 0.004
     buyreward_maxwait: int = 20
@@ -39,7 +40,8 @@ data_2017_to_2023vs2024_only_price_percent = DataConfig(
     test_data_paths= [
         [
             "binance/BTCUSDT-1m-2024-1.json", "binance/BTCUSDT-1m-2024-2.json", "binance/BTCUSDT-1m-2024-3.json", "binance/BTCUSDT-1m-2024-4.json",
-            # "binance/BTCUSDT-1m-2024-5.json", "binance/BTCUSDT-1m-2024-6.json", "binance/BTCUSDT-1m-2024-7.json", "binance/BTCUSDT-1m-2024-8.json",
+            "binance/BTCUSDT-1m-2024-5.json", "binance/BTCUSDT-1m-2024-6.json", "binance/BTCUSDT-1m-2024-7.json", "binance/BTCUSDT-1m-2024-8.json",
+            # RB7: 2024-9..12 not on disk yet — add when mined (data mine).
             # "binance/BTCUSDT-1m-2024-9.json", "binance/BTCUSDT-1m-2024-10.json", "binance/BTCUSDT-1m-2024-11.json", "binance/BTCUSDT-1m-2024-12.json",
          ],
     ],

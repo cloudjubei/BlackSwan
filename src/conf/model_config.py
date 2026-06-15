@@ -409,8 +409,9 @@ model_rl = ModelConfigSearch(
         #     # ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
         # ],
 
-        # net_arch= [[512,64]],
-        net_arch= [[8192,512]],
+        # QW5: default to the known winner; [8192,512] was the documented −40% loser.
+        net_arch= [[512,64]],
+        # net_arch= [[8192,512]],
         # custom_net_arch= [
         #     ["Linear", "activation_fn", "Linear", "activation_fn", "Linear"], # ALWAYS HAS TO BE 1 more Linear+act than custom_net_arch count
         #     ["BatchNorm1d", "Linear", "activation_fn", "Dropout", "Linear", "ResidualBlock", "Dropout", "activation_fn", "Linear"],
@@ -538,7 +539,7 @@ model_rl = ModelConfigSearch(
 
         episodes= [1],
 
-        reward_multiplier_combo_noaction= [-1],
+        reward_multiplier_combo_noaction= [0],
         reward_multiplier_combo_wrongaction= [-0.01],
         # reward_multiplier_combo_wrongaction= [0, -0.001, -0.01, -0.1, -1],
         reward_multiplier_combo_positionprofitpercentage= [10],

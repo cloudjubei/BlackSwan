@@ -123,6 +123,7 @@ def main(argv=None):
     parser.add_argument("--summary-out", required=True)
     parser.add_argument("--calibrate", action="store_true")
     parser.add_argument("--resume-from")
+    parser.add_argument("--evaluate", action="store_true")
     args = parser.parse_args(argv)
 
     os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -138,9 +139,26 @@ def main(argv=None):
     if args.resume_from:
         cfg["checkpoint_to_load"] = args.resume_from
 
+    if args.evaluate:
+        # Re-test a saved checkpoint on the test window WITHOUT retraining. The hub injects the run's
+        # `checkpoint` artifact into the config; map it to the loader key so the model loads it and
+        # `_run_one` skips training (model.is_pretrained()).
+        checkpoint = cfg.get("checkpoint") or cfg.get("checkpoint_to_load")
+        if not checkpoint:
+            parser.error("--evaluate requires a 'checkpoint' (or 'checkpoint_to_load') in the config")
+        # artifacts.checkpoint is "<checkpoints_folder>/<id>.zip"; the loader re-adds the folder + .zip,
+        # so reduce to the bare id.
+        ckpt = os.path.basename(str(checkpoint))
+        if ckpt.endswith(".zip"):
+            ckpt = ckpt[: -len(".zip")]
+        cfg["checkpoint_to_load"] = ckpt
+
     ran_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     env_test, state, model, is_rl, train_seconds = _run_one(cfg)
     out = summary_mod.build_summary(env_test, state, cfg, model, ran_at, is_rl)
+
+    if args.evaluate:
+        out["evaluation"] = {"checkpoint": str(cfg.get("checkpoint_to_load") or ""), "episodes": 0}
 
     if args.calibrate:
         episodes = int(cfg.get("episodes", 1))

@@ -77,9 +77,6 @@ def _run_prices(env, n):
     provider = getattr(env, "data_provider", None)
     if provider is None:
         return []
-    prices = getattr(provider, "prices", None)
-    if isinstance(prices, (list, tuple, np.ndarray)) and len(prices) >= 2:
-        return [_finite(p) for p in list(prices)[:n]]
     get_price = getattr(provider, "get_price", None)
     if callable(get_price):
         out = []
@@ -88,7 +85,11 @@ def _run_prices(env, n):
                 out.append(_finite(get_price(i)))
             except Exception:
                 break
-        return out
+        if len(out) >= 2:
+            return out
+    prices = getattr(provider, "prices", None)
+    if isinstance(prices, (list, tuple, np.ndarray)) and len(prices) >= 2:
+        return [_finite(p) for p in list(prices)[:n]]
     return []
 
 
@@ -222,6 +223,34 @@ def _cagr(curve, periods_per_year):
     return _finite((curve[-1] / curve[0]) ** (1.0 / years) - 1.0)
 
 
+def _window_breakdown(curve, n_windows=4):
+    """RB7: split the test equity curve into ``n_windows`` equal sub-periods and report robustness
+    across them — a strategy that only profits in one sub-window (a single lucky regime) is fragile.
+    Returns per-window return %, the worst window, and the fraction of windows that were profitable.
+    Equal-size index chunks (bars are uniform within a fidelity) avoid timestamp-alignment fragility.
+    """
+    pts = [c for c in curve if isinstance(c, (int, float)) and math.isfinite(c) and c > 0]
+    if len(pts) < 4:
+        return None
+    n = max(1, min(n_windows, len(pts) - 1))
+    size = len(pts) / n
+    returns = []
+    for i in range(n):
+        lo = int(round(i * size))
+        hi = (int(round((i + 1) * size)) if i < n - 1 else len(pts)) - 1
+        if hi > lo and pts[lo] > 0:
+            returns.append((pts[hi] / pts[lo] - 1.0) * 100)
+    if not returns:
+        return None
+    profitable = sum(1 for r in returns if r > 0)
+    return {
+        "window_returns_pct": [round(r, 4) for r in returns],
+        "worst_window_return_pct": min(returns),
+        "windows_profitable_pct": 100.0 * profitable / len(returns),
+        "n_windows": len(returns),
+    }
+
+
 def _health(env, state, is_rl, lookback):
     flags = []
     n_trades = _finite(state[17]) if len(state) > 17 else 0
@@ -249,28 +278,39 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     total_return = _finite(state[2]) if len(state) > 2 else 0.0
     n_trades = _finite(state[17]) if len(state) > 17 else 0.0
     # Trade-aware objective: total return (profit, NOT beat-hold) gated by trade frequency, so a run
-    # must trade often to keep its return. A 1-trade ~ buy-and-hold run is gated to ~0 however far
-    # price moved; an active losing run stays negative. trade_gate is surfaced so the discount is legible.
-    trade_gate = min(1.0, n_trades / MIN_TRADES_FOR_FULL_CREDIT) if MIN_TRADES_FOR_FULL_CREDIT > 0 else 1.0
+    trade_gate = (
+        min(1.0, (n_trades / MIN_TRADES_FOR_FULL_CREDIT) ** 2)
+        if MIN_TRADES_FOR_FULL_CREDIT > 0
+        else 1.0
+    )
     traded_return = total_return * 100 * trade_gate
+    windows = _window_breakdown(curve)
+    metrics = {
+        "traded_return": traded_return,
+        "total_return_pct": total_return * 100,
+        "win_pct": _finite(state[7]) if len(state) > 7 else 0.0,
+        "n_trades": n_trades,
+        "trade_gate": trade_gate,
+        "sharpe": sharpe,
+        "max_drawdown_pct": _max_drawdown(curve) * 100,
+        "cagr_pct": _cagr(curve, periods) * 100,
+        "stop_losses": _finite(state[18]) if len(state) > 18 else 0.0,
+        "final_net_worth": curve[-1] if curve else 0.0,
+    }
+    if windows:
+        # RB7: robustness across sub-periods — the worst window's return + how many windows profited.
+        metrics["worst_window_return_pct"] = windows["worst_window_return_pct"]
+        metrics["windows_profitable_pct"] = windows["windows_profitable_pct"]
+    series = {"equity": _downsample(curve)}
+    if windows:
+        series["window_returns_pct"] = windows["window_returns_pct"]
     summary = {
         "objective": traded_return,
-        "metrics": {
-            "traded_return": traded_return,
-            "total_return_pct": total_return * 100,
-            "win_pct": _finite(state[7]) if len(state) > 7 else 0.0,
-            "n_trades": n_trades,
-            "trade_gate": trade_gate,
-            "sharpe": sharpe,
-            "max_drawdown_pct": _max_drawdown(curve) * 100,
-            "cagr_pct": _cagr(curve, periods) * 100,
-            "stop_losses": _finite(state[18]) if len(state) > 18 else 0.0,
-            "final_net_worth": curve[-1] if curve else 0.0,
-        },
+        "metrics": metrics,
         "health": _health(env, state, is_rl, lookback),
         "config": dict(cfg),
         "provenance": {"ranAt": ran_at},
-        "series": {"equity": _downsample(curve)},
+        "series": series,
         "dataset": _dataset(env, cfg, fidelity, len(curve)),
     }
     artifacts = {}

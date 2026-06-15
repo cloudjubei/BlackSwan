@@ -8,6 +8,7 @@ import datetime
 
 from src.data.data_utils import plot_indicator
 from src.util.plot import plot_timeseries
+from src.data import indicators as _indicators
 
 class AbstractDataProvider(ABC):
     def __init__(self, config: DataConfig):
@@ -123,6 +124,23 @@ class AbstractDataProvider(ABC):
 
         return rewards_profitable, rewards_drawdown
 
+    def _add_curated_indicators(self, result_df):
+        if not getattr(self.config, "use_indicators", False):
+            return result_df
+        if not all(c in result_df.columns for c in ("price", "price_high", "price_low", "volume")):
+            return result_df
+        close = pd.to_numeric(result_df["price"], errors="coerce")
+        high = pd.to_numeric(result_df["price_high"], errors="coerce")
+        low = pd.to_numeric(result_df["price_low"], errors="coerce")
+        volume = pd.to_numeric(result_df["volume"], errors="coerce")
+        result_df["rsi10"] = _indicators.rsi(close, 10)
+        result_df["williams10"] = _indicators.williams(close, 10)
+        result_df["stochasticOscillator10"] = _indicators.stochastic(close, low, high, 10)
+        result_df["choppiness30"] = _indicators.choppiness(close, low, high, 30)
+        result_df["meanReversion10"] = np.tanh(_indicators.mean_reversion(close, 10) / 2.5)
+        result_df["turbulenceIndex10"] = np.tanh(_indicators.turbulence(close, 10) / 4.0)
+        result_df["obv10"] = np.tanh(_indicators.obv(close, volume, 10) / 1.5)
+        return result_df
 
     def get_data(self, paths, type, timestamp, indicator, buyreward_percent, buyreward_maxwait):
         dfs = []
@@ -144,6 +162,8 @@ class AbstractDataProvider(ABC):
         # QW2: taker (aggressor) buy pressure — bounded [0,1], computed before the raw volume/taker
         # columns are dropped below so the order-flow signal survives into the feature set.
         result_df['taker_buy_ratio'] = (pd.to_numeric(result_df['asset_volume_taker_base'], errors='coerce') / pd.to_numeric(result_df['volume'], errors='coerce')).clip(lower=0, upper=1)
+
+        result_df = self._add_curated_indicators(result_df)
 
         if type != "standard" and type != "solo_price" and type != "only_price":
             result_df['price_percent'] = pd.to_numeric(result_df['price'], errors='coerce').astype(float).pct_change()
@@ -265,7 +285,9 @@ class AbstractDataProvider(ABC):
             result_df['day_of_week'] = result_df['timestamp'].dt.dayofweek/6
 
         result_df = result_df.drop(columns=['timestamp'])
-        result_df = result_df.drop(columns=['price_open', 'indicators'])
+        result_df = result_df.drop(columns=['price_open'])
+        if 'indicators' in result_df.columns:
+            result_df = result_df.drop(columns=['indicators'])
         result_df = result_df.drop(columns=['asset_volume_quote', 'trades_number', 'asset_volume_taker_base', 'asset_volume_taker_quote']) # raw cols dropped; taker_buy_ratio (above) retains the order-flow signal
 
         for col in result_df.keys():
@@ -297,7 +319,8 @@ class AbstractDataProvider(ABC):
     def get_raw_data(self, paths, timestamp = "none", columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number","asset_volume_taker_base"]):
         dfs = []
 
-        # asset_volume_taker_base carried through for the QW2 taker_buy_ratio feature.
+        # asset_volume_taker_base carried through for the QW2 taker_buy_ratio feature. Indicators are
+        # COMPUTED from this OHLCV at runtime (process_df_simple -> _add_curated_indicators), not read.
 
         for path in paths:
             df = pd.read_json(path)
@@ -313,6 +336,8 @@ class AbstractDataProvider(ABC):
 
         prices = result_df["price"].values
         timestamps = ((pd.to_datetime(result_df["timestamp_close"]).astype('int64') // 10**6) + 1).to_numpy()
+
+        result_df = self._add_curated_indicators(result_df)
 
         # The _1d/_1m/_1y windows below are fixed time horizons (1 day / 1 month / 1 year), but
         # the bars reaching this method may be 1m, 1h or 1d (single-layer or process_fidelity
@@ -446,7 +471,7 @@ class AbstractDataProvider(ABC):
                 values["asset_volume_quote"].append(part['asset_volume_quote'].sum())
                 values["trades_number"].append(part['trades_number'].sum())
                 values["asset_volume_taker_base"].append(part['asset_volume_taker_base'].sum())
-                
+
             raw_df = pd.DataFrame(values, columns=columns)
             result_df, ps, _ = self.process_df_simple(raw_df.copy(), timestamp, columns)
             dfs[mapping] = result_df
