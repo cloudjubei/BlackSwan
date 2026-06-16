@@ -17,6 +17,21 @@ import random
 import sys
 import time
 
+# Cap per-process math threads BEFORE numpy/torch load their BLAS backends. Each RL run is
+# otherwise multi-threaded (PyTorch/BLAS grab EVERY core), so running many in parallel (the Model
+# Trainer's concurrency) thrashes the CPU — e.g. 17 runs × ~16 threads = ~270 threads on 10 cores.
+# A small cap lets N runs share the host cleanly (N runs × this ≈ core count). Override with
+# BS_NUM_THREADS (1 = pack the most parallel runs; higher = faster single runs).
+_BS_THREADS = max(1, int(os.environ.get("BS_NUM_THREADS", "2") or "2"))
+for _v in (
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+):
+    os.environ.setdefault(_v, str(_BS_THREADS))
+
 import numpy as np
 
 from src.data.data_factory import create_provider
@@ -24,6 +39,13 @@ from src.environment.env_factory import create_environment
 from src.model.model_factory import create_model
 
 from trainer import config_builder, summary as summary_mod
+
+try:
+    import torch
+
+    torch.set_num_threads(_BS_THREADS)
+except Exception:
+    pass
 
 # A deliberately tiny configuration for --calibrate (one short 1d episode).
 _CALIBRATE_CFG = {
