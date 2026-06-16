@@ -3,11 +3,24 @@
   "recordType": "blackswan-run",
   "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
   "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
-  "evaluate": ".venv/bin/python -m trainer.run --evaluate --config-json {configPath} --summary-out {summaryOut}",
   "objective": {
     "name": "traded_return",
     "direction": "max"
   },
+  "pipelineVersion": "2",
+  "pipelineChangelog": [
+    {
+      "version": "2",
+      "date": "2026-06-15",
+      "breaking": true,
+      "summary": "Data + scoring overhaul: fidelity-scaled rolling windows (QW1) + taker-buy ratio (QW2), 1m-canonical derive-cache + runtime-computed indicators, trade-aware traded_return with a QUADRATIC trade gate, n_trades fixed to completed-trade count, benchmark vs-hold aligned via get_price, combo_noaction default 0 (no synthetic-short bias). Scores are NOT comparable to v1."
+    },
+    {
+      "version": "1",
+      "breaking": false,
+      "summary": "Original pipeline — the historical results_hour.ods ledger import (Sharpe-era, pre-overhaul). Kept for reference; not comparable to v2."
+    }
+  ],
   "levers": {
     "model_name": {
       "type": "choice",

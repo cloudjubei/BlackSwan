@@ -61,6 +61,12 @@ class CustomQNetwork(QNetwork):
 
         net_sizes = [input_dim] + net_arch + [output_dim]
 
+        # No custom architecture supplied (e.g. a *-custom model whose custom_net_arch resolved empty):
+        # fall back to a standard MLP — one Linear+activation per hidden layer plus the output Linear —
+        # so the policy still builds instead of crashing on custom_net_arch[0].
+        if not custom_net_arch:
+            custom_net_arch = ["Linear", "activation_fn"] * len(net_arch) + ["Linear"]
+
         first_module_name = custom_net_arch[0]
         if first_module_name == "LSTFull":
             return [LSTMLocal(input_dim, net_arch[0], len(net_arch)), nn.Linear(net_arch[0], output_dim, bias=True)]

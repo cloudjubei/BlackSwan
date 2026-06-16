@@ -18,9 +18,10 @@ _PERIODS_PER_YEAR = {"1m": 365.0 * 24 * 60, "5m": 365.0 * 24 * 12, "15m": 365.0 
 _MAX_SERIES_POINTS = 200
 
 # Trades a run must make to earn full credit for its return — the "trade often" bar. Below it the
-# objective is linearly gated toward 0, so a near-buy-and-hold run (e.g. 1 trade) scores ~0 no matter
-# how far the underlying price moved. The aim is to trade OFTEN and WELL; a single trade is ~holding,
-# which is not a strategy. Tune to the test-window length.
+# objective is QUADRATICALLY gated toward 0 (gate = (n_trades/MIN)**2), so a near-buy-and-hold run
+# (e.g. 1 trade) scores ~0 no matter how far the underlying price moved, and under-trading is punished
+# steeply. The aim is to trade OFTEN and WELL; a single trade is ~holding, not a strategy. Tune to the
+# test-window length.
 MIN_TRADES_FOR_FULL_CREDIT = 20
 # At or below this many trades a run is effectively buy-and-hold, flagged degenerate (RL runs only —
 # the hodl baseline trades once by design).
@@ -275,7 +276,15 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     returns = [curve[i] / curve[i - 1] - 1.0 for i in range(1, len(curve)) if curve[i - 1] > 0]
 
     sharpe = _sharpe(returns, periods)
-    total_return = _finite(state[2]) if len(state) > 2 else 0.0
+    # Total return from the post-fee equity curve (so it is CONSISTENT with final_net_worth = curve[-1]).
+    # The env's state[2] is GROSS realized profit / initial — fees are never subtracted from it — which
+    # let a fee-eaten run report a positive % while its final net worth sat BELOW the starting balance.
+    # This also makes the traded_return objective fee-honest.
+    total_return = (
+        (curve[-1] / curve[0] - 1.0)
+        if len(curve) >= 2 and curve[0]
+        else (_finite(state[2]) if len(state) > 2 else 0.0)
+    )
     n_trades = _finite(state[17]) if len(state) > 17 else 0.0
     # Trade-aware objective: total return (profit, NOT beat-hold) gated by trade frequency, so a run
     trade_gate = (
