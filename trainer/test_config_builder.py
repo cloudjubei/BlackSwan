@@ -49,6 +49,40 @@ def test_build_data_config_1h_uses_window_and_stays_btc_only(monkeypatch):
     assert "2023" in cfg.id
 
 
+def test_build_data_config_fidelity_set_stacks_layers(monkeypatch):
+    import trainer.derive_cache as dc
+
+    monkeypatch.setattr(
+        dc,
+        "ensure_derived",
+        lambda symbol, pairs, fidelity, cache_dir=None: [f"{fidelity}-{y}-{m}" for (y, m) in pairs],
+    )
+    cfg = config_builder.build_data_config({"fidelity_set": "1h+1d+1w", "walk_forward_window": "2024"})
+    assert list(cfg.layers) == ["1h", "1d", "1w"]
+    assert list(cfg.layers_test) == ["1h", "1d", "1w"]
+    assert cfg.lookback_window_size == 32
+    assert "1h+1d+1w" in cfg.id
+
+
+def test_build_data_config_fidelity_set_1d_overrides_timeframe(monkeypatch):
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config({"timeframe": "1h", "fidelity_set": "1d"})
+    assert list(cfg.layers) == ["1d"]
+    assert cfg.lookback_window_size == 1
+    assert cfg.fidelity_run == "1d"
+
+
+def test_build_data_config_default_1h_is_the_1h_plus_1d_stack(monkeypatch):
+    import trainer.derive_cache as dc
+
+    monkeypatch.setattr(
+        dc, "ensure_derived", lambda symbol, pairs, fidelity, cache_dir=None: ["f"]
+    )
+    cfg = config_builder.build_data_config({"timeframe": "1h"})
+    assert list(cfg.layers) == ["1h", "1d"]
+    assert cfg.lookback_window_size == 32
+
+
 def test_require_data_present_checks_the_selected_window(monkeypatch):
     seen = set()
 

@@ -18,6 +18,7 @@ from src.conf.data_config import DataConfig
 from src.conf.env_config import EnvConfig
 from src.conf.model_config import ModelConfigSearch, model_rl
 from src.model.model_factory import get_model_combinations
+from trainer.fidelity import resolve_fidelity
 from trainer.walk_forward import resolve_walk_forward_window
 
 _SYMBOL = "BTCUSDT"
@@ -54,52 +55,53 @@ def _parse_net_arch(value):
 
 def build_data_config(cfg):
     asset = str(cfg.get("asset", _SYMBOL))
-    timeframe = str(cfg.get("timeframe", "1d"))
     train_pairs, test_pairs, window = resolve_walk_forward_window(cfg)
     wf = window["walk_forward_window"]
-    if timeframe == "1h":
+    fset_id, fspec = resolve_fidelity(cfg)
+    layers = list(fspec["layers"])
+    lookback = int(fspec["lookback"])
+    # Intraday sets step on 1h bars (with higher layers resampled by the multi-layer provider) and
+    # need the derived-cache path; the single daily set runs the fast lookback-1 path off raw 1d files.
+    if fspec["fidelity_run"] != "1d":
         if asset != _SYMBOL:
             raise SystemExit(
-                f"{asset} has no 1h dataset on disk — 1h is {_SYMBOL}-only until "
+                f"{asset} has no intraday dataset on disk — intraday is {_SYMBOL}-only until "
                 f"altcoin klines are added (deferred to the data mine)."
             )
         from trainer.derive_cache import ensure_derived
 
         return OmegaConf.structured(
             DataConfig(
-                id=f"{asset}-1h-wf{wf}",
+                id=f"{asset}-{fset_id}-wf{wf}",
                 train_data_paths=[ensure_derived(asset, train_pairs, "1h")],
                 test_data_paths=[ensure_derived(asset, test_pairs, "1h")],
-                lookback_window_size=32,
+                lookback_window_size=lookback,
                 type=str(cfg.get("data_type", "only_price_percent")),
                 use_indicators=bool(cfg.get("use_indicators", False)),
                 timestamp="day_of_week",
                 fidelity_input="1h",
                 fidelity_run="1h",
-                layers=["1h", "1d"],
+                layers=layers,
                 fidelity_input_test="1h",
                 fidelity_run_test="1h",
-                layers_test=["1h", "1d"],
+                layers_test=layers,
             )
         )
-    # The env's lookback>1 observation path requires the multi-layer provider;
-    # the single-layer daily path therefore runs with lookback 1 (fast,
-    # exploratory). The "1h" timeframe is the research-grade path (lookback 32).
     return OmegaConf.structured(
         DataConfig(
-            id=f"{asset}-1d-wf{wf}",
+            id=f"{asset}-{fset_id}-wf{wf}",
             train_data_paths=[_daily_files(train_pairs, asset)],
             test_data_paths=[_daily_files(test_pairs, asset)],
-            lookback_window_size=1,
+            lookback_window_size=lookback,
             type=str(cfg.get("data_type", "only_price_percent")),
             use_indicators=bool(cfg.get("use_indicators", False)),
             timestamp="none",
             fidelity_input="1d",
             fidelity_run="1d",
-            layers=["1d"],
+            layers=layers,
             fidelity_input_test="1d",
             fidelity_run_test="1d",
-            layers_test=["1d"],
+            layers_test=layers,
         )
     )
 

@@ -13,6 +13,8 @@ import statistics
 
 import numpy as np
 
+from trainer.fidelity import resolve_fidelity
+
 _PERIODS_PER_YEAR = {"1m": 365.0 * 24 * 60, "5m": 365.0 * 24 * 12, "15m": 365.0 * 24 * 4,
                      "1h": 365.0 * 24, "4h": 365.0 * 6, "1d": 365.0}
 _MAX_SERIES_POINTS = 200
@@ -166,11 +168,14 @@ def _iso_from_ms(value):
 
 
 def _dataset(env, cfg, fidelity, candles):
+    fset_id, fspec = resolve_fidelity(cfg)
     dataset = {
         "asset": str(cfg.get("asset", "BTCUSDT")),
         "timeframe": fidelity,
         "candles": int(candles),
         "walk_forward_window": str(cfg.get("walk_forward_window", "2024")),
+        "fidelity_set": fset_id,
+        "layers": list(fspec["layers"]),
     }
     provider = getattr(env, "data_provider", None)
     timestamps = getattr(provider, "timestamps", None) if provider is not None else None
@@ -225,6 +230,21 @@ def _cagr(curve, periods_per_year):
     return _finite((curve[-1] / curve[0]) ** (1.0 / years) - 1.0)
 
 
+def _trade_gate(n_trades, mode, min_trades):
+    """Map a trade count to the [0,1] objective multiplier for the chosen gate mode. The gate is the
+    research-named "churn band-aid" — realistic fees already regulate frequency — so it is a sweepable
+    lever: none (ungated), linear, quadratic (the historical default, punishes under-trading steeply),
+    or threshold (full credit at/above the bar, none below)."""
+    if min_trades <= 0 or mode == "none":
+        return 1.0
+    ratio = n_trades / min_trades
+    if mode == "linear":
+        return min(1.0, ratio)
+    if mode == "threshold":
+        return 1.0 if n_trades >= min_trades else 0.0
+    return min(1.0, ratio**2)
+
+
 def _window_breakdown(curve, n_windows=4):
     """RB7: split the test equity curve into ``n_windows`` equal sub-periods and report robustness
     across them — a strategy that only profits in one sub-window (a single lucky regime) is fragile.
@@ -271,7 +291,7 @@ def _health(env, state, is_rl, lookback):
 
 def build_summary(env, state, cfg, model, ran_at, is_rl):
     lookback = _lookback(env, cfg)
-    fidelity = "1d" if str(cfg.get("timeframe", "1d")) == "1d" else "1h"
+    fidelity = resolve_fidelity(cfg)[1]["fidelity_run"]
     periods = _PERIODS_PER_YEAR.get(fidelity, 365.0)
     curve = _equity_curve(env, lookback)
     returns = [curve[i] / curve[i - 1] - 1.0 for i in range(1, len(curve)) if curve[i - 1] > 0]
@@ -288,11 +308,9 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         else (_finite(state[2]) if len(state) > 2 else 0.0)
     )
     n_trades = _finite(state[17]) if len(state) > 17 else 0.0
-    # Trade-aware objective: total return (profit, NOT beat-hold) gated by trade frequency, so a run
-    trade_gate = (
-        min(1.0, (n_trades / MIN_TRADES_FOR_FULL_CREDIT) ** 2)
-        if MIN_TRADES_FOR_FULL_CREDIT > 0
-        else 1.0
+    # Trade-aware objective: total return (profit, NOT beat-hold) gated by trade frequency.
+    trade_gate = _trade_gate(
+        n_trades, str(cfg.get("trade_gate_mode", "quadratic")), MIN_TRADES_FOR_FULL_CREDIT
     )
     traded_return = total_return * 100 * trade_gate
     windows = _window_breakdown(curve)

@@ -1,6 +1,7 @@
 {
   "name": "blackswan",
   "recordType": "blackswan-run",
+  "description": "BlackSwan trains reinforcement-learning agents to trade a SINGLE crypto asset (BTCUSDT) on the spot market, long-only by default, under realistic 0.1% per-trade fees. Each run trains on historical klines and is tested OUT-OF-SAMPLE (walk-forward windows 2022/2023/2024, expanding train); the agent observes multi-timeframe OHLCV (e.g. stacked 1h+1d layers) plus optional technical indicators. The objective is traded_return = total post-fee return gated by trade frequency (trade often AND well — a near-hold run scores ~0). In the strong presets the agent has NO explicit sell action (no_sell_action): it only times entries and exits are forced by take-profit/stop-loss/trailing-stop — so 'many buys, few sells' is by design, not a bug. 'Good' = a setup that trades often and profitably AND beats buy-and-hold on risk-adjusted terms (positive sharpe_alpha) net of fees, stable across seeds and walk-forward windows.",
   "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
   "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
   "objective": {
@@ -13,7 +14,7 @@
       "version": "3",
       "date": "2026-06-16",
       "breaking": false,
-      "summary": "Walk-forward evaluation: a walk_forward_window lever tests on 2022/2023/2024 with an expanding train window (default 2024 = train 2020-2023 / test 2024 reproduces the v2 single split EXACTLY, so v2 runs stay comparable to v3 window-2024 runs). Adds sharpe_alpha (risk-adjusted excess over buy-and-hold on the same window) to metrics and stamps the window into the dataset. Different windows are separate out-of-sample samples — group them, never compare a 2022 run to a 2024 run as one number."
+      "summary": "Walk-forward evaluation: a walk_forward_window lever tests on 2022/2023/2024 with an expanding train window (default 2024 = train 2020-2023 / test 2024 reproduces the v2 single split EXACTLY, so v2 runs stay comparable to v3 window-2024 runs). Adds sharpe_alpha (risk-adjusted excess over buy-and-hold on the same window) to metrics and stamps the window into the dataset. Adds a sweepable trade_gate_mode (none/linear/quadratic/threshold) for the objective's trade-frequency gate (default quadratic = unchanged). Different windows are separate out-of-sample samples — group them, never compare a 2022 run to a 2024 run as one number."
     },
     {
       "version": "2",
@@ -65,6 +66,17 @@
       "choices": [0, -1],
       "default": 0,
       "description": "Reward multiplier applied to price moves while the agent is FLAT (no position). Default 0 = direction-neutral (a flat agent is neither rewarded nor punished for which way price moves). -1 bakes a synthetic-short incentive (rewards price falling while flat) — kept as a deliberate variant to probe, NOT the default, since the agent is long-only."
+    },
+    "trade_gate_mode": {
+      "type": "choice",
+      "choices": [
+        "quadratic",
+        "linear",
+        "threshold",
+        "none"
+      ],
+      "default": "quadratic",
+      "description": "How the objective (traded_return) is gated by trade frequency: quadratic = (n/20)^2 (historical default — punishes under-trading steeply); linear = n/20; threshold = full credit at >=20 trades else 0; none = ungated. POST-RUN scoring only (does NOT change the training reward), so it's safe to sweep. Research view: realistic fees already regulate churn, so the gate is a band-aid — 'none' lets vol-targeting/Sharpe self-regulate frequency."
     },
     "learning_rate": {
       "type": "number",
@@ -172,6 +184,18 @@
       ],
       "default": "1d",
       "description": "Bar size. 1d = fast single-layer path; 1h = the richer multi-layer path. Minute data behaved like noise for the RL models."
+    },
+    "fidelity_set": {
+      "type": "choice",
+      "choices": [
+        "auto",
+        "1d",
+        "1h",
+        "1h+1d",
+        "1h+1d+1w"
+      ],
+      "default": "auto",
+      "description": "Multi-fidelity observation stack — which timeframes the agent sees AT ONCE (higher layers are resampled from the base bars, so wider = more temporal context but a bigger network input). auto = follow the timeframe lever (1h -> 1h+1d, else 1d); 1d = fast single daily; 1h = single 1h; 1h+1d = the standard intraday stack; 1h+1d+1w adds the weekly trend. Wider stacks gave more insight empirically — sweep to confirm under walk-forward. When set (not auto) it overrides timeframe's implicit stack."
     },
     "walk_forward_window": {
       "type": "choice",

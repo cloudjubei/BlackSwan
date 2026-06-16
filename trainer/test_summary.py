@@ -35,7 +35,7 @@ def _state(n_trades=25, win=50.0):
     return s
 
 
-def _build(cfg, net_worths=None, actions=None, prices=None):
+def _build(cfg, net_worths=None, actions=None, prices=None, n_trades=25):
     if net_worths is None:
         net_worths = [100000, 101000, 100500, 102000, 101800, 103000]
     if actions is None:
@@ -43,7 +43,9 @@ def _build(cfg, net_worths=None, actions=None, prices=None):
     if prices is None:
         prices = [100, 110, 105, 120, 115, 130]
     env = _FakeEnv(net_worths, actions, prices)
-    return summary_mod.build_summary(env, _state(), cfg, _FakeModel(), "2026-01-01T00:00:00Z", True)
+    return summary_mod.build_summary(
+        env, _state(n_trades=n_trades), cfg, _FakeModel(), "2026-01-01T00:00:00Z", True
+    )
 
 
 def test_sharpe_alpha_is_strategy_minus_hold_sharpe():
@@ -64,6 +66,19 @@ def test_dataset_window_defaults_to_2024_when_absent():
     assert out["dataset"]["walk_forward_window"] == "2024"
 
 
+def test_dataset_stamps_fidelity_set_and_layers():
+    out = _build({"timeframe": "1h", "fidelity_set": "1h+1d+1w", "lookback_window_size": 0})
+    assert out["dataset"]["fidelity_set"] == "1h+1d+1w"
+    assert out["dataset"]["layers"] == ["1h", "1d", "1w"]
+    assert out["dataset"]["timeframe"] == "1h"
+
+
+def test_dataset_fidelity_defaults_from_timeframe():
+    out = _build({"timeframe": "1d", "lookback_window_size": 0})
+    assert out["dataset"]["fidelity_set"] == "1d"
+    assert out["dataset"]["layers"] == ["1d"]
+
+
 def test_sharpe_alpha_absent_without_a_benchmark():
     out = _build(
         {"timeframe": "1d", "lookback_window_size": 0},
@@ -73,3 +88,27 @@ def test_sharpe_alpha_absent_without_a_benchmark():
     )
     assert out.get("benchmark") is None
     assert "sharpe_alpha" not in out["metrics"]
+
+
+def test_trade_gate_modes():
+    gate = summary_mod._trade_gate
+    m = summary_mod.MIN_TRADES_FOR_FULL_CREDIT
+    assert gate(m, "quadratic", m) == 1.0
+    assert gate(m / 2, "quadratic", m) == pytest.approx(0.25)
+    assert gate(m / 2, "linear", m) == pytest.approx(0.5)
+    assert gate(m * 2, "linear", m) == 1.0
+    assert gate(m - 1, "threshold", m) == 0.0
+    assert gate(m, "threshold", m) == 1.0
+    assert gate(0, "none", m) == 1.0
+    assert gate(5, "quadratic", 0) == 1.0
+
+
+def test_trade_gate_mode_none_ungates_a_low_trade_run():
+    out = _build({"timeframe": "1d", "trade_gate_mode": "none", "lookback_window_size": 0}, n_trades=3)
+    assert out["metrics"]["trade_gate"] == 1.0
+    assert out["objective"] == pytest.approx(out["metrics"]["total_return_pct"])
+
+
+def test_trade_gate_mode_defaults_to_quadratic():
+    out = _build({"timeframe": "1d", "lookback_window_size": 0}, n_trades=10)
+    assert out["metrics"]["trade_gate"] == pytest.approx((10 / summary_mod.MIN_TRADES_FOR_FULL_CREDIT) ** 2)
