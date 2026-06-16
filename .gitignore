@@ -68,3 +68,5 @@ trials
 .venv
 run.sh
 mlruns/
+
+.factory/data

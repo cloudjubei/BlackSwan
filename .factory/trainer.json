@@ -170,7 +170,7 @@
     "use_indicators": {
       "type": "boolean",
       "default": false,
-      "description": "Add a curated set of precomputed indicators (RSI/Williams/Stochastic/Choppiness + tanh-squashed meanReversion/turbulence/OBV) as features. Only takes effect on 1d (those klines carry the indicators; the 1m source feeding 1h does not yet — that needs the data mine)."
+      "description": "Add a curated set of indicators (RSI/Williams/Stochastic/Choppiness + tanh-squashed meanReversion/turbulence/OBV) as features, computed at RUNTIME from OHLCV — so it works on BOTH 1d and the 1m-derived 1h path. Past RL runs found indicators didn't help on 1d; re-test under v2 scoring."
     },
     "transaction_fee": {
       "type": "number",
@@ -179,7 +179,8 @@
         0,
         0.01
       ],
-      "description": "Per-trade fee fraction applied to each trade (models real cost; discourages churn)."
+      "scope": "environment",
+      "description": "Per-trade fee fraction applied to each trade (models real cost; discourages churn). ENVIRONMENT setting — defines the market, not the model."
     },
     "stop_loss": {
       "type": "number",
@@ -188,7 +189,8 @@
         0,
         0.1
       ],
-      "description": "Auto-close a losing position at this drawdown fraction (0 = off)."
+      "scope": "environment",
+      "description": "Auto-close a losing position at this drawdown fraction (0 = off). ENVIRONMENT setting — an exit mechanic, not the model."
     },
     "take_profit": {
       "type": "number",
@@ -197,7 +199,8 @@
         0,
         0.05
       ],
-      "description": "Auto-close a winning position at this gain fraction (0 = off)."
+      "scope": "environment",
+      "description": "Auto-close a winning position at this gain fraction (0 = off). ENVIRONMENT setting — an exit mechanic, not the model."
     },
     "trailing_take_profit": {
       "type": "number",
@@ -206,7 +209,8 @@
         0,
         0.01
       ],
-      "description": "Trailing take-profit fraction that follows the price up (0 = off)."
+      "scope": "environment",
+      "description": "Trailing take-profit fraction that follows the price up (0 = off). ENVIRONMENT setting — an exit mechanic, not the model."
     },
     "no_sell_action": {
       "type": "boolean",
