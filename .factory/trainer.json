@@ -56,10 +56,12 @@
         "combo",
         "combo2",
         "profit_all2",
-        "profit_percentage3"
+        "profit_percentage3",
+        "profit_percentage_direct",
+        "differential_sharpe"
       ],
       "default": "combo_all",
-      "description": "Which reward function shapes behaviour. The combo_* family weight profit, drawdown and action-quality differently — each is a distinct approach (intentionally kept separate). combo_all_fee = combo_all plus an explicit per-trade turnover penalty (discourages churn; pairs with the trade-aware objective)."
+      "description": "Which reward function shapes behaviour. The combo_* family weight profit, drawdown and action-quality differently — each is a distinct approach (intentionally kept separate). combo_all_fee = combo_all plus an explicit per-trade turnover penalty. profit_percentage_direct = the raw per-step portfolio return (direct RL); differential_sharpe = Moody & Saffell online risk-adjusted return (the research-favoured kind for trading) — both reward the equity path itself rather than hand-shaped signals."
     },
     "combo_noaction": {
       "type": "choice",
@@ -168,6 +170,34 @@
       ],
       "description": "How many passes over the training data. Too few underfits; the exploration schedule now anneals across episodes."
     },
+    "exploration_fraction": {
+      "type": "number",
+      "default": 0.1,
+      "range": [
+        0.01,
+        0.99
+      ],
+      "description": "Fraction of training over which the exploration rate (epsilon) anneals from 1.0 to exploration_final_eps. Higher = explore longer before exploiting. DQN-family algorithms."
+    },
+    "exploration_final_eps": {
+      "type": "number",
+      "default": 0.2,
+      "range": [
+        0.01,
+        0.5
+      ],
+      "description": "Final exploration rate (epsilon) the schedule anneals to — the residual randomness kept late in training. DQN-family algorithms."
+    },
+    "lookback_window": {
+      "type": "choice",
+      "choices": [
+        16,
+        32,
+        64
+      ],
+      "default": 32,
+      "description": "How many past bars per fidelity layer the agent observes each step (intraday paths only; the single daily path is fixed at 1). Wider = more context but a bigger network input."
+    },
     "asset": {
       "type": "choice",
       "choices": [
@@ -210,7 +240,17 @@
     "use_indicators": {
       "type": "boolean",
       "default": false,
-      "description": "Add a curated set of indicators (RSI/Williams/Stochastic/Choppiness + tanh-squashed meanReversion/turbulence/OBV) as features, computed at RUNTIME from OHLCV — so it works on BOTH 1d and the 1m-derived 1h path. Past RL runs found indicators didn't help on 1d; re-test under v2 scoring."
+      "description": "Add a curated set of indicators (RSI/Williams/Stochastic/Choppiness + tanh-squashed meanReversion/turbulence/OBV + a realized-vol regime and a trend-slope feature) as features, computed at RUNTIME from OHLCV — so it works on BOTH 1d and the 1m-derived 1h path. Past RL runs found indicators didn't help on 1d; re-test under v3 scoring with the added regime/trend context."
+    },
+    "obs_squash": {
+      "type": "choice",
+      "choices": [
+        "none",
+        "clip",
+        "tanh"
+      ],
+      "default": "none",
+      "description": "Observation normalization experiment. Several base features exceed the declared [-1,1] observation bound and SB3 does NOT clip, so the network sees raw out-of-range values. none = leave as-is (historical); clip = clip features to [-1,1]; tanh = tanh-squash them. Does respecting the declared bound help or hurt?"
     },
     "transaction_fee": {
       "type": "number",
@@ -256,6 +296,29 @@
       "type": "boolean",
       "default": false,
       "description": "Remove the explicit sell action — exits happen only via TP/SL. Performed well in past runs."
+    },
+    "position_sizing": {
+      "type": "choice",
+      "choices": [
+        "fixed",
+        "vol_target"
+      ],
+      "default": "fixed",
+      "description": "How much of the balance to deploy per entry. fixed = all-in (historical default). vol_target = scale the deployed fraction to target a constant volatility (size = vol_target / recent realized vol, clamped to [0.1, 1]) — risks less in turbulent regimes, the structural fix for 'churns many trades for ~+1%'."
+    },
+    "vol_target": {
+      "type": "number",
+      "default": 0.02,
+      "range": [
+        0.005,
+        0.1
+      ],
+      "description": "Target per-bar volatility for vol_target position sizing (higher = larger positions). Only used when position_sizing = vol_target."
+    },
+    "allow_shorting": {
+      "type": "boolean",
+      "default": false,
+      "description": "Allow SHORT positions — adds short(3)/cover(4) so the action space becomes 5-way and the agent can profit when price FALLS (essential in down years where long-only can only sit out). Long-only behaviour is unchanged when off; short exits respect TP/SL (mirrored)."
     },
     "device": {
       "type": "choice",
@@ -393,6 +456,110 @@
       "seeds": 4,
       "thesis": "is a 1h winner robust across regime-years out-of-sample, or tuned to 2024?",
       "thesisTarget": "walk_forward_window"
+    },
+    {
+      "label": "▶ Exp 7 · Shorting on/off (1h winner)",
+      "sweep": { "allow_shorting": [false, true] },
+      "fixed": {
+        "timeframe": "1h",
+        "model_name": "reppo-custom",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "device": "cpu"
+      },
+      "seeds": 3,
+      "thesis": "does enabling short positions beat long-only (esp. in down windows)?",
+      "thesisTarget": "allow_shorting"
+    },
+    {
+      "label": "▶ Exp 8 · Vol-targeted sizing (1h winner)",
+      "sweep": { "position_sizing": ["fixed", "vol_target"] },
+      "fixed": {
+        "timeframe": "1h",
+        "model_name": "reppo-custom",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "device": "cpu"
+      },
+      "seeds": 3,
+      "thesis": "does vol-targeted sizing beat all-in (fewer trades, steadier Sharpe)?",
+      "thesisTarget": "position_sizing"
+    },
+    {
+      "label": "▶ Exp 9 · Direct/recurrent rewards (1h winner)",
+      "sweep": { "reward_model": ["combo_all", "profit_percentage_direct", "differential_sharpe"] },
+      "fixed": {
+        "timeframe": "1h",
+        "model_name": "reppo-custom",
+        "net_arch": "512,64",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "device": "cpu"
+      },
+      "seeds": 3,
+      "thesis": "do equity-path rewards beat the combo shaping family?",
+      "thesisTarget": "reward_model"
+    },
+    {
+      "label": "▶ Exp 10 · Fidelity stack (1h winner)",
+      "sweep": { "fidelity_set": ["1h", "1h+1d", "1h+1d+1w"] },
+      "fixed": {
+        "timeframe": "1h",
+        "model_name": "reppo-custom",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "device": "cpu"
+      },
+      "seeds": 3,
+      "thesis": "how much does stacking more timeframes help out-of-sample?",
+      "thesisTarget": "fidelity_set"
+    },
+    {
+      "label": "▶ Exp 11 · Obs squash (1h winner)",
+      "sweep": { "obs_squash": ["none", "clip", "tanh"] },
+      "fixed": {
+        "timeframe": "1h",
+        "model_name": "reppo-custom",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "device": "cpu"
+      },
+      "seeds": 3,
+      "thesis": "does respecting the [-1,1] observation bound help?",
+      "thesisTarget": "obs_squash"
     },
     {
       "label": "TRPO-custom · 512,64 (~+60%)",

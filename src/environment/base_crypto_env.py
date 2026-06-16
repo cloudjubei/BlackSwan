@@ -157,6 +157,7 @@ class BaseCryptoEnv(AbstractEnv):
         self.tpsls = []
 
         self.position_price_highest = 0
+        self.position_price_lowest = 0
         self.position_price_entry = 0
 
         for _ in range(self.data_provider.get_lookback_window()):
@@ -178,6 +179,8 @@ class BaseCryptoEnv(AbstractEnv):
         self.total_reward = 0
         self.drawdown_peak = 0
         self.drawdown_trough = 0
+        self._ds_a = 0.0
+        self._ds_b = 0.0
 
         self.fees = []
         self.buys = []
@@ -201,31 +204,36 @@ class BaseCryptoEnv(AbstractEnv):
         return self.last_obs, {}
     
     def resolve_tpsl(self):
-        if self.positions[-1] > 0:
-            if self.env_config.take_profit is not None:
-                net_worth = self._calculate_net_worth(self.current_step)
-                take_profit = self.env_config.take_profit
-                
-                if self.env_config.trailing_take_profit is not None:
-                    entry_price_amount = self.position_price_entry
-                    activation_amount = entry_price_amount * (1.0 + take_profit)
-                    current_price_amount = self.current_price
-                    highest_price_amount = self.position_price_highest
-                    if highest_price_amount >= activation_amount:
-                        trailing_take_profit = self.env_config.trailing_take_profit
-                        trigger_amount = highest_price_amount * (1.0 - trailing_take_profit)
-                        if current_price_amount <= trigger_amount:
-                            return 2, True # TP TRAILING SELL
-
-                profit_percentage = (net_worth / self.initial_net_worth) - 1.0
-                if profit_percentage >= take_profit:
-                    return 2, True # TP SELL
-            if self.env_config.stop_loss is not None:
-                net_worth = self._calculate_net_worth(self.current_step)
-                stop_loss = self.env_config.stop_loss
-                loss_percentage = 1.0 - (net_worth / self.initial_net_worth)
-                if loss_percentage >= stop_loss:
-                    return 2, False # SL SELL
+        position = self.positions[-1]
+        if position == 0:
+            return 0, None
+        # Close action by side: long closes with 2 (sell), short covers with 4. TP/SL thresholds are
+        # measured on net worth, which already reflects the position's sign — so the same profit/loss
+        # checks serve both directions; only the trailing stop (price-anchored) is mirrored by side.
+        close_action = 2 if position > 0 else 4
+        net_worth = self._calculate_net_worth(self.current_step)
+        profit_percentage = (net_worth / self.initial_net_worth) - 1.0
+        if self.env_config.take_profit is not None:
+            take_profit = self.env_config.take_profit
+            if self.env_config.trailing_take_profit is not None:
+                entry = self.position_price_entry
+                trailing = self.env_config.trailing_take_profit
+                if position > 0:
+                    activation = entry * (1.0 + take_profit)
+                    if self.position_price_highest >= activation:
+                        if self.current_price <= self.position_price_highest * (1.0 - trailing):
+                            return close_action, True
+                else:
+                    activation = entry * (1.0 - take_profit)
+                    if 0 < self.position_price_lowest <= activation:
+                        if self.current_price >= self.position_price_lowest * (1.0 + trailing):
+                            return close_action, True
+            if profit_percentage >= take_profit:
+                return close_action, True
+        if self.env_config.stop_loss is not None:
+            loss_percentage = 1.0 - (net_worth / self.initial_net_worth)
+            if loss_percentage >= self.env_config.stop_loss:
+                return close_action, False
         return 0, None
     
 
@@ -282,9 +290,11 @@ class BaseCryptoEnv(AbstractEnv):
         if made_action:
             tpsl = self.tpsls[-1]
 
-            if (action == 1 and forced_action == 0) or (forced_action == 1):
+            opened = action in (1, 3) and forced_action == 0
+            closed = (action in (2, 4) and forced_action == 0) or (forced_action in (2, 4))
+            if opened:
                 self.buys.append(net_worth)
-            elif (action == 2 and forced_action == 0) or (forced_action == 2):
+            elif closed:
                 self.sells.append(net_worth)
 
                 if current_profit >= 0:
@@ -307,23 +317,36 @@ class BaseCryptoEnv(AbstractEnv):
         self.total_profits.append(self.total_profit)
 
     def update_position_prices(self):
-        if self.positions[-1] > 0:
-            if self.actions_made[-1]: # just made an action
-                if self.actions[-1] == 1: # had made a buy action
-                    self.position_price_entry = self.current_price
+        if self.positions[-1] != 0:
+            if self.actions_made[-1] and self.actions[-1] in (1, 3): # just opened a position
+                self.position_price_entry = self.current_price
+                self.position_price_highest = self.current_price
+                self.position_price_lowest = self.current_price
             if self.current_price > self.position_price_highest:
                 self.position_price_highest = self.current_price
+            if self.position_price_lowest == 0 or self.current_price < self.position_price_lowest:
+                self.position_price_lowest = self.current_price
         else:
             self.position_price_entry = 0
             self.position_price_highest = 0
+            self.position_price_lowest = 0
 
     def update_drawdown(self):
+        # Drawdown tracks adverse price moves WHILE in a position; for a short the adverse direction
+        # is price rising, so it mirrors via the inverse price (keeping the same peak/trough math).
         if self.positions[-1] > 0:
             if self.current_price > self.drawdown_peak:
                 self.drawdown_peak = self.current_price
                 self.drawdown_trough = self.drawdown_peak
             elif self.current_price < self.drawdown_trough:
                 self.drawdown_trough = self.current_price
+        elif self.positions[-1] < 0:
+            inv = 1.0 / self.current_price if self.current_price > 0 else 0
+            if inv > self.drawdown_peak:
+                self.drawdown_peak = inv
+                self.drawdown_trough = self.drawdown_peak
+            elif inv < self.drawdown_trough:
+                self.drawdown_trough = inv
         else:
             self.drawdown_peak = 0
             self.drawdown_trough = 0
@@ -380,9 +403,49 @@ class BaseCryptoEnv(AbstractEnv):
         return (self.balances[offset_step] + self.positions[offset_step] * self.get_price(step))
     def _calculate_drawdown(self):
         return 0 if self.drawdown_peak <= 0 else (self.drawdown_trough / self.drawdown_peak) - 1.0
+
+    def _realized_vol(self):
+        """Lookahead-free volatility: stdev of the last ``vol_window`` price returns up to now."""
+        window = max(2, int(getattr(self.env_config, "vol_window", 10)))
+        lo = max(0, self.current_step - window)
+        prices = [self.get_price(s) for s in range(lo, self.current_step + 1)]
+        rets = [prices[i] / prices[i - 1] - 1.0 for i in range(1, len(prices)) if prices[i - 1] > 0]
+        if len(rets) < 2:
+            return None
+        return float(np.std(rets))
+
+    def _position_size(self):
+        """Fraction of balance to deploy on entry. ``fixed`` = all-in (1.0); ``vol_target`` scales
+        toward a constant volatility (vol_target / realized_vol), clamped to [vol_target_min, 1]."""
+        if getattr(self.env_config, "position_sizing", "fixed") != "vol_target":
+            return 1.0
+        vol = self._realized_vol()
+        if not vol or vol <= 0:
+            return 1.0
+        target = float(getattr(self.env_config, "vol_target", 0.02))
+        min_size = float(getattr(self.env_config, "vol_target_min", 0.1))
+        return float(min(1.0, max(min_size, target / vol)))
     
     
     def _calculate_reward(self):
+        # Direct/recurrent-RL rewards on the portfolio's per-step return (research-favoured over the
+        # combo shaping family): profit_percentage_direct = the raw step return; differential_sharpe =
+        # the Moody & Saffell online differential Sharpe (rewards risk-adjusted return without a split).
+        if self.reward_model == "profit_percentage_direct" or self.reward_model == "differential_sharpe":
+            if len(self.net_worths) < 2 or self.net_worths[-2] <= 0:
+                return 0.0
+            r = self.net_worths[-1] / self.net_worths[-2] - 1.0
+            if self.reward_model == "profit_percentage_direct":
+                return r
+            eta = 0.01
+            a_prev, b_prev = self._ds_a, self._ds_b
+            delta_a, delta_b = r - a_prev, r * r - b_prev
+            denom = (b_prev - a_prev * a_prev) ** 1.5
+            dsr = 0.0 if denom <= 0 else (b_prev * delta_a - 0.5 * a_prev * delta_b) / denom
+            self._ds_a = a_prev + eta * delta_a
+            self._ds_b = b_prev + eta * delta_b
+            return dsr if math.isfinite(dsr) else 0.0
+
         if self.reward_model == "combo":
 
             if self.actions_made[-1]: # just made an action
@@ -442,23 +505,25 @@ class BaseCryptoEnv(AbstractEnv):
 
         if self.reward_model == "combo_all" or self.reward_model == "combo_all2" or self.reward_model == "combo_all_fee":
             if self.actions_made[-1]: # just made an action
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # has made a sell action or SL/TP triggered
+                if self.actions[-1] in (2, 4) or self.tpsls[-1] != 0: # closed a position (sell/cover) or SL/TP
                     sell_net_worth = self.sells[-1]
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
                     return profit_percentage * self.reward_multipliers["combo_sell"]
-                
+
+                # opened a position — a long is rewarded for price rising, a short for price falling
                 price = self.current_price
                 price_next = self.get_price(self.current_step+1)
                 price_diff = price_next/price - 1
-                return price_diff * self.reward_multipliers["combo_buy"]
-            
-            if len(self.positions) > 1 and self.positions[-1] > 0 and self.positions[-2] > 0: # in position is diff than out of position
+                open_direction = 1 if self.actions[-1] == 1 else -1
+                return open_direction * price_diff * self.reward_multipliers["combo_buy"]
+
+            if len(self.positions) > 1 and self.positions[-1] != 0 and self.positions[-2] != 0: # in position is diff than out of position
                 net_worth = self.net_worths[-1]
                 prev_net_worth = self.net_worths[-2]
                 profit_percentage = net_worth/self.initial_net_worth - 1
                 prev_profit_percentage = prev_net_worth/self.initial_net_worth - 1
 
-                if self.actions[-1] == 1 and self.reward_model == "combo_all2": # buying but already in position
+                if self.actions[-1] in (1, 3) and self.reward_model == "combo_all2": # opening but already in position
                     return (profit_percentage - prev_profit_percentage) * self.reward_multipliers["combo_positionprofitpercentage"] + self.reward_multipliers["combo_wrongaction"]
 
                 return (profit_percentage - prev_profit_percentage) * self.reward_multipliers["combo_positionprofitpercentage"]
@@ -468,9 +533,9 @@ class BaseCryptoEnv(AbstractEnv):
                 price = self.current_price
                 price_diff = price/price_prev - 1
 
-                if self.actions[-1] == 2 and self.reward_model == "combo_all2": # selling but not in position
+                if self.actions[-1] in (2, 4) and self.reward_model == "combo_all2": # closing but not in position
                     return self.reward_multipliers["combo_wrongaction"]
-                
+
                 return price_diff * self.reward_multipliers["combo_noaction"]
             return 0
 

@@ -21,6 +21,10 @@ class DataConfig:
     layers_test: List[str] = field(default_factory=[])
     buyreward_percent_test: float = 0.004
     buyreward_maxwait_test: int = 20
+    # Observation squashing experiment: several base features exceed the declared Box(-1,1) bound and
+    # SB3 does not clip. "none" = leave as-is (historical); "clip" = clip features to [-1,1]; "tanh" =
+    # tanh-squash. Applied to the final feature frame in process_df_simple.
+    obs_squash: str = "none"
    
 data_2017_to_2023vs2024_only_price_percent = DataConfig(
     id= "data_2020_to_2023vs2024_only_price_percent",

@@ -75,10 +75,11 @@ def build_data_config(cfg):
                 id=f"{asset}-{fset_id}-wf{wf}",
                 train_data_paths=[ensure_derived(asset, train_pairs, "1h")],
                 test_data_paths=[ensure_derived(asset, test_pairs, "1h")],
-                lookback_window_size=lookback,
+                lookback_window_size=int(cfg.get("lookback_window") or lookback),
                 type=str(cfg.get("data_type", "only_price_percent")),
                 use_indicators=bool(cfg.get("use_indicators", False)),
                 timestamp="day_of_week",
+                obs_squash=str(cfg.get("obs_squash", "none")),
                 fidelity_input="1h",
                 fidelity_run="1h",
                 layers=layers,
@@ -96,6 +97,7 @@ def build_data_config(cfg):
             type=str(cfg.get("data_type", "only_price_percent")),
             use_indicators=bool(cfg.get("use_indicators", False)),
             timestamp="none",
+            obs_squash=str(cfg.get("obs_squash", "none")),
             fidelity_input="1d",
             fidelity_run="1d",
             layers=layers,
@@ -121,6 +123,12 @@ def build_env_config(cfg):
             trailing_take_profit=_optional_float(cfg, "trailing_take_profit", None),
             stop_loss=_optional_float(cfg, "stop_loss", 0.02),
             no_sell_action=bool(cfg.get("no_sell_action", False)),
+            position_sizing=str(cfg.get("position_sizing", "fixed")),
+            vol_target=float(cfg.get("vol_target", 0.02)),
+            vol_target_min=float(cfg.get("vol_target_min", 0.1)),
+            vol_window=int(cfg.get("vol_window", 10)),
+            allow_shorting=bool(cfg.get("allow_shorting", False)),
+            max_short_size=float(cfg.get("max_short_size", 1.0)),
             observations_contain=[
                 "networth_percent_this_trade",
                 "in_position",
@@ -166,6 +174,10 @@ def build_model_config(cfg):
         rl.optimizer_class = [str(cfg["optimizer_class"])]
     if "activation_fn" in cfg:
         rl.activation_fn = [str(cfg["activation_fn"])]
+    if "exploration_fraction" in cfg:
+        rl.exploration_fraction = [float(cfg["exploration_fraction"])]
+    if "exploration_final_eps" in cfg:
+        rl.exploration_final_eps = [float(cfg["exploration_final_eps"])]
     config = get_model_combinations(OmegaConf.structured(search))[0]
     config.iterations_to_pick_best = 1
     return config

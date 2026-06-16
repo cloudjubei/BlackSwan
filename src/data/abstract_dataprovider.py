@@ -140,6 +140,12 @@ class AbstractDataProvider(ABC):
         result_df["meanReversion10"] = np.tanh(_indicators.mean_reversion(close, 10) / 2.5)
         result_df["turbulenceIndex10"] = np.tanh(_indicators.turbulence(close, 10) / 4.0)
         result_df["obv10"] = np.tanh(_indicators.obv(close, volume, 10) / 1.5)
+        # Regime/trend context (research bets): realized-volatility regime + deviation-from-trend, both
+        # tanh-bounded into [-1,1]. Volatility tells the agent how turbulent the tape is; trend slope
+        # tells it which way and how strongly price is moving relative to its recent mean.
+        returns = close.pct_change()
+        result_df["volRegime10"] = np.tanh(returns.rolling(10).std() * 20.0)
+        result_df["trendSlope10"] = np.tanh((close / close.rolling(10).mean() - 1.0) * 20.0)
         return result_df
 
     def get_data(self, paths, type, timestamp, indicator, buyreward_percent, buyreward_maxwait):
@@ -434,9 +440,23 @@ class AbstractDataProvider(ABC):
             result_df['timestamp_close_new'] = pd.to_numeric(result_df['timestamp_close']).astype(int) / 1000000000
 
         result_df = result_df.drop(columns=columns_to_drop).fillna(0).replace([np.inf, -np.inf], 0).reset_index(drop=True)
+        result_df = self._squash_observation_features(result_df)
 
         return result_df, prices, timestamps
-    
+
+    def _squash_observation_features(self, result_df):
+        """Apply the obs_squash experiment to the final feature frame: clip or tanh every numeric
+        feature into the declared Box(-1,1) bound (SB3 does not clip), or leave as-is for "none"."""
+        squash = getattr(self.config, "obs_squash", "none")
+        if not squash or squash == "none":
+            return result_df
+        cols = result_df.select_dtypes(include=[np.number]).columns
+        if squash == "clip":
+            result_df[cols] = result_df[cols].clip(-1.0, 1.0)
+        elif squash == "tanh":
+            result_df[cols] = np.tanh(result_df[cols])
+        return result_df
+
     def process_fidelity(self, df, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run, multiplier_input_to_run, timestamp, columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number","asset_volume_taker_base"]):
         steps = df.shape[0]
 

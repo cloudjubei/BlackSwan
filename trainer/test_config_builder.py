@@ -83,6 +83,16 @@ def test_build_data_config_default_1h_is_the_1h_plus_1d_stack(monkeypatch):
     assert cfg.lookback_window_size == 32
 
 
+def test_build_data_config_lookback_window_override(monkeypatch):
+    import trainer.derive_cache as dc
+
+    monkeypatch.setattr(
+        dc, "ensure_derived", lambda symbol, pairs, fidelity, cache_dir=None: ["f"]
+    )
+    cfg = config_builder.build_data_config({"timeframe": "1h", "lookback_window": 64})
+    assert cfg.lookback_window_size == 64
+
+
 def test_require_data_present_checks_the_selected_window(monkeypatch):
     seen = set()
 

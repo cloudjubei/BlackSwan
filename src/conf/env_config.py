@@ -12,6 +12,18 @@ class EnvConfig:
     trailing_take_profit: float | None = None
     stop_loss: float | None = None
     no_sell_action: bool = False
+    # Position sizing: "fixed" deploys the whole balance (the historical all-in behaviour);
+    # "vol_target" scales the deployed fraction to target a constant volatility (size =
+    # vol_target / realized_vol, clamped to [vol_target_min, 1]) so the agent risks less in
+    # turbulent regimes and survives costs.
+    position_sizing: str = "fixed"
+    vol_target: float = 0.02
+    vol_target_min: float = 0.1
+    vol_window: int = 10
+    # Shorting: when enabled the action space gains short(3)/cover(4) and positions may go
+    # negative; long-only behaviour is unchanged when False.
+    allow_shorting: bool = False
+    max_short_size: float = 1.0
     batch_size: int = 32
     
 env_swap_all = EnvConfig(
