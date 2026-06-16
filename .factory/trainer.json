@@ -7,8 +7,14 @@
     "name": "traded_return",
     "direction": "max"
   },
-  "pipelineVersion": "2",
+  "pipelineVersion": "3",
   "pipelineChangelog": [
+    {
+      "version": "3",
+      "date": "2026-06-16",
+      "breaking": false,
+      "summary": "Walk-forward evaluation: a walk_forward_window lever tests on 2022/2023/2024 with an expanding train window (default 2024 = train 2020-2023 / test 2024 reproduces the v2 single split EXACTLY, so v2 runs stay comparable to v3 window-2024 runs). Adds sharpe_alpha (risk-adjusted excess over buy-and-hold on the same window) to metrics and stamps the window into the dataset. Different windows are separate out-of-sample samples — group them, never compare a 2022 run to a 2024 run as one number."
+    },
     {
       "version": "2",
       "date": "2026-06-15",
@@ -166,6 +172,16 @@
       ],
       "default": "1d",
       "description": "Bar size. 1d = fast single-layer path; 1h = the richer multi-layer path. Minute data behaved like noise for the RL models."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2022",
+        "2023",
+        "2024"
+      ],
+      "default": "2024",
+      "description": "Walk-forward evaluation window — which year to TEST on, training on every year before it (2024 = train 2020-2023 / test 2024, the historical split; 2023 = train 2020-2022 / test 2023; 2022 = train 2020-2021 / test 2022). Sweep all three to see whether a config is robust across different market regimes OUT-OF-SAMPLE rather than tuned to one lucky year. Each window is a SEPARATE run: read them as a distribution, never as a single number."
     },
     "use_indicators": {
       "type": "boolean",
@@ -332,6 +348,27 @@
       "seeds": 4,
       "thesis": "indicators on/off (1h, RB1)",
       "thesisTarget": "use_indicators"
+    },
+    {
+      "label": "▶ Exp 6 · Walk-forward robustness (2022·2023·2024)",
+      "sweep": { "walk_forward_window": ["2022", "2023", "2024"] },
+      "fixed": {
+        "timeframe": "1h",
+        "model_name": "reppo-custom",
+        "net_arch": "512,64",
+        "reward_model": "combo_all",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "device": "cpu"
+      },
+      "seeds": 4,
+      "thesis": "is a 1h winner robust across regime-years out-of-sample, or tuned to 2024?",
+      "thesisTarget": "walk_forward_window"
     },
     {
       "label": "TRPO-custom · 512,64 (~+60%)",

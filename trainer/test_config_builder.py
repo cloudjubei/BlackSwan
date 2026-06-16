@@ -1,0 +1,71 @@
+import pytest
+
+from trainer import config_builder
+
+
+def _echo_daily(monkeypatch):
+    monkeypatch.setattr(
+        config_builder,
+        "_daily_files",
+        lambda pairs, symbol=config_builder._SYMBOL: [f"{y}-{m}" for (y, m) in pairs],
+    )
+
+
+def test_build_data_config_1d_uses_the_selected_window_pairs(monkeypatch):
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config({"timeframe": "1d", "walk_forward_window": "2022"})
+    train = list(cfg.train_data_paths[0])
+    test = list(cfg.test_data_paths[0])
+    assert train[0] == "2020-1"
+    assert train[-1] == "2021-12"
+    assert test == [f"2022-{m}" for m in range(1, 13)]
+    assert "2022" in cfg.id
+
+
+def test_build_data_config_1d_default_window_is_the_legacy_split(monkeypatch):
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config({"timeframe": "1d"})
+    train = list(cfg.train_data_paths[0])
+    test = list(cfg.test_data_paths[0])
+    assert train[0] == "2020-1"
+    assert train[-1] == "2023-12"
+    assert test == [f"2024-{m}" for m in range(1, 13)]
+
+
+def test_build_data_config_1h_uses_window_and_stays_btc_only(monkeypatch):
+    import trainer.derive_cache as dc
+
+    monkeypatch.setattr(
+        dc,
+        "ensure_derived",
+        lambda symbol, pairs, fidelity, cache_dir=None: [f"{fidelity}-{y}-{m}" for (y, m) in pairs],
+    )
+    cfg = config_builder.build_data_config({"timeframe": "1h", "walk_forward_window": "2023"})
+    train = list(cfg.train_data_paths[0])
+    test = list(cfg.test_data_paths[0])
+    assert train[0] == "1h-2020-1"
+    assert train[-1] == "1h-2022-12"
+    assert test == [f"1h-2023-{m}" for m in range(1, 13)]
+    assert "2023" in cfg.id
+
+
+def test_require_data_present_checks_the_selected_window(monkeypatch):
+    seen = set()
+
+    def fake_daily(pairs, symbol=config_builder._SYMBOL):
+        seen.update(y for (y, _) in pairs)
+        return [f"{y}-{m}" for (y, m) in pairs]
+
+    monkeypatch.setattr(config_builder, "_daily_files", fake_daily)
+    config_builder.require_data_present({"walk_forward_window": "2022"})
+    assert 2021 in seen
+    assert 2022 in seen
+    assert 2024 not in seen
+
+
+def test_require_data_present_raises_when_window_data_missing(monkeypatch):
+    monkeypatch.setattr(
+        config_builder, "_daily_files", lambda pairs, symbol=config_builder._SYMBOL: []
+    )
+    with pytest.raises(SystemExit):
+        config_builder.require_data_present({"walk_forward_window": "2023"})

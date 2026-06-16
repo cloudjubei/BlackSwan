@@ -170,6 +170,7 @@ def _dataset(env, cfg, fidelity, candles):
         "asset": str(cfg.get("asset", "BTCUSDT")),
         "timeframe": fidelity,
         "candles": int(candles),
+        "walk_forward_window": str(cfg.get("walk_forward_window", "2024")),
     }
     provider = getattr(env, "data_provider", None)
     timestamps = getattr(provider, "timestamps", None) if provider is not None else None
@@ -276,6 +277,7 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     returns = [curve[i] / curve[i - 1] - 1.0 for i in range(1, len(curve)) if curve[i - 1] > 0]
 
     sharpe = _sharpe(returns, periods)
+    benchmark = _benchmark(env, lookback, periods)
     # Total return from the post-fee equity curve (so it is CONSISTENT with final_net_worth = curve[-1]).
     # The env's state[2] is GROSS realized profit / initial — fees are never subtracted from it — which
     # let a fee-eaten run report a positive % while its final net worth sat BELOW the starting balance.
@@ -310,6 +312,8 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         # RB7: robustness across sub-periods — the worst window's return + how many windows profited.
         metrics["worst_window_return_pct"] = windows["worst_window_return_pct"]
         metrics["windows_profitable_pct"] = windows["windows_profitable_pct"]
+    if benchmark:
+        metrics["sharpe_alpha"] = _finite(sharpe - _finite(benchmark.get("hold_sharpe")))
     series = {"equity": _downsample(curve)}
     if windows:
         series["window_returns_pct"] = windows["window_returns_pct"]
@@ -335,7 +339,6 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         artifacts["best"] = False
     if artifacts:
         summary["artifacts"] = artifacts
-    benchmark = _benchmark(env, lookback, periods)
     if benchmark:
         summary["benchmark"] = benchmark
     if "seed" in cfg:

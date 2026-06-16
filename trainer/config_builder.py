@@ -18,8 +18,11 @@ from src.conf.data_config import DataConfig
 from src.conf.env_config import EnvConfig
 from src.conf.model_config import ModelConfigSearch, model_rl
 from src.model.model_factory import get_model_combinations
+from trainer.walk_forward import resolve_walk_forward_window
 
 _SYMBOL = "BTCUSDT"
+# The default walk-forward window ("2024") resolves to exactly these pairs; the dip line
+# (trainer/dip.py) reads them directly, so they stay as the canonical single-split default.
 _TRAIN_PAIRS = [(y, m) for y in range(2020, 2024) for m in range(1, 13)]
 _TEST_PAIRS = [(2024, m) for m in range(1, 13)]
 
@@ -33,7 +36,8 @@ def require_data_present(cfg=None):
     """Fail fast with a clear message when the chosen asset's klines aren't on disk."""
     cfg = cfg or {}
     symbol = str(cfg.get("asset", _SYMBOL))
-    if not _daily_files(_TRAIN_PAIRS, symbol) or not _daily_files(_TEST_PAIRS, symbol):
+    train_pairs, test_pairs, _ = resolve_walk_forward_window(cfg)
+    if not _daily_files(train_pairs, symbol) or not _daily_files(test_pairs, symbol):
         from trainer.data_inventory import available_assets
 
         raise SystemExit(
@@ -51,6 +55,8 @@ def _parse_net_arch(value):
 def build_data_config(cfg):
     asset = str(cfg.get("asset", _SYMBOL))
     timeframe = str(cfg.get("timeframe", "1d"))
+    train_pairs, test_pairs, window = resolve_walk_forward_window(cfg)
+    wf = window["walk_forward_window"]
     if timeframe == "1h":
         if asset != _SYMBOL:
             raise SystemExit(
@@ -61,9 +67,9 @@ def build_data_config(cfg):
 
         return OmegaConf.structured(
             DataConfig(
-                id=f"{asset}-1h-derived-2020to2023vs2024",
-                train_data_paths=[ensure_derived(asset, _TRAIN_PAIRS, "1h")],
-                test_data_paths=[ensure_derived(asset, _TEST_PAIRS, "1h")],
+                id=f"{asset}-1h-wf{wf}",
+                train_data_paths=[ensure_derived(asset, train_pairs, "1h")],
+                test_data_paths=[ensure_derived(asset, test_pairs, "1h")],
                 lookback_window_size=32,
                 type=str(cfg.get("data_type", "only_price_percent")),
                 use_indicators=bool(cfg.get("use_indicators", False)),
@@ -81,9 +87,9 @@ def build_data_config(cfg):
     # exploratory). The "1h" timeframe is the research-grade path (lookback 32).
     return OmegaConf.structured(
         DataConfig(
-            id=f"{asset}-1d-2020to2023vs2024q1",
-            train_data_paths=[_daily_files(_TRAIN_PAIRS, asset)],
-            test_data_paths=[_daily_files(_TEST_PAIRS, asset)],
+            id=f"{asset}-1d-wf{wf}",
+            train_data_paths=[_daily_files(train_pairs, asset)],
+            test_data_paths=[_daily_files(test_pairs, asset)],
             lookback_window_size=1,
             type=str(cfg.get("data_type", "only_price_percent")),
             use_indicators=bool(cfg.get("use_indicators", False)),
