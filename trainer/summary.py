@@ -1,22 +1,23 @@
 """Compute the trainer-standard RunSummary for one BlackSwan trading test run.
 
-The risk-adjusted objective (Sharpe / CAGR / max-drawdown) is computed HERE from
-the env's retained per-step equity curve (``env.net_worths``, padded by the
-provider's lookback window) and action history — the env's own risk methods are
-abstract-unimplemented or price-based placeholders, so they are not used.
+BlackSwan trades a FIXED stake (the account is reset to ``initial_balance`` after every close,
+so a losing streak can't compound to ruin), so the honest performance figure is the SUM of
+per-trade P&L, NOT the endpoint of the raw ``net_worths`` curve (which sawtooths back to the
+initial balance after each trade and would only reflect the last/open position). This module
+reconstructs the round-trips from the env's retained per-step arrays (read-side, no env change),
+derives a REAL equity curve (initial + cumulative realized + current unrealized), and reports the
+behavioural breakdown that makes a run explainable: exit reasons, per-regime performance, and a
+trade ledger. Buy-and-hold is kept only as a display yardstick, never an objective.
 """
 
 import bisect
 import datetime
 import math
-import statistics
 
 import numpy as np
 
 from trainer.fidelity import resolve_fidelity
 
-_PERIODS_PER_YEAR = {"1m": 365.0 * 24 * 60, "5m": 365.0 * 24 * 12, "15m": 365.0 * 24 * 4,
-                     "1h": 365.0 * 24, "4h": 365.0 * 6, "1d": 365.0}
 _MAX_SERIES_POINTS = 200
 
 # Trades a run must make to earn full credit for its return — the "trade often" bar. Below it the
@@ -28,6 +29,10 @@ MIN_TRADES_FOR_FULL_CREDIT = 20
 # At or below this many trades a run is effectively buy-and-hold, flagged degenerate (RL runs only —
 # the hodl baseline trades once by design).
 DEGENERATE_TRADE_COUNT = 2
+# Trailing return over this fraction of the test window classifies a bar's regime as up/down (else
+# flat) for the trend-based regime split. The band keeps a sideways drift from reading as a trend.
+_REGIME_TREND_BAND = 0.01
+_REGIME_TREND_WINDOW_DIVISOR = 50
 
 
 def _finite(x, default=0.0):
@@ -96,13 +101,15 @@ def _run_prices(env, n):
     return []
 
 
-def _run_chart(env, lookback):
-    """A JSON-renderable price line + preserved buy/sell/TP/SL markers for the hub viewer.
+def _run_chart(env, lookback, trades):
+    """A JSON-renderable price line + trade markers for the hub viewer, built from the SAME
+    reconstructed round-trips as the ledger so the two never disagree.
 
-    Re-creates the data the repo's interactive-only ``plot_actions_data`` draws, but as
-    serialisable arrays: a downsampled close price with every trade marker mapped onto the
-    downsampled grid so no trade is dropped by the downsample (1=buy, 2=sell; TP/SL from tpsls).
-    """
+    Marker types distinguish EXECUTED trades from ATTEMPTED (no-op) agent requests, and by side:
+    executed opens ``buy`` (long) / ``short``; executed agent closes ``sell`` (long) / ``cover``
+    (short); auto closes ``tp`` / ``trailing`` / ``sl``; no-op requests ``*_attempt``. ``counts`` is
+    AUTHORITATIVE — tallied over the full series before the draw-only downsample dedup — so the legend
+    can't under-count (the old chart collapsed e.g. 28 stop-losses to 21 on the 200-point grid)."""
     actions = [_action_int(a) for a in _live(getattr(env, "actions", []), lookback)]
     if len(actions) < 2:
         return None
@@ -112,50 +119,217 @@ def _run_chart(env, lookback):
     n = min(len(actions), len(prices))
     actions = actions[:n]
     prices = prices[:n]
-    tpsls = [_action_int(t) for t in _live(getattr(env, "tpsls", []), lookback)[:n]]
+    made = list(_live(getattr(env, "actions_made", []), lookback))[:n]
 
     ds_price, kept = _downsample_indexed(prices)
+    open_type = {"long": "buy", "short": "short"}
+    attempt_type = {1: "buy_attempt", 2: "sell_attempt", 3: "short_attempt", 4: "cover_attempt"}
+    raw = []
+    for t in trades:
+        ei, xi = int(t["entry_step"]), int(t["exit_step"])
+        if 0 <= ei < n:
+            raw.append((ei, open_type.get(t["side"], "buy"), prices[ei]))
+        if t["reason"] != "open" and 0 <= xi < n:
+            raw.append((xi, t["reason"], prices[xi]))
+    for i in range(n):
+        if i < len(made) and not made[i] and actions[i] in attempt_type:
+            raw.append((i, attempt_type[actions[i]], prices[i]))
+
+    counts = {}
+    for _, typ, _ in raw:
+        counts[typ] = counts.get(typ, 0) + 1
+
     seen = set()
     markers = []
-    for i in range(n):
-        events = []
-        if actions[i] == 1:
-            events.append("buy")
-        elif actions[i] == 2:
-            events.append("sell")
-        if i < len(tpsls) and tpsls[i] == 1:
-            events.append("tp")
-        elif i < len(tpsls) and tpsls[i] == -1:
-            events.append("sl")
-        if not events:
+    for orig_i, typ, price in raw:
+        x = _marker_x(orig_i, kept)
+        if (x, typ) in seen:
             continue
-        x = _marker_x(i, kept)
-        for kind in events:
-            if (x, kind) in seen:
-                continue
-            seen.add((x, kind))
-            markers.append({"i": x, "type": kind, "price": _finite(prices[i])})
-    return {"price": ds_price, "markers": markers}
+        seen.add((x, typ))
+        markers.append({"i": x, "type": typ, "price": _finite(price)})
+    return {"price": ds_price, "markers": markers, "counts": counts}
 
 
-def _benchmark(env, lookback, periods):
-    """Buy-and-hold control over the same live window — a display benchmark, NOT a reward target.
+def _benchmark(env, lookback):
+    """Buy-and-hold control over the same live window — a display yardstick, NOT a reward target.
 
-    Computed from the price series the run already saw (buy at the first live bar, hold to the
-    last), so every run is self-describing against "just holding" without a separate hodl run.
+    Computed from the price series the run already saw (buy at the first live bar, hold to the last),
+    so every run is self-describing against "just holding" without a separate hodl run. The capital
+    base differs from the fixed-stake strategy, so the delta is indicative, not exact.
     """
     actions = _live(getattr(env, "actions", []), lookback)
     prices = _run_prices(env, len(actions)) if len(actions) >= 2 else []
     prices = [p for p in prices if math.isfinite(p) and p > 0]
     if len(prices) < 2:
         return None
-    curve = [p / prices[0] for p in prices]
-    rets = [curve[i] / curve[i - 1] - 1.0 for i in range(1, len(curve)) if curve[i - 1] > 0]
+    return {"hold_return_pct": (prices[-1] / prices[0] - 1.0) * 100}
+
+
+def _trade(entry, exit_step, exit_price, reason, pnl, initial):
     return {
-        "hold_return_pct": (curve[-1] - 1.0) * 100,
-        "hold_sharpe": _sharpe(rets, periods),
-        "hold_max_drawdown_pct": _max_drawdown(curve) * 100,
+        "entry_step": int(entry["step"]),
+        "entry_price": _finite(entry["price"]),
+        "exit_step": int(exit_step),
+        "exit_price": _finite(exit_price),
+        "side": entry["side"],
+        "reason": reason,
+        "pnl": _finite(pnl),
+        "pnl_pct": _finite(pnl / initial * 100) if initial else 0.0,
+        "bars_held": int(exit_step - entry["step"]),
     }
+
+
+def _reconstruct_trades(env, lookback, initial):
+    """Reconstruct round-trips from the env's OWN per-step close/open signals — actions_made, actions,
+    forced_actions, tpsls — i.e. exactly how ``update_position_and_balance`` books a trade. This is
+    robust to long/short and the swap env's overloaded action, and stays aligned with ``net_worths``.
+    (The ``positions`` array is NOT used: ``take_action`` mutates it in place and the post-close reset
+    lands one index off ``net_worths``, so transitions there mispair trades.) Each close's realized
+    P&L is ``net_worth_at_close - initial`` (clean per-trade P&L thanks to the fixed-stake reset). A
+    position still open at the last bar is closed at the last price (implied sell), reason ``open``.
+    Returns (trades, real_equity_curve, live_prices)."""
+    actions = [_action_int(a) for a in _live(getattr(env, "actions", []), lookback)]
+    made = list(_live(getattr(env, "actions_made", []), lookback))
+    forced = [_action_int(f) for f in _live(getattr(env, "forced_actions", []), lookback)]
+    tpsls = [_action_int(t) for t in _live(getattr(env, "tpsls", []), lookback)]
+    kinds = list(_live(getattr(env, "tpsl_kinds", []), lookback))
+    nws = [_finite(x) for x in _live(getattr(env, "net_worths", []), lookback)]
+    n = min(len(actions), len(nws))
+    if n < 1:
+        return [], [], []
+    prices = _run_prices(env, n)
+    n = min(n, len(prices))
+    if n < 1:
+        return [], [], prices
+
+    trades = []
+    entry = None
+    holding = False
+    in_position = [False] * n
+    for i in range(n):
+        is_made = bool(made[i]) if i < len(made) else False
+        a = actions[i] if i < len(actions) else 0
+        f = forced[i] if i < len(forced) else 0
+        tp = tpsls[i] if i < len(tpsls) else 0
+        opened = is_made and a in (1, 3) and f == 0
+        closed = is_made and ((a in (2, 4) and f == 0) or f in (2, 4))
+        if closed and entry is not None:
+            kind = kinds[i] if i < len(kinds) else None
+            if tp == 1:
+                reason = "trailing" if kind == "trailing" else "tp"
+            elif tp == -1:
+                reason = "sl"
+            else:
+                reason = "sell" if entry["side"] == "long" else "cover"
+            trades.append(_trade(entry, i, prices[i], reason, nws[i] - initial, initial))
+            entry = None
+            holding = False
+        elif opened and entry is None:
+            entry = {"step": i, "price": prices[i], "side": "long" if a == 1 else "short"}
+            holding = True
+        in_position[i] = holding
+    if entry is not None:
+        trades.append(_trade(entry, n - 1, prices[n - 1], "open", nws[n - 1] - initial, initial))
+
+    equity = _equity_from_trades(trades, nws, in_position, initial, n)
+    return trades, equity, prices
+
+
+def _equity_from_trades(trades, nws, in_position, initial, n):
+    """A real (non-sawtooth) equity curve for the fixed-stake account: at each step,
+    ``initial + cumulative realized P&L of trades closed so far + current unrealized P&L``."""
+    closed = sorted((t["exit_step"], t["pnl"]) for t in trades if t["reason"] != "open")
+    equity = []
+    realized = 0.0
+    ci = 0
+    for i in range(n):
+        while ci < len(closed) and closed[ci][0] <= i:
+            realized += closed[ci][1]
+            ci += 1
+        unrealized = (nws[i] - initial) if (i < len(in_position) and in_position[i]) else 0.0
+        equity.append(initial + realized + unrealized)
+    return equity
+
+
+def _exit_breakdown(trades, initial):
+    """Per exit-reason (sell/cover/tp/trailing/sl/open) count, win-rate and P&L — answers
+    'does it decide to sell, or do the TP/trailing/SL rules close for it?'."""
+    out = {}
+    for t in trades:
+        b = out.setdefault(t["reason"], {"count": 0, "wins": 0, "pnl": 0.0})
+        b["count"] += 1
+        if t["pnl"] >= 0:
+            b["wins"] += 1
+        b["pnl"] += t["pnl"]
+    for b in out.values():
+        b["win_pct"] = 100.0 * b["wins"] / b["count"] if b["count"] else 0.0
+        b["total_pnl_pct"] = _finite(b["pnl"] / initial * 100) if initial else 0.0
+        b["avg_pnl_pct"] = _finite(b["pnl"] / b["count"] / initial * 100) if (b["count"] and initial) else 0.0
+    return out or None
+
+
+def _regime_windows(trades, prices, initial, n_windows=4):
+    """Skill-vs-luck by equal time sub-windows: each window's market move vs the model's realized
+    trading P&L + win-rate. Profit that only appears where the market rose is beta (luck)."""
+    n = len(prices)
+    if n < 2 or not initial:
+        return None
+    k = max(1, min(n_windows, n - 1))
+    size = n / k
+    windows = []
+    for w in range(k):
+        lo = int(round(w * size))
+        hi = (int(round((w + 1) * size)) if w < k - 1 else n) - 1
+        if hi <= lo:
+            continue
+        market = (prices[hi] / prices[lo] - 1.0) * 100 if prices[lo] else 0.0
+        wt = [t for t in trades if lo <= int(t["exit_step"]) <= hi]
+        pnl = sum(t["pnl"] for t in wt)
+        wins = sum(1 for t in wt if t["pnl"] >= 0)
+        windows.append({
+            "market_return_pct": _finite(market),
+            "realized_pnl_pct": _finite(pnl / initial * 100),
+            "n_trades": len(wt),
+            "win_pct": 100.0 * wins / len(wt) if wt else 0.0,
+        })
+    return windows or None
+
+
+def _regime_trend(trades, prices, initial):
+    """Skill-vs-luck by market regime: classify each bar up/flat/down by its trailing trend, then
+    report realized P&L + win-rate of trades ENTERED in each regime, plus how much of the window
+    each regime occupied. Profit concentrated in 'up' is riding the market, not timing it."""
+    n = len(prices)
+    if n < 3 or not initial:
+        return None
+    w = max(2, n // _REGIME_TREND_WINDOW_DIVISOR)
+
+    def label(i):
+        j = i - w
+        if j < 0 or prices[j] <= 0:
+            return "flat"
+        r = prices[i] / prices[j] - 1.0
+        return "up" if r > _REGIME_TREND_BAND else ("down" if r < -_REGIME_TREND_BAND else "flat")
+
+    buckets = {key: {"n_trades": 0, "wins": 0, "pnl": 0.0} for key in ("up", "flat", "down")}
+    for t in trades:
+        b = buckets[label(int(t["entry_step"]))]
+        b["n_trades"] += 1
+        if t["pnl"] >= 0:
+            b["wins"] += 1
+        b["pnl"] += t["pnl"]
+    bar_counts = {"up": 0, "flat": 0, "down": 0}
+    for i in range(n):
+        bar_counts[label(i)] += 1
+    out = {}
+    for key, b in buckets.items():
+        out[key] = {
+            "n_trades": b["n_trades"],
+            "win_pct": 100.0 * b["wins"] / b["n_trades"] if b["n_trades"] else 0.0,
+            "realized_pnl_pct": _finite(b["pnl"] / initial * 100),
+            "bars_pct": 100.0 * bar_counts[key] / n if n else 0.0,
+        }
+    return out
 
 
 def _iso_from_ms(value):
@@ -198,38 +372,6 @@ def _lookback(env, cfg):
     return int(cfg.get("lookback_window_size", 32))
 
 
-def _equity_curve(env, lookback):
-    nw = [float(x) for x in getattr(env, "net_worths", [])]
-    live = nw[lookback:] if len(nw) > lookback + 1 else nw
-    return live if len(live) >= 2 else nw
-
-
-def _sharpe(returns, periods_per_year):
-    if len(returns) < 2:
-        return 0.0
-    sd = statistics.pstdev(returns)
-    if sd <= 0:
-        return 0.0
-    return _finite((statistics.fmean(returns) / sd) * math.sqrt(periods_per_year))
-
-
-def _max_drawdown(curve):
-    peak = float("-inf")
-    mdd = 0.0
-    for x in curve:
-        peak = max(peak, x)
-        if peak > 0:
-            mdd = min(mdd, x / peak - 1.0)
-    return _finite(mdd)
-
-
-def _cagr(curve, periods_per_year):
-    if len(curve) < 2 or curve[0] <= 0:
-        return 0.0
-    years = max(len(curve), 1) / periods_per_year
-    return _finite((curve[-1] / curve[0]) ** (1.0 / years) - 1.0)
-
-
 def _trade_gate(n_trades, mode, min_trades):
     """Map a trade count to the [0,1] objective multiplier for the chosen gate mode. The gate is the
     research-named "churn band-aid" — realistic fees already regulate frequency — so it is a sweepable
@@ -243,34 +385,6 @@ def _trade_gate(n_trades, mode, min_trades):
     if mode == "threshold":
         return 1.0 if n_trades >= min_trades else 0.0
     return min(1.0, ratio**2)
-
-
-def _window_breakdown(curve, n_windows=4):
-    """RB7: split the test equity curve into ``n_windows`` equal sub-periods and report robustness
-    across them — a strategy that only profits in one sub-window (a single lucky regime) is fragile.
-    Returns per-window return %, the worst window, and the fraction of windows that were profitable.
-    Equal-size index chunks (bars are uniform within a fidelity) avoid timestamp-alignment fragility.
-    """
-    pts = [c for c in curve if isinstance(c, (int, float)) and math.isfinite(c) and c > 0]
-    if len(pts) < 4:
-        return None
-    n = max(1, min(n_windows, len(pts) - 1))
-    size = len(pts) / n
-    returns = []
-    for i in range(n):
-        lo = int(round(i * size))
-        hi = (int(round((i + 1) * size)) if i < n - 1 else len(pts)) - 1
-        if hi > lo and pts[lo] > 0:
-            returns.append((pts[hi] / pts[lo] - 1.0) * 100)
-    if not returns:
-        return None
-    profitable = sum(1 for r in returns if r > 0)
-    return {
-        "window_returns_pct": [round(r, 4) for r in returns],
-        "worst_window_return_pct": min(returns),
-        "windows_profitable_pct": 100.0 * profitable / len(returns),
-        "n_windows": len(returns),
-    }
 
 
 def _health(env, state, is_rl, lookback):
@@ -292,49 +406,41 @@ def _health(env, state, is_rl, lookback):
 def build_summary(env, state, cfg, model, ran_at, is_rl):
     lookback = _lookback(env, cfg)
     fidelity = resolve_fidelity(cfg)[1]["fidelity_run"]
-    periods = _PERIODS_PER_YEAR.get(fidelity, 365.0)
-    curve = _equity_curve(env, lookback)
-    returns = [curve[i] / curve[i - 1] - 1.0 for i in range(1, len(curve)) if curve[i - 1] > 0]
-
-    sharpe = _sharpe(returns, periods)
-    benchmark = _benchmark(env, lookback, periods)
-    # Total return from the post-fee equity curve (so it is CONSISTENT with final_net_worth = curve[-1]).
-    # The env's state[2] is GROSS realized profit / initial — fees are never subtracted from it — which
-    # let a fee-eaten run report a positive % while its final net worth sat BELOW the starting balance.
-    # This also makes the traded_return objective fee-honest.
-    total_return = (
-        (curve[-1] / curve[0] - 1.0)
-        if len(curve) >= 2 and curve[0]
-        else (_finite(state[2]) if len(state) > 2 else 0.0)
+    initial = (
+        _finite(getattr(env, "initial_net_worth", 0))
+        or _finite(getattr(env, "initial_balance", 0))
+        or 1.0
     )
+
+    trades, equity, prices = _reconstruct_trades(env, lookback, initial)
+    if len(equity) >= 2 and initial:
+        total_return = (equity[-1] - initial) / initial
+    else:
+        total_return = _finite(state[2]) if len(state) > 2 else 0.0
+        equity = [_finite(x) for x in _live(getattr(env, "net_worths", []), lookback)]
+
     n_trades = _finite(state[17]) if len(state) > 17 else 0.0
-    # Trade-aware objective: total return (profit, NOT beat-hold) gated by trade frequency.
     trade_gate = _trade_gate(
         n_trades, str(cfg.get("trade_gate_mode", "quadratic")), MIN_TRADES_FOR_FULL_CREDIT
     )
     traded_return = total_return * 100 * trade_gate
-    windows = _window_breakdown(curve)
+
     metrics = {
         "traded_return": traded_return,
         "total_return_pct": total_return * 100,
         "win_pct": _finite(state[7]) if len(state) > 7 else 0.0,
         "n_trades": n_trades,
         "trade_gate": trade_gate,
-        "sharpe": sharpe,
-        "max_drawdown_pct": _max_drawdown(curve) * 100,
-        "cagr_pct": _cagr(curve, periods) * 100,
         "stop_losses": _finite(state[18]) if len(state) > 18 else 0.0,
-        "final_net_worth": curve[-1] if curve else 0.0,
+        "final_net_worth": equity[-1] if equity else initial,
     }
-    if windows:
-        # RB7: robustness across sub-periods — the worst window's return + how many windows profited.
-        metrics["worst_window_return_pct"] = windows["worst_window_return_pct"]
-        metrics["windows_profitable_pct"] = windows["windows_profitable_pct"]
+    benchmark = _benchmark(env, lookback)
     if benchmark:
-        metrics["sharpe_alpha"] = _finite(sharpe - _finite(benchmark.get("hold_sharpe")))
-    series = {"equity": _downsample(curve)}
-    if windows:
-        series["window_returns_pct"] = windows["window_returns_pct"]
+        metrics["hold_return_pct"] = benchmark["hold_return_pct"]
+        metrics["return_vs_hold_pct"] = _finite(total_return * 100 - benchmark["hold_return_pct"])
+
+    series = {"equity": _downsample(equity)}
+
     summary = {
         "objective": traded_return,
         "metrics": metrics,
@@ -342,11 +448,27 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         "config": dict(cfg),
         "provenance": {"ranAt": ran_at},
         "series": series,
-        "dataset": _dataset(env, cfg, fidelity, len(curve)),
+        "dataset": _dataset(env, cfg, fidelity, len(equity)),
     }
+
+    exits = _exit_breakdown(trades, initial)
+    if exits:
+        summary["exits"] = exits
+    regimes = {}
+    windows = _regime_windows(trades, prices, initial)
+    if windows:
+        regimes["windows"] = windows
+    trend = _regime_trend(trades, prices, initial)
+    if trend:
+        regimes["trend"] = trend
+    if regimes:
+        summary["regimes"] = regimes
+    if trades:
+        summary["ledger"] = trades[:5000]
+
     artifacts = {}
     try:
-        run_chart = _run_chart(env, lookback)
+        run_chart = _run_chart(env, lookback, trades)
     except Exception:
         run_chart = None
     if run_chart:

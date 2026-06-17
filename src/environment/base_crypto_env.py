@@ -155,6 +155,7 @@ class BaseCryptoEnv(AbstractEnv):
         self.forced_actions = []
         self.rewards = []
         self.tpsls = []
+        self.tpsl_kinds = []
 
         self.position_price_highest = 0
         self.position_price_lowest = 0
@@ -175,6 +176,7 @@ class BaseCryptoEnv(AbstractEnv):
             self.forced_actions.append(0)
             self.rewards.append(0)
             self.tpsls.append(0)
+            self.tpsl_kinds.append(None)
 
         self.total_reward = 0
         self.drawdown_peak = 0
@@ -206,7 +208,7 @@ class BaseCryptoEnv(AbstractEnv):
     def resolve_tpsl(self):
         position = self.positions[-1]
         if position == 0:
-            return 0, None
+            return 0, None, None
         # Close action by side: long closes with 2 (sell), short covers with 4. TP/SL thresholds are
         # measured on net worth, which already reflects the position's sign — so the same profit/loss
         # checks serve both directions; only the trailing stop (price-anchored) is mirrored by side.
@@ -222,19 +224,19 @@ class BaseCryptoEnv(AbstractEnv):
                     activation = entry * (1.0 + take_profit)
                     if self.position_price_highest >= activation:
                         if self.current_price <= self.position_price_highest * (1.0 - trailing):
-                            return close_action, True
+                            return close_action, True, "trailing"
                 else:
                     activation = entry * (1.0 - take_profit)
                     if 0 < self.position_price_lowest <= activation:
                         if self.current_price >= self.position_price_lowest * (1.0 + trailing):
-                            return close_action, True
+                            return close_action, True, "trailing"
             if profit_percentage >= take_profit:
-                return close_action, True
+                return close_action, True, "tp"
         if self.env_config.stop_loss is not None:
             loss_percentage = 1.0 - (net_worth / self.initial_net_worth)
             if loss_percentage >= self.env_config.stop_loss:
-                return close_action, False
-        return 0, None
+                return close_action, False, "sl"
+        return 0, None, None
     
 
     # static UpdateTakeProfit(trade: TradingSetupTradeModel, setup: TradingSetupModel, minAmount: string) : TradingSetupActionModel
@@ -261,13 +263,16 @@ class BaseCryptoEnv(AbstractEnv):
         forced_action = 0
         if made_action:
             self.tpsls.append(0)
+            self.tpsl_kinds.append(None)
         else:
-            forced_action, tp_action = self.resolve_tpsl()
+            forced_action, tp_action, tpsl_kind = self.resolve_tpsl()
             if forced_action != 0:
                 made_action = self.take_action(forced_action)
                 self.tpsls.append(1 if tp_action else -1)
+                self.tpsl_kinds.append(tpsl_kind)
             else:
                 self.tpsls.append(0)
+                self.tpsl_kinds.append(None)
 
         self.actions.append(action if action is not None else 0)
         self.actions_made.append(made_action)

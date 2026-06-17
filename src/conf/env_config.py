@@ -6,7 +6,7 @@ class EnvConfig:
     type: str = "trade_all" # possible: ["swap", "trade_all", "trade_percent", "trade_position", "trade_amount"]
     initial_balance: int = 100000
     amount: float = 1
-    observations_contain: List[str] = field(default_factory=[]) # possible ["networth_percent_this_trade", "in_position", "drawdown", "actions_made", "trades_won", "trades_lost", "win_ratio"]
+    observations_contain: List[str] = field(default_factory=list) # possible ["networth_percent_this_trade", "in_position", "drawdown", "actions_made", "trades_won", "trades_lost", "win_ratio"]
     transaction_fee: float = 0.001
     take_profit: float | None = None
     trailing_take_profit: float | None = None
