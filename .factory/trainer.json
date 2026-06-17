@@ -204,7 +204,8 @@
         "BTCUSDT"
       ],
       "default": "BTCUSDT",
-      "description": "Which coin to train on. Only BTCUSDT has 1d/1h data today; altcoins need backfill (the data mine)."
+      "scope": "dataset",
+      "description": "Which coin to train on. Only BTCUSDT has 1d/1h data today; altcoins need backfill (the data mine). DATASET setting — managed as named datasets, not a model knob."
     },
     "timeframe": {
       "type": "choice",
@@ -225,7 +226,8 @@
         "1h+1d+1w"
       ],
       "default": "auto",
-      "description": "Multi-fidelity observation stack — which timeframes the agent sees AT ONCE (higher layers are resampled from the base bars, so wider = more temporal context but a bigger network input). auto = follow the timeframe lever (1h -> 1h+1d, else 1d); 1d = fast single daily; 1h = single 1h; 1h+1d = the standard intraday stack; 1h+1d+1w adds the weekly trend. Wider stacks gave more insight empirically — sweep to confirm under walk-forward. When set (not auto) it overrides timeframe's implicit stack."
+      "scope": "dataset",
+      "description": "Multi-fidelity observation stack — which timeframes the agent sees AT ONCE (higher layers are resampled from the base bars, so wider = more temporal context but a bigger network input). auto = follow the timeframe lever (1h -> 1h+1d, else 1d); 1d = fast single daily; 1h = single 1h; 1h+1d = the standard intraday stack; 1h+1d+1w adds the weekly trend. Wider stacks gave more insight empirically. DATASET setting — define named datasets (e.g. '1h' vs '1h+1d') in the Datasets tab and run a model across them. When set (not auto) it overrides timeframe's implicit stack."
     },
     "walk_forward_window": {
       "type": "choice",
@@ -235,7 +237,8 @@
         "2024"
       ],
       "default": "2024",
-      "description": "Walk-forward evaluation window — which year to TEST on, training on every year before it (2024 = train 2020-2023 / test 2024, the historical split; 2023 = train 2020-2022 / test 2023; 2022 = train 2020-2021 / test 2022). Sweep all three to see whether a config is robust across different market regimes OUT-OF-SAMPLE rather than tuned to one lucky year. Each window is a SEPARATE run: read them as a distribution, never as a single number."
+      "scope": "dataset",
+      "description": "Walk-forward evaluation window — which year to TEST on, training on every year before it (2024 = train 2020-2023 / test 2024, the historical split; 2023 = train 2020-2022 / test 2023; 2022 = train 2020-2021 / test 2022). Run all three to see whether a config is robust across different market regimes OUT-OF-SAMPLE rather than tuned to one lucky year. DATASET setting — each window is a separate dataset; read them as a distribution, never as a single number."
     },
     "use_indicators": {
       "type": "boolean",
@@ -438,7 +441,11 @@
     },
     {
       "label": "▶ Exp 6 · Walk-forward robustness (2022·2023·2024)",
-      "sweep": { "walk_forward_window": ["2022", "2023", "2024"] },
+      "datasets": [
+        { "walk_forward_window": "2022" },
+        { "walk_forward_window": "2023" },
+        { "walk_forward_window": "2024" }
+      ],
       "fixed": {
         "timeframe": "1h",
         "model_name": "reppo-custom",
@@ -521,7 +528,11 @@
     },
     {
       "label": "▶ Exp 10 · Fidelity stack (1h winner)",
-      "sweep": { "fidelity_set": ["1h", "1h+1d", "1h+1d+1w"] },
+      "datasets": [
+        { "fidelity_set": "1h" },
+        { "fidelity_set": "1h+1d" },
+        { "fidelity_set": "1h+1d+1w" }
+      ],
       "fixed": {
         "timeframe": "1h",
         "model_name": "reppo-custom",
