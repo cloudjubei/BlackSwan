@@ -57,19 +57,32 @@ def test_build_data_config_fidelity_set_stacks_layers(monkeypatch):
         "ensure_derived",
         lambda symbol, pairs, fidelity, cache_dir=None: [f"{fidelity}-{y}-{m}" for (y, m) in pairs],
     )
-    cfg = config_builder.build_data_config({"fidelity_set": "1h+1d+1w", "walk_forward_window": "2024"})
+    cfg = config_builder.build_data_config(
+        {"timeframe": "1h", "fidelity_set": "1h+1d+1w", "walk_forward_window": "2024"}
+    )
     assert list(cfg.layers) == ["1h", "1d", "1w"]
     assert list(cfg.layers_test) == ["1h", "1d", "1w"]
     assert cfg.lookback_window_size == 32
     assert "1h+1d+1w" in cfg.id
 
 
-def test_build_data_config_fidelity_set_1d_overrides_timeframe(monkeypatch):
-    _echo_daily(monkeypatch)
-    cfg = config_builder.build_data_config({"timeframe": "1h", "fidelity_set": "1d"})
-    assert list(cfg.layers) == ["1d"]
-    assert cfg.lookback_window_size == 1
-    assert cfg.fidelity_run == "1d"
+def test_build_data_config_coarser_only_stack_at_hourly_step(monkeypatch):
+    import trainer.derive_cache as dc
+
+    monkeypatch.setattr(
+        dc, "ensure_derived", lambda symbol, pairs, fidelity, cache_dir=None: ["f"]
+    )
+    # An hourly-stepping agent fed only coarser layers (1d, 1w) every hour.
+    cfg = config_builder.build_data_config({"timeframe": "1h", "fidelity_set": "1d+1w"})
+    assert list(cfg.layers) == ["1d", "1w"]
+    assert cfg.fidelity_run == "1h"
+    assert cfg.lookback_window_size == 32
+
+
+def test_build_data_config_incoherent_timeframe_fidelity_fails_fast():
+    # Daily step + a finer/multi stack is not provider-supported — must fail fast, not silently run.
+    with pytest.raises(SystemExit):
+        config_builder.build_data_config({"timeframe": "1d", "fidelity_set": "1h+1d"})
 
 
 def test_build_data_config_default_1h_is_the_1h_plus_1d_stack(monkeypatch):

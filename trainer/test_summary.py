@@ -82,6 +82,25 @@ def _two_trade_summary():
     return summary_mod.build_summary(env, state, _CFG, _FakeModel(), "2026-01-01T00:00:00Z", True), env, state
 
 
+def test_realized_cost_bps_from_env_fees():
+    env = _FakeEnv(
+        net_worths=[100000, 101000],
+        actions=[1, 2],
+        prices=[100, 110],
+        positions=[1, 0],
+    )
+    env.fees = [60.0, 40.0]  # $100 total fees on a 100000 stake -> 10 bps
+    out = summary_mod.build_summary(
+        env, _state(n_trades=1), _CFG, _FakeModel(), "2026-01-01T00:00:00Z", True
+    )
+    assert out["metrics"]["realized_cost_bps"] == pytest.approx(10.0)
+
+
+def test_realized_cost_bps_zero_without_fees():
+    out, _, _ = _two_trade_summary()
+    assert out["metrics"]["realized_cost_bps"] == 0.0
+
+
 def test_reconstructs_round_trips_with_reasons_and_pnl():
     out, _, _ = _two_trade_summary()
     ledger = out["ledger"]
@@ -277,7 +296,7 @@ def test_dataset_stamps_fidelity_set_and_layers():
 
 def test_dataset_fidelity_defaults_from_timeframe():
     out = _build({"timeframe": "1d", "lookback_window_size": 0})
-    assert out["dataset"]["fidelity_set"] == "1d"
+    assert out["dataset"]["fidelity_set"] == "auto"
     assert out["dataset"]["layers"] == ["1d"]
 
 

@@ -214,7 +214,7 @@
         "1h"
       ],
       "default": "1d",
-      "description": "Bar size. 1d = fast single-layer path; 1h = the richer multi-layer path. Minute data behaved like noise for the RL models."
+      "description": "STEP frequency — how OFTEN the agent acts (1d = once per day, 1h = once per hour). This is separate from which timeframes it OBSERVES (the fidelity_set dataset lever). Minute data behaved like noise for the RL models."
     },
     "fidelity_set": {
       "type": "choice",
@@ -223,11 +223,12 @@
         "1d",
         "1h",
         "1h+1d",
-        "1h+1d+1w"
+        "1h+1d+1w",
+        "1d+1w"
       ],
       "default": "auto",
       "scope": "dataset",
-      "description": "Multi-fidelity observation stack — which timeframes the agent sees AT ONCE (higher layers are resampled from the base bars, so wider = more temporal context but a bigger network input). auto = follow the timeframe lever (1h -> 1h+1d, else 1d); 1d = fast single daily; 1h = single 1h; 1h+1d = the standard intraday stack; 1h+1d+1w adds the weekly trend. Wider stacks gave more insight empirically. DATASET setting — define named datasets (e.g. '1h' vs '1h+1d') in the Datasets tab and run a model across them. When set (not auto) it overrides timeframe's implicit stack."
+      "description": "Observation LAYERS — which timeframes the agent sees AT ONCE at each step (separate from the STEP frequency, which is the timeframe lever). Higher layers are resampled from the base, so wider = more context but a bigger input. auto = follow timeframe (1h->1h+1d, 1d->1d). At an HOURLY step (timeframe=1h): 1h (single), 1h+1d, 1h+1d+1w, or 1d+1w (coarser layers fed every hour). At a DAILY step (timeframe=1d): only 1d for now (daily-step + finer/multi layers is a planned data-provider enhancement). DATASET setting — define named datasets (e.g. '1h' vs '1h+1d') in the Datasets tab. An incompatible step×layers combo FAILS FAST at run start with a clear message."
     },
     "walk_forward_window": {
       "type": "choice",

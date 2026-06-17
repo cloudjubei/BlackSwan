@@ -425,6 +425,9 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     )
     traded_return = total_return * 100 * trade_gate
 
+    # Realized transaction-cost drag: the env appends each trade's fee (in $) to `fees`, so the total
+    # over the run as basis points of the stake is the honest "how much did fees cost" figure.
+    fees_paid = sum(_finite(f) for f in getattr(env, "fees", []))
     metrics = {
         "traded_return": traded_return,
         "total_return_pct": total_return * 100,
@@ -433,6 +436,7 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         "trade_gate": trade_gate,
         "stop_losses": _finite(state[18]) if len(state) > 18 else 0.0,
         "final_net_worth": equity[-1] if equity else initial,
+        "realized_cost_bps": _finite(fees_paid / initial * 10000) if initial else 0.0,
     }
     benchmark = _benchmark(env, lookback)
     if benchmark:
