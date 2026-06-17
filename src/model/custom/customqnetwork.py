@@ -75,6 +75,31 @@ class CustomQNetwork(QNetwork):
         elif first_module_name == "GRUFull":
             return [GRULocal(input_dim, net_arch[0], len(net_arch), with_hidden=False), nn.Linear(net_arch[0], output_dim, bias=True)]
 
+        # A -custom recipe consumes one width per layer-producing block; it MUST define exactly
+        # len(net_arch)+1 of them (one per width plus the output layer). When it doesn't, the built
+        # net's width silently diverges from the declared latent dim and training crashes deep in the
+        # forward pass (mat1×mat2 shape error). Fail fast here with an actionable message instead.
+        layer_blocks = {
+            "Linear", "NoisyLinear",
+            "weight_norm", "weight_norm2",
+            "weight_norm_noisy", "weight_norm_noisy2", "weight_norm_noisy3",
+            "weight_norm2_noisy", "weight_norm2_noisy2", "weight_norm2_noisy3",
+            "spectral_norm", "spectral_norm2",
+            "spectral_norm_noisy", "spectral_norm_noisy2", "spectral_norm_noisy3",
+            "spectral_norm2_noisy", "spectral_norm2_noisy2", "spectral_norm2_noisy3",
+            "DropConnectLinear",
+            "LSTMLocal", "LSTMLocalN", "GRULocal", "GRULocal2", "GRULocal4",
+        }
+        required = len(net_sizes) - 1
+        produced = sum(1 for m in custom_net_arch if m in layer_blocks)
+        if produced != required:
+            raise ValueError(
+                f"custom_net_arch defines {produced} layer-producing block(s) but net_arch={net_arch} "
+                f"requires exactly {required} (= len(net_arch) + 1: one per width plus the output layer). "
+                f"Fix the preset: use a net_arch with {produced - 1} width(s) for this recipe, or a recipe "
+                f"with {required} Linear-like blocks. custom_net_arch={custom_net_arch}"
+            )
+
         idx = 0
 
         for module_idx in range(len(custom_net_arch)):
