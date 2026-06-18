@@ -83,7 +83,9 @@ class BaseRLModel(AbstractModel):
             "combo_buy_profitable": self.rl_config.reward_multiplier_combo_buy_profitable,
             "combo_buy_drawdown": self.rl_config.reward_multiplier_combo_buy_drawdown,
             "combo_hold_profit": self.rl_config.reward_multiplier_combo_hold_profit,
-            "combo_hold_drawdown": self.rl_config.reward_multiplier_combo_hold_drawdown
+            "combo_hold_drawdown": self.rl_config.reward_multiplier_combo_hold_drawdown,
+            "combo_fee_penalty": self.rl_config.reward_multiplier_combo_fee_penalty,
+            "combo_noop_penalty": self.rl_config.reward_multiplier_combo_noop_penalty
         }
 
 class BaseDeepModel(AbstractModel):

@@ -243,3 +243,76 @@ def test_differential_sharpe_is_finite_and_nonzero():
     rewards = [env.step(0)[1] for _ in range(4)]
     assert all(np.isfinite(r) for r in rewards)
     assert any(abs(r) > 0 for r in rewards)
+
+
+# --- no-op action penalty (combo_all_noop) ---
+
+
+def _noop_env(reward_model="combo_all_noop"):
+    env = make_env([100] * 8)
+    env.reward_model = reward_model
+    env.reward_multipliers = dict(_MULTIPLIERS)
+    return env
+
+
+def _set_last(env, action, made, forced=0):
+    env.actions = [action]
+    env.actions_made = [made]
+    env.forced_actions = [forced]
+
+
+def test_noop_penalty_penalizes_unexecuted_buy():
+    env = _noop_env()
+    _set_last(env, 1, False, 0)  # tried to buy, nothing executed (already long / no cash)
+    assert env._noop_penalty() > 0
+
+
+def test_noop_penalty_zero_for_executed_action():
+    env = _noop_env()
+    _set_last(env, 1, True, 0)  # the agent's buy actually executed
+    assert env._noop_penalty() == 0.0
+
+
+def test_noop_penalty_zero_on_hold():
+    env = _noop_env()
+    _set_last(env, 0, False, 0)
+    assert env._noop_penalty() == 0.0
+
+
+def test_noop_penalty_fires_when_only_a_forced_tpsl_executed():
+    env = _noop_env()
+    _set_last(env, 1, True, 2)  # agent's buy was a no-op; a forced TP/SL (2) did the close
+    assert env._noop_penalty() > 0
+
+
+def test_noop_penalty_off_for_other_reward_models():
+    env = _noop_env("combo_all")
+    _set_last(env, 1, False, 0)
+    assert env._noop_penalty() == 0.0
+
+
+def test_noop_penalty_uses_configured_value():
+    env = _noop_env()
+    _set_last(env, 1, False, 0)
+    env.reward_multipliers = {**_MULTIPLIERS, "combo_noop_penalty": 0.02}
+    assert env._noop_penalty() == pytest.approx(0.02)
+
+
+def test_noop_penalty_off_when_value_zero():
+    env = _noop_env()
+    _set_last(env, 1, False, 0)
+    env.reward_multipliers = {**_MULTIPLIERS, "combo_noop_penalty": 0.0}
+    assert env._noop_penalty() == 0.0
+
+
+def test_combo_all_noop_lowers_reward_on_a_noop_buy_vs_combo_all():
+    # buy, then buy AGAIN (a no-op while already long): penalized under combo_all_noop, not combo_all.
+    noop = make_env([100, 100, 100, 100])
+    noop.setup("combo_all_noop", dict(_MULTIPLIERS))
+    noop.step(1)
+    r_noop = noop.step(1)[1]
+    plain = make_env([100, 100, 100, 100])
+    plain.setup("combo_all", dict(_MULTIPLIERS))
+    plain.step(1)
+    r_plain = plain.step(1)[1]
+    assert r_noop < r_plain

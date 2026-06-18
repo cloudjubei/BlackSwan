@@ -174,6 +174,8 @@ def build_model_config(cfg):
         rl.custom_net_arch = [[]]
     rl.reward_model = [str(cfg.get("reward_model", "combo_all2"))]
     rl.reward_multiplier_combo_noaction = [float(cfg.get("combo_noaction", 0))]
+    rl.reward_multiplier_combo_fee_penalty = [float(cfg.get("combo_fee_penalty", 1.0))]
+    rl.reward_multiplier_combo_noop_penalty = [float(cfg.get("combo_noop_penalty", 0.001))]
     rl.learning_rate = [float(cfg.get("learning_rate", 0.0001))]
     rl.gamma = [float(cfg.get("gamma", 0.99))]
     rl.batch_size = [int(cfg.get("batch_size", 512))]

@@ -125,6 +125,18 @@ def test_build_model_config_supervised_maps_levers():
     assert config.model_supervised.seed == 7
 
 
+def test_build_model_config_maps_penalty_multipliers():
+    config = config_builder.build_model_config({"combo_noop_penalty": 0.02, "combo_fee_penalty": 2.5})
+    assert config.model_rl.reward_multiplier_combo_noop_penalty == 0.02
+    assert config.model_rl.reward_multiplier_combo_fee_penalty == 2.5
+
+
+def test_build_model_config_penalty_multipliers_default():
+    config = config_builder.build_model_config({})
+    assert config.model_rl.reward_multiplier_combo_noop_penalty == 0.001
+    assert config.model_rl.reward_multiplier_combo_fee_penalty == 1.0
+
+
 def test_require_data_present_checks_the_selected_window(monkeypatch):
     seen = set()
 

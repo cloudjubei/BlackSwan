@@ -10,6 +10,10 @@ import math
 import matplotlib.pyplot as plt
 
 
+# Flat per-no-op cost for the combo_all_noop reward (≈ one default fee); scaled by combo_noop_penalty.
+_NOOP_PENALTY = 0.001
+
+
 class BaseCryptoEnv(AbstractEnv):
     """
     Base trading environment for reinforcement learning with crypto.
@@ -359,11 +363,30 @@ class BaseCryptoEnv(AbstractEnv):
         self.drawdowns.append(self._calculate_drawdown())
 
     def update_reward(self):
-        reward = self._calculate_reward() - self._turnover_penalty()
+        reward = self._calculate_reward() - self._turnover_penalty() - self._noop_penalty()
         self.total_reward += reward
         self.rewards.append(self.total_reward)
         self.rewards_history.append(reward)
         return reward
+
+    def _noop_penalty(self):
+        # combo_all_noop: penalize a "no-op" trade — the agent emits a buy/sell/short/cover that does
+        # NOT change the position (buy while already long, sell while flat, etc.), so `take_action`
+        # returned False. The combo rewards otherwise ignore these wasted/invalid decisions, leaving
+        # the agent free to spam dead actions. A flat per-no-op cost (fee-independent — it's a
+        # decision-quality signal, not a real cost) discourages that. Tunable via `combo_noop_penalty`.
+        if self.reward_model != "combo_all_noop":
+            return 0.0
+        if not self.actions or self.actions[-1] == 0:
+            return 0.0
+        # The agent's OWN action executed only if something was made AND it wasn't a forced TP/SL — if a
+        # forced exit did the work, the agent's buy/sell was still a no-op.
+        agent_executed = bool(self.actions_made[-1]) and self.forced_actions[-1] == 0
+        if agent_executed:
+            return 0.0
+        # The multiplier IS the per-no-op penalty value (combo_noop_penalty lever); 0 = off. Defaults to
+        # _NOOP_PENALTY when absent (e.g. a non-RL model whose multipliers dict omits the key).
+        return self.reward_multipliers.get("combo_noop_penalty", _NOOP_PENALTY)
 
     def _turnover_penalty(self):
         # RB4: turnover/fee-aware reward VARIANT. The combo rewards already see the realized fee
@@ -508,7 +531,7 @@ class BaseCryptoEnv(AbstractEnv):
             
             return hold_reward1 + hold_reward2 + wrong_action_reward
 
-        if self.reward_model == "combo_all" or self.reward_model == "combo_all2" or self.reward_model == "combo_all_fee":
+        if self.reward_model == "combo_all" or self.reward_model == "combo_all2" or self.reward_model == "combo_all_fee" or self.reward_model == "combo_all_noop":
             if self.actions_made[-1]: # just made an action
                 if self.actions[-1] in (2, 4) or self.tpsls[-1] != 0: # closed a position (sell/cover) or SL/TP
                     sell_net_worth = self.sells[-1]

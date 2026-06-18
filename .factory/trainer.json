@@ -57,6 +57,7 @@
         "combo_all2",
         "combo_all",
         "combo_all_fee",
+        "combo_all_noop",
         "combo",
         "combo2",
         "profit_all2",
@@ -65,13 +66,37 @@
         "differential_sharpe"
       ],
       "default": "combo_all",
-      "description": "Which reward function shapes behaviour. The combo_* family weight profit, drawdown and action-quality differently — each is a distinct approach (intentionally kept separate). combo_all_fee = combo_all plus an explicit per-trade turnover penalty. profit_percentage_direct = the raw per-step portfolio return (direct RL); differential_sharpe = Moody & Saffell online risk-adjusted return (the research-favoured kind for trading) — both reward the equity path itself rather than hand-shaped signals."
+      "description": "Which reward function shapes behaviour. The combo_* family weight profit, drawdown and action-quality differently — each is a distinct approach (intentionally kept separate). combo_all_fee = combo_all plus an explicit per-trade turnover penalty. combo_all_noop = combo_all plus an explicit penalty for NO-OP actions — a buy/sell/short/cover the agent emits that doesn't change the position (buy while already long, sell while flat, …); the other combo rewards ignore these wasted/invalid decisions, so this is the one that pushes the agent to stop spamming dead actions. profit_percentage_direct = the raw per-step portfolio return (direct RL); differential_sharpe = Moody & Saffell online risk-adjusted return (the research-favoured kind for trading) — both reward the equity path itself rather than hand-shaped signals."
     },
     "combo_noaction": {
       "type": "choice",
       "choices": [0, -1],
       "default": 0,
       "description": "Reward multiplier applied to price moves while the agent is FLAT (no position). Default 0 = direction-neutral (a flat agent is neither rewarded nor punished for which way price moves). -1 bakes a synthetic-short incentive (rewards price falling while flat) — kept as a deliberate variant to probe, NOT the default, since the agent is long-only."
+    },
+    "combo_noop_penalty": {
+      "type": "number",
+      "default": 0.001,
+      "range": [
+        0,
+        0.05
+      ],
+      "appliesWhen": {
+        "reward_model": ["combo_all_noop"]
+      },
+      "description": "ONLY for reward_model = combo_all_noop: the penalty subtracted each time the agent emits a NO-OP trade — a buy while ALREADY holding the asset, or a sell while holding cash (the action can't change the position). 0 = off. Sweep it to find how hard to discourage dead actions without suppressing real trades."
+    },
+    "combo_fee_penalty": {
+      "type": "number",
+      "default": 1,
+      "range": [
+        0,
+        10
+      ],
+      "appliesWhen": {
+        "reward_model": ["combo_all_fee"]
+      },
+      "description": "ONLY for reward_model = combo_all_fee: weight on the per-trade turnover penalty (penalty = transaction_fee × this) that discourages over-trading/churn. 0 = off (combo_all_fee then behaves like combo_all)."
     },
     "trade_gate_mode": {
       "type": "choice",
@@ -531,7 +556,7 @@
     },
     {
       "label": "▶ Exp 9 · Direct/recurrent rewards (1h winner)",
-      "sweep": { "reward_model": ["combo_all", "profit_percentage_direct", "differential_sharpe"] },
+      "sweep": { "reward_model": ["combo_all", "combo_all_noop", "profit_percentage_direct", "differential_sharpe"] },
       "fixed": {
         "timeframe": "1h",
         "model_name": "reppo-custom",
@@ -660,6 +685,34 @@
       "thesisTarget": "model_name"
     },
     {
+      "label": "▶ Exp 15 · No-op penalty sweep (combo_all_noop strength)",
+      "sweep": {
+        "combo_noop_penalty": [
+          0,
+          0.001,
+          0.005,
+          0.02
+        ]
+      },
+      "fixed": {
+        "timeframe": "1h",
+        "model_name": "reppo-custom",
+        "net_arch": "512,64",
+        "reward_model": "combo_all_noop",
+        "learning_rate": 0.0001,
+        "learning_starts": 20000,
+        "batch_size": 512,
+        "buffer_size": 1000000,
+        "gamma": 0.99,
+        "optimizer_class": "RMSprop",
+        "activation_fn": "CELU",
+        "device": "cpu"
+      },
+      "seeds": 3,
+      "thesis": "how hard should no-op buys/sells (buy while already long, sell while holding cash) be penalized? 0 = off (≈ combo_all) up to a strong penalty.",
+      "thesisTarget": "combo_noop_penalty"
+    },
+    {
       "label": "Buy & hold (control)",
       "fixed": {
         "model_name": "hodl",
@@ -668,6 +721,236 @@
     }
   ],
   "papers": [
+    {
+      "id": "no-champions-tsf-2025",
+      "title": "There are no Champions in Long-Term Time Series Forecasting",
+      "url": "https://arxiv.org/abs/2502.14045",
+      "authors": "Brigato, Morand, Strommen, Panagiotou, Schmidt, Mougiakakou",
+      "year": 2025,
+      "claim": "Across 14 datasets and ~5000 trained nets, pairwise differences among DLinear/PatchTST/iTransformer/TimeMixer/TimeXer are mostly statistically INSIGNIFICANT (Friedman p~0.95); the 'champion' flips with setup + metric — no universal best forecaster.",
+      "approach": "Large-scale, statistically-rigorous re-benchmark of long-term TSF models.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "long-horizon forecasting MSE/accuracy, not trading P&L or crypto"
+      },
+      "verdictNote": "Supports the WEAK form ('simpler TIES complex') and undercuts any blanket 'X wins'. For BlackSwan: demand a margin that survives multiple windows/seeds before crediting attn/tcn over the MLP.",
+      "tags": [
+        "architecture-evidence",
+        "forecasting",
+        "no-universal-champion",
+        "benchmarking",
+        "methodology",
+        "supports-simpler-ties"
+      ],
+      "replicateConfig": {},
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "dlinear-transformers-effective-2023",
+      "title": "Are Transformers Effective for Time Series Forecasting?",
+      "url": "https://arxiv.org/abs/2205.13504",
+      "authors": "Zeng, Chen, Zhang, Xu",
+      "year": 2023,
+      "claim": "A 1-layer linear model (DLinear/LTSF-Linear) outperforms FEDformer/Autoformer/Informer in all tested cases (often 20-50%); a naive repeat-last beats all Transformers ~45% on the financial Exchange-rate set — high-capacity Transformers overfit noisy series.",
+      "approach": "Strips Transformers to a linear baseline (trend+seasonal decomposition) across LTSF benchmarks.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "forecasting MSE; contested by PatchTST/iTransformer"
+      },
+      "verdictNote": "Core SUPPORT for 'simpler wins on noisy financial data' — the prior reason to treat MLP/GBM as BlackSwan champions-to-beat. Contested (see the HF rebuttal blog).",
+      "tags": [
+        "architecture-evidence",
+        "forecasting",
+        "linear-beats-transformer",
+        "overfitting",
+        "supports-simpler-wins"
+      ],
+      "replicateConfig": {},
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "grinsztajn-trees-tabular-2022",
+      "title": "Why do tree-based models still outperform deep learning on typical tabular data?",
+      "url": "https://arxiv.org/abs/2207.08815",
+      "authors": "Grinsztajn, Oyallon, Varoquaux",
+      "year": 2022,
+      "claim": "Tree ensembles (XGBoost/RF/GBT) remain SOTA over deep nets on medium tabular data (~10K samples) even after ~20k compute-hours of tuning — NNs overfit irregular targets + uninformative features and are rotation-invariant.",
+      "approach": "Standardized benchmark of trees vs deep nets across 45 tabular datasets.",
+      "assumptions": {
+        "netOfCosts": false,
+        "notes": "i.i.d. tabular, not time series — analogical transfer; gap narrows with more data"
+      },
+      "verdictNote": "Supports 'engineered-features -> tabular -> trees/MLP win' in BlackSwan's small-sample regime; grounds supervised-gbm as a hard baseline.",
+      "tags": [
+        "architecture-evidence",
+        "tabular",
+        "trees-vs-deep",
+        "small-sample",
+        "gbm",
+        "supports-simpler-wins"
+      ],
+      "replicateConfig": {},
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "elsayed-need-dl-tsf-2021",
+      "title": "Do We Really Need Deep Learning Models for Time Series Forecasting?",
+      "url": "https://arxiv.org/abs/2101.02118",
+      "authors": "Elsayed, Thyssens, Rashed, Jomaa, Schmidt-Thieme",
+      "year": 2021,
+      "claim": "A window-based feature transformation lifts a simple GBRT to beat 7 of 8 SOTA deep baselines (incl. Exchange-rate); the lift comes from the INPUT transformation, not the learner. (Internal counter: TFT, an attention model, consistently beats GBRT.)",
+      "approach": "Reframes forecasting as tabular regression via windowed features, then GBRT.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "forecasting metrics; one deep model (TFT) still beats GBRT"
+      },
+      "verdictNote": "The closest analog to BlackSwan's multi-timeframe stacking + supervised-gbm: engineered features carry the signal. Note the TFT counterexample.",
+      "tags": [
+        "architecture-evidence",
+        "feature-engineering",
+        "gbrt",
+        "window-features",
+        "supports-simpler-wins"
+      ],
+      "replicateConfig": {},
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "dl-financial-risk-adjusted-benchmark-2026",
+      "title": "Deep Learning for Financial Time Series: A Large-Scale Benchmark of Risk-Adjusted Performance",
+      "url": "https://arxiv.org/abs/2603.01820",
+      "authors": "Saly-Kaufmann, Wood, Peter-Calliess, Zohren",
+      "year": 2026,
+      "claim": "Cross-asset daily-futures benchmark (rolling OOS + breakeven-cost analysis): hybrid LSTM/PatchTST models top by Sharpe (~2.3-2.4) with the largest cost buffer, while a temporally-aware linear (DLinear ~0.64) UNDERperformed a trivial AR(1).",
+      "approach": "Large-scale, cost-aware, risk-adjusted backtest of DL architectures across asset classes 2010-2025.",
+      "assumptions": {
+        "fees": true,
+        "netOfCosts": true,
+        "multiAsset": true,
+        "notes": "futures not single-asset crypto; doesn't test stacked-MLP/GBT"
+      },
+      "verdictNote": "REFUTES the strong 'simpler wins' form in a finance + COSTS setting — the key counter-evidence. For BlackSwan: sequence models CAN win on risk-adjusted P&L; the metric (P&L vs accuracy) is the pivot.",
+      "tags": [
+        "architecture-evidence",
+        "finance",
+        "transaction-costs",
+        "sharpe",
+        "walk-forward",
+        "refutes-simpler-wins"
+      ],
+      "replicateConfig": {},
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "patchmlp-2024",
+      "title": "Unlocking the Power of Patch: Patch-Based MLP for Long-Term Time Series Forecasting",
+      "url": "https://arxiv.org/abs/2405.13575",
+      "authors": "Tang, Zhang",
+      "year": 2024,
+      "claim": "An attention-free patch-based MLP beats PatchTST and iTransformer on long-term forecasting — the recent gains come from PATCHING + channel handling, not attention.",
+      "approach": "Patch embedding + channel mixing/independence in a pure MLP.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "forecasting MSE"
+      },
+      "verdictNote": "Supports 'the input handling / inductive bias matters more than attention' — a well-fed MLP can match transformers.",
+      "tags": [
+        "architecture-evidence",
+        "forecasting",
+        "mlp",
+        "patching",
+        "attention-free",
+        "supports-simpler-wins"
+      ],
+      "replicateConfig": {},
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "hf-transformers-effective-tsf-2023",
+      "title": "Yes, Transformers are Effective for Time Series Forecasting (+ Autoformer)",
+      "url": "https://huggingface.co/blog/autoformer",
+      "authors": "Hugging Face (Rasul et al.)",
+      "year": 2023,
+      "claim": "Rebuttal to DLinear: a size-matched, properly-designed Transformer (plus RevIN for distribution shift) matches/beats the linear model — 'Transformers aren't ineffective, they were improperly used.'",
+      "approach": "Fair re-run of DLinear vs a comparable Transformer + Autoformer with normalization.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "blog (not peer-reviewed); forecasting MSE"
+      },
+      "verdictNote": "Balancing/REFUTING the simpler-wins claim — argues linear-beats-transformer was a fairness artifact. Keep as the counterpoint to DLinear.",
+      "tags": [
+        "architecture-evidence",
+        "forecasting",
+        "rebuttal",
+        "transformer",
+        "refutes-simpler-wins",
+        "blog"
+      ],
+      "replicateConfig": {},
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "m5-competition-2022",
+      "title": "The M5 competition: Results, findings, and conclusions",
+      "url": "https://www.sciencedirect.com/science/article/pii/S0169207021001874",
+      "authors": "Makridakis, Spiliotis, Assimakopoulos",
+      "year": 2022,
+      "claim": "In the M5 competition (42,840 series), all top methods were pure ML; LightGBM was the most-used and the winner; DeepAR placed ~3rd and N-BEATS only at high aggregation.",
+      "approach": "The largest open forecasting competition (Walmart retail demand).",
+      "assumptions": {
+        "netOfCosts": false,
+        "multiAsset": true,
+        "notes": "retail demand not finance; leans on POOLING across thousands of correlated series — not available single-asset"
+      },
+      "verdictNote": "Supports 'GBM wins' — but the edge comes from cross-series pooling, an advantage BlackSwan (single asset) does NOT have. Read with that caveat.",
+      "tags": [
+        "architecture-evidence",
+        "forecasting",
+        "gbm",
+        "lightgbm",
+        "competition",
+        "pooling-caveat"
+      ],
+      "replicateConfig": {},
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "tsfm-finance-revisiting-2025",
+      "title": "Re(Visiting) Time Series Foundation Models in Finance",
+      "url": "https://arxiv.org/abs/2511.18578",
+      "authors": "Rahimikia, Ni, Wang",
+      "year": 2025,
+      "claim": "Across global markets, off-the-shelf time-series foundation models do NOT consistently beat a simple gradient-boosted tree; only heavy financial-domain pretraining helps.",
+      "approach": "Empirical eval of pretrained TSFMs vs simple baselines on financial forecasting.",
+      "assumptions": {
+        "netOfCosts": false,
+        "notes": "cross-sectional equities, not single-asset crypto trading P&L"
+      },
+      "verdictNote": "Supports 'a simple GBT is a hard baseline in finance' even vs large pretrained models. Grounds the supervised-gbm baseline.",
+      "tags": [
+        "architecture-evidence",
+        "finance",
+        "foundation-models",
+        "gbt",
+        "supports-simpler-wins"
+      ],
+      "replicateConfig": {},
+      "status": "untested",
+      "source": "manual"
+    },
     {
       "id": "theate-ernst-tdqn-2021",
       "title": "An Application of Deep Reinforcement Learning to Algorithmic Trading",

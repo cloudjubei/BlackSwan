@@ -46,6 +46,8 @@ class ModelRLConfigSearch:
     reward_multiplier_combo_buy_drawdown: List[float] = field(default_factory=[])
     reward_multiplier_combo_hold_profit: List[float] = field(default_factory=[])
     reward_multiplier_combo_hold_drawdown: List[float] = field(default_factory=[])
+    reward_multiplier_combo_fee_penalty: List[float] = field(default_factory=[])
+    reward_multiplier_combo_noop_penalty: List[float] = field(default_factory=[])
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
@@ -96,6 +98,8 @@ class ModelRLConfig:
     reward_multiplier_combo_buy_drawdown: float = 0,
     reward_multiplier_combo_hold_profit: float = 0,
     reward_multiplier_combo_hold_drawdown: float = 0,
+    reward_multiplier_combo_fee_penalty: float = 1.0
+    reward_multiplier_combo_noop_penalty: float = 0.001
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
@@ -586,6 +590,8 @@ model_rl = ModelConfigSearch(
         reward_multiplier_combo_hold_profit= [10],
         # reward_multiplier_combo_hold_drawdown= [0.0001, 0.01, 0.001, 1], #
         reward_multiplier_combo_hold_drawdown= [0.0001],
+        reward_multiplier_combo_fee_penalty= [1.0],
+        reward_multiplier_combo_noop_penalty= [0.001],
 
         # checkpoint_to_load='rl_reppo-custom_combo_all2_0~0001_20000_512_1000000_0~99_RMSprop_CELU_512]64_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1733280295~7779999'
     )
@@ -686,6 +692,8 @@ model_rl_dip = ModelConfigSearch(
         reward_multiplier_combo_buy_drawdown= [0.001],
         reward_multiplier_combo_hold_profit= [10],
         reward_multiplier_combo_hold_drawdown= [0.0001],
+        reward_multiplier_combo_fee_penalty= [1.0],
+        reward_multiplier_combo_noop_penalty= [0.001],
 
         # checkpoint_to_load= 'rl_munchausen-dqn-custom_dip_0~0001_1000_512_100000_0~99_RMSprop_CELU_8192]512_Batcd-weigm-actin-Dropt-weigm-Dropt-actin-weigm_1_1734351613~7001207'
     )
@@ -866,6 +874,8 @@ class ModelRLConfig:
     reward_multiplier_combo_buy_drawdown: float = 0,
     reward_multiplier_combo_hold_profit: float = 0,
     reward_multiplier_combo_hold_drawdown: float = 0,
+    reward_multiplier_combo_fee_penalty: float = 1.0
+    reward_multiplier_combo_noop_penalty: float = 0.001
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
