@@ -38,7 +38,7 @@ from src.data.data_factory import create_provider
 from src.environment.env_factory import create_environment
 from src.model.model_factory import create_model
 
-from trainer import config_builder, summary as summary_mod
+from trainer import config_builder, decision_trace, summary as summary_mod
 
 try:
     import torch
@@ -178,6 +178,16 @@ def main(argv=None):
     ran_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     env_test, state, model, is_rl, train_seconds = _run_one(cfg)
     out = summary_mod.build_summary(env_test, state, cfg, model, ran_at, is_rl)
+
+    if not args.calibrate:
+        # Explain WHY the model acted: replay the deterministic test once more to capture per-step
+        # confidence/Q-values + attribution onto out['artifacts']['decisionTrace']. Best-effort — a
+        # failure here must not fail an otherwise-good run, and it resets env_test (read AFTER the
+        # summary is built).
+        try:
+            decision_trace.attach_decision_trace(out, env_test, model, cfg, args.summary_out, is_rl)
+        except Exception as exc:
+            print(f"decision-trace skipped: {exc}")
 
     if args.evaluate:
         out["evaluation"] = {"checkpoint": str(cfg.get("checkpoint_to_load") or ""), "episodes": 0}
