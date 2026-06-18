@@ -14,6 +14,7 @@ from src.model.custom.customqnetwork import CustomQNetwork
 from src.model.custom.dgwo import DGWO
 from src.model.custom.ensemble.ensemble import EnsembleModel
 from src.model.custom.policies import CustomActorCriticPolicy, CustomDQNPolicy, CustomDuelingDQNPolicy, CustomQRDQNPolicy, CustomRainbowPolicy, CustomRecurrentActorCriticPolicy
+from src.model.custom.sequence_extractor import SequenceFeaturesExtractor
 from src.model.custom.policy_iqn import CustomIQNPolicy
 from src.model.dqn_lstm_policy import LSTMFCE
 from src.model.dueling_dqn.dueling_dqn import DuelingDQN
@@ -260,6 +261,28 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                            "custom_net_arch": config.model_rl.custom_net_arch
                        })
     
+    elif config.model_rl.model_name in ("attn-ppo", "tcn-ppo"):
+        # PPO over a true SEQUENCE features-extractor (self-attention / TCN) that reshapes the flat
+        # obs back to its [lookback, per_bar] bar grid and encodes over the bars — the principled way
+        # to add modern sequence architectures (the custom_net_arch attention tokens run on the flat
+        # vector, not a real sequence). The extractor takes lookback from the env's data provider.
+        encoder = "attn" if config.model_rl.model_name == "attn-ppo" else "tcn"
+        print(f"Loading {config.model_rl.model_name} - PPO with a {encoder} sequence features-extractor")
+        rl_model = PPO(env=env, policy='MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=config.model_rl.target_update_interval, batch_size= config.model_rl.batch_size,
+                       n_epochs=1,
+                       gamma= config.model_rl.gamma,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "features_extractor_class": SequenceFeaturesExtractor,
+                           "features_extractor_kwargs": {
+                               "lookback": env.data_provider.get_lookback_window(),
+                               "encoder": encoder,
+                               "features_dim": 64,
+                           },
+                       })
     elif config.model_rl.model_name == "trpo":
         print(f"Loading TRPO - Trust Region Policy Optimization model")
         rl_model = TRPO(env=env, policy= 'MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=config.model_rl.target_update_interval, batch_size= config.model_rl.batch_size, 
