@@ -31,6 +31,9 @@ class AbstractModel(ABC):
     def is_pretrained(self):
         return False
 
+    def produces_checkpoint(self) -> bool:
+        return False
+
     def show_train_render(self) -> bool:
         return False
     
@@ -55,7 +58,10 @@ class BaseRLModel(AbstractModel):
     
     def is_pretrained(self):
         return self.rl_config.checkpoint_to_load is not None
-    
+
+    def produces_checkpoint(self) -> bool:
+        return True
+
     def get_reward_model(self):
         return self.rl_config.reward_model
     

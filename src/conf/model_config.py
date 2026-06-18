@@ -159,6 +159,20 @@ class ModelRegressionConfig:
     decision_threshold: float = 0.5
 
 @dataclass
+class ModelSupervisedConfigSearch:
+    model_name: List[str] = field(default_factory=[])  # possible ["supervised-logreg", "supervised-gbm"]
+    forward_horizon: List[int] = field(default_factory=[])
+    prob_threshold: List[float] = field(default_factory=[])
+    seed: int | None = None
+    checkpoint_to_load: str | None = None
+@dataclass
+class ModelSupervisedConfig:
+    model_name: str = 'supervised-logreg'  # "supervised-logreg" | "supervised-gbm"
+    forward_horizon: int = 1  # label = sign of the return over the next N steps
+    prob_threshold: float = 0.5  # go long when P(up) exceeds this
+    seed: int | None = None
+    checkpoint_to_load: str | None = None
+@dataclass
 class ModelTimeConfigSearch:
     time_buy: List[int] = field(default_factory=[1200])
     time_sell: List[int] = field(default_factory=[1400])
@@ -192,21 +206,23 @@ class ModelTechnicalConfig:
     sell_is_up_check: bool = True
 @dataclass
 class ModelConfigSearch:
-    model_type: str # possible ["hodl", "rl", "technical", "time"]
-    model_rl: ModelRLConfigSearch | None = None    
+    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time"]
+    model_rl: ModelRLConfigSearch | None = None
     model_regression: ModelRegressionConfigSearch | None = None
+    model_supervised: ModelSupervisedConfigSearch | None = None
     model_technical: ModelTechnicalConfigSearch | None = None
     model_time: ModelTimeConfigSearch | None = None
 @dataclass
 class ModelConfig:
-    model_type: str # possible ["hodl", "rl", "technical", "time"]
+    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time"]
     iterations_to_pick_best: int = 10
     # iterations_to_pick_best: int = 1
     model_rl: ModelRLConfig | None = None
     model_regression: ModelRegressionConfig | None = None
+    model_supervised: ModelSupervisedConfig | None = None
     model_technical: ModelTechnicalConfig | None = None
     model_time: ModelTimeConfig | None = None
-    
+
     def is_deep(self) -> bool:
         return self.model_type == "rl" or self.model_type == "regression"
     def is_hodl(self) -> bool:

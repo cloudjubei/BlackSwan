@@ -1,7 +1,7 @@
 {
   "name": "blackswan",
   "recordType": "blackswan-run",
-  "description": "BlackSwan trains reinforcement-learning agents to trade a SINGLE crypto asset (BTCUSDT) on the spot market, long-only by default, under realistic 0.1% per-trade fees. Each run trains on historical klines and is tested OUT-OF-SAMPLE (walk-forward windows 2022/2023/2024, expanding train); the agent observes multi-timeframe OHLCV (e.g. stacked 1h+1d layers) plus optional technical indicators. The objective is traded_return = total post-fee return gated by trade frequency (trade often AND well — a near-hold run scores ~0). In the strong presets the agent has NO explicit sell action (no_sell_action): it only times entries and exits are forced by take-profit/stop-loss/trailing-stop — so 'many buys, few sells' is by design, not a bug. 'Good' = a setup that trades often and profitably AND beats buy-and-hold on risk-adjusted terms (positive sharpe_alpha) net of fees, stable across seeds and walk-forward windows.",
+  "description": "BlackSwan trains reinforcement-learning agents to trade a SINGLE crypto asset (BTCUSDT) on the spot market, long-only by default, under realistic 0.1% per-trade fees. Each run trains on historical klines and is tested OUT-OF-SAMPLE (walk-forward windows 2022/2023/2024, expanding train); the agent observes multi-timeframe OHLCV (e.g. stacked 1h+1d layers) plus optional technical indicators. The objective is traded_return = total post-fee return gated by trade frequency (trade often AND well — a near-hold run scores ~0). In the strong presets the agent has NO explicit sell action (no_sell_action): it only times entries and exits are forced by take-profit/stop-loss/trailing-stop — so 'many buys, few sells' is by design, not a bug. 'Good' = a setup that trades often and profitably AND beats buy-and-hold (positive return_vs_hold_pct) net of fees, stable across seeds and walk-forward windows.",
   "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
   "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
   "objective": {
@@ -42,10 +42,12 @@
         "dqn",
         "ppo",
         "a2c",
+        "supervised-logreg",
+        "supervised-gbm",
         "hodl"
       ],
       "default": "reppo-custom",
-      "description": "The RL algorithm / policy. '-custom' variants use tuned network internals; 'hodl' is the buy-and-hold control."
+      "description": "The algorithm / policy. '-custom' RL variants use tuned network internals. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control — research favours supervised+rules for single-asset trading). 'hodl' is the buy-and-hold control."
     },
     "reward_model": {
       "type": "choice",
@@ -245,6 +247,24 @@
       "type": "boolean",
       "default": false,
       "description": "Add a curated set of indicators (RSI/Williams/Stochastic/Choppiness + tanh-squashed meanReversion/turbulence/OBV + a realized-vol regime and a trend-slope feature) as features, computed at RUNTIME from OHLCV — so it works on BOTH 1d and the 1m-derived 1h path. Past RL runs found indicators didn't help on 1d; re-test under v3 scoring with the added regime/trend context."
+    },
+    "forward_horizon": {
+      "type": "number",
+      "default": 1,
+      "range": [
+        1,
+        10
+      ],
+      "description": "SUPERVISED baseline only: the classifier's label is the SIGN of the return over the next N steps (1 = next bar). Longer horizons predict a slower trend rather than next-bar noise. Ignored by RL/hodl models."
+    },
+    "prob_threshold": {
+      "type": "number",
+      "default": 0.5,
+      "range": [
+        0.5,
+        0.9
+      ],
+      "description": "SUPERVISED baseline only: go long only when the classifier's P(up) exceeds this (0.5 = act on any edge; higher = trade only high-confidence signals, fewer trades). Ignored by RL/hodl models."
     },
     "obs_squash": {
       "type": "choice",
@@ -574,59 +594,16 @@
       "thesisTarget": "obs_squash"
     },
     {
-      "label": "TRPO-custom · 512,64 (~+60%)",
+      "label": "▶ Exp 12 · Exit-mechanic sweep (SL × TP × trailing)",
+      "environments": [
+        { "stop_loss": 0.02, "take_profit": 0, "trailing_take_profit": 0 },
+        { "stop_loss": 0.02, "take_profit": 0.02, "trailing_take_profit": 0 },
+        { "stop_loss": 0.01, "take_profit": 0.05, "trailing_take_profit": 0 },
+        { "stop_loss": 0.02, "take_profit": 0.05, "trailing_take_profit": 0.005 },
+        { "stop_loss": 0.02, "take_profit": 0.02, "trailing_take_profit": 0.001 }
+      ],
       "fixed": {
-        "model_name": "trpo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_all",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
         "timeframe": "1h",
-        "device": "cpu"
-      }
-    },
-    {
-      "label": "Duel-DQN-custom · 512,256,64,32 (~+60%)",
-      "fixed": {
-        "model_name": "duel-dqn-custom",
-        "net_arch": "512,256,64,32",
-        "reward_model": "combo_all",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "timeframe": "1h",
-        "device": "cpu"
-      }
-    },
-    {
-      "label": "TRPO-custom · 512,128,32 (~+50%)",
-      "fixed": {
-        "model_name": "trpo-custom",
-        "net_arch": "512,128,32",
-        "reward_model": "combo_all",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "timeframe": "1h",
-        "device": "cpu"
-      }
-    },
-    {
-      "label": "Reppo-custom · 512,64 (~+50%, win 67%)",
-      "fixed": {
         "model_name": "reppo-custom",
         "net_arch": "512,64",
         "reward_model": "combo_all",
@@ -637,43 +614,27 @@
         "gamma": 0.99,
         "optimizer_class": "RMSprop",
         "activation_fn": "CELU",
-        "timeframe": "1h",
+        "no_sell_action": true,
         "device": "cpu"
-      }
+      },
+      "seeds": 3,
+      "thesis": "with exits driven only by TP/SL (no_sell_action), which stop-loss / take-profit / trailing profile trades best?",
+      "thesisTarget": "take_profit"
     },
     {
-      "label": "Duel-DQN-custom-LSTM · 512,256,64,32 (~+50%)",
+      "label": "▶ Exp 13 · Supervised baseline (logreg vs gbm vs RL vs hold)",
+      "sweep": { "model_name": ["supervised-logreg", "supervised-gbm", "reppo-custom", "hodl"] },
       "fixed": {
-        "model_name": "duel-dqn-custom-lstm",
-        "net_arch": "512,256,64,32",
-        "reward_model": "combo_all",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
         "timeframe": "1h",
-        "device": "cpu"
-      }
-    },
-    {
-      "label": "Duel-DQN-custom · 512,128,32 (~+30%, win 80%)",
-      "fixed": {
-        "model_name": "duel-dqn-custom",
-        "net_arch": "512,128,32",
+        "net_arch": "512,64",
         "reward_model": "combo_all",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "timeframe": "1h",
+        "use_indicators": true,
+        "stop_loss": 0.02,
         "device": "cpu"
-      }
+      },
+      "seeds": 3,
+      "thesis": "does a supervised classifier + rules beat end-to-end RL (and buy-and-hold) on the same 1h features?",
+      "thesisTarget": "model_name"
     },
     {
       "label": "Buy & hold (control)",
@@ -681,6 +642,570 @@
         "model_name": "hodl",
         "timeframe": "1h"
       }
+    }
+  ],
+  "papers": [
+    {
+      "id": "theate-ernst-tdqn-2021",
+      "title": "An Application of Deep Reinforcement Learning to Algorithmic Trading",
+      "url": "https://arxiv.org/abs/2004.06627",
+      "authors": "Thibaut Théate, Damien Ernst",
+      "year": 2021,
+      "claim": "Introduces TDQN (Trading Deep Q-Network), a DQN adapted to single-asset algorithmic trading that trains one agent per instrument to maximize the annualised Sharpe ratio, using artificial-trajectory data augmentation. On a 30-instrument testbench it claims to outperform passive and active benchmarks on average, while candidly reporting mixed, asset-dependent results and overfitting on some stocks.",
+      "approach": "A five-layer feedforward Deep Q-Network learns a discrete long/short/neutral position policy per asset; training is bootstrapped from artificial trajectories synthesized from limited historical OHLCV, and the 0.1% trading cost is folded directly into the decision process. One model is trained per stock (single-asset, single-split OOS) with shared hyperparameters across the testbench.",
+      "claimedMetrics": {
+        "sharpe_tdqn_avg": 0.404,
+        "sharpe_buyhold_avg": 0.369,
+        "fee_pct": 0.1,
+        "num_assets": 30,
+        "train_years": 6,
+        "test_years": 2
+      },
+      "assumptions": {
+        "fees": true,
+        "frictionless": false,
+        "netOfCosts": true,
+        "multiAsset": false,
+        "retrainCadence": "Train once on 2012-2017, evaluate frozen policy on 2018-2019; no retraining/walk-forward, no online learning on the test set (DNN params fixed during test execution).",
+        "notes": "Single fixed train/test split per asset, NOT walk-forward; equities/indices only (no crypto); training leans on artificial-trajectory augmentation; a validation subset of the training set is used for hyperparameter tuning, so the test set is a single OOS holdout; authors explicitly acknowledge overfitting on some stocks (e.g. Tesla) and cite Bailey/Lopez de Prado backtest-overfitting risk."
+      },
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "dqn",
+          "reward_model": "differential_sharpe",
+          "timeframe": "1d",
+          "use_indicators": true,
+          "position_sizing": "fixed",
+          "allow_shorting": true,
+          "net_arch": "512,128,32",
+          "lookback_window": 32
+        },
+        "sweep": {
+          "walk_forward_window": [
+            2022,
+            2023,
+            2024
+          ]
+        },
+        "seeds": 3
+      },
+      "verdictNote": "Ideal protocol match (single-asset, one agent per instrument, OOS test, 0.1% per-trade fees explicitly modelled and deducted), so it transfers cleanly to BTC. BUT the headline edge is thin: testbench AVERAGE Sharpe is TDQN 0.404 vs B&H 0.369, a marginal margin over a passive baseline in a mostly bullish 2018-2019 window, with highly dispersed per-asset results. The authors flag overfitting and reliance on artificial-trajectory augmentation. A 0.04-Sharpe single-split beat is fragile and unlikely to robustly survive walk-forward; on BTC the long-bias of B&H is even stronger, so 'beats B&H' could easily flip. Replicate as a baseline DRL method; treat 'beats B&H' as borderline/fluff-risk until reproduced walk-forward at 0.1% fees on BTC.",
+      "tags": [
+        "positive-method",
+        "DRL",
+        "DQN",
+        "single-asset",
+        "per-asset-training",
+        "sharpe-objective",
+        "equities",
+        "fees-modelled-0.1pct",
+        "most-cited",
+        "replication-candidate"
+      ],
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "zhang-zohren-roberts-drl-2020",
+      "title": "Deep Reinforcement Learning for Trading",
+      "url": "https://arxiv.org/abs/1911.10107",
+      "authors": "Zihao Zhang, Stefan Zohren, Stephen Roberts",
+      "year": 2020,
+      "claim": "Deep RL trading agents (DQN, Policy Gradient, A2C) over discrete and continuous action spaces, with volatility scaling, outperform classical time-series momentum baselines on 50 liquid futures and continue to deliver positive profits even under heavy transaction costs (up to ~25bp per trade).",
+      "approach": "Three deep RL algorithms — DQN (discrete {-1,0,1}), Policy Gradients (discrete), and A2C (continuous [-1,1]) — map normalised prices, multi-horizon returns (1/2/3-month, 1-year), MACD and RSI into a target position. Reward is volatility-scaled to size positions inversely to market volatility, then aggregated across a 50-contract diversified portfolio with vol-targeting.",
+      "claimedMetrics": {
+        "sharpe_dqn": 1.288,
+        "sharpe_a2c": 1.05,
+        "sharpe_signR_baseline": 0.441,
+        "sharpe_macd_baseline": 0.091,
+        "cost_tolerance_bp": 25
+      },
+      "assumptions": {
+        "fees": true,
+        "frictionless": false,
+        "netOfCosts": true,
+        "multiAsset": true,
+        "retrainCadence": "Expanding-window retrain every 5 years with parameters frozen for the next 5-year block; OOS spans 2011-2019. Coarse two/three-fold walk-forward, NOT tight rolling re-train.",
+        "notes": "Headline Sharpe (1.288/1.050) is a 50-contract DIVERSIFIED, vol-targeted FUTURES portfolio — much of the Sharpe comes from cross-sectional diversification and vol-targeting, not the RL signal alone. Positions are long-AND-short and vol-scaled (continuous sizing). Costs modelled as bp-per-trade up to 25bp with explicit sensitivity curves. Profitability stated at portfolio level, not single-asset breakeven. Coarse 5-year retrain blocks risk regime-staleness."
+      },
+      "replicateConfig": {
+        "fixed": {
+          "reward_model": "differential_sharpe",
+          "timeframe": "1d",
+          "use_indicators": true,
+          "position_sizing": "vol_target",
+          "vol_target": 0.15,
+          "allow_shorting": true,
+          "lookback_window": 64
+        },
+        "sweep": {
+          "model_name": [
+            "dqn",
+            "a2c",
+            "ppo-custom"
+          ],
+          "walk_forward_window": [
+            2022,
+            2023,
+            2024
+          ]
+        },
+        "seeds": 3
+      },
+      "verdictNote": "Highly-cited benchmark (Oxford-Man, JFDS 2020); the algorithm/feature menu (DQN/PG/A2C + momentum + MACD/RSI + vol-scaling) maps directly onto the registry. BUT headline Sharpe does NOT transfer to single-asset BTC spot: (1) it is a 50-contract diversified portfolio — diversification and vol-targeting carry most of the 1.0-1.3 Sharpe, gone for one asset; (2) long-AND-short continuous sizing vs long-biased; (3) futures cost structure (~25bp) is not the same as 0.1%=10bp round-trip on spot. Their 25bp tolerance is nominally above 10bp, encouraging IF it survives single-asset. The 5-year frozen-retrain walk-forward is coarse. Replicate the algorithm menu + vol-scaling, but independently re-verify 'survives heavy costs' at single-asset BTC under 0.1%/trade with a finer rolling retrain.",
+      "tags": [
+        "positive-method",
+        "rl",
+        "dqn",
+        "policy-gradient",
+        "a2c",
+        "actor-critic",
+        "momentum",
+        "technical-indicators",
+        "volatility-scaling",
+        "walk-forward",
+        "long-short",
+        "transaction-costs"
+      ],
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "moody-saffell-rrl-2001",
+      "title": "Learning to Trade via Direct Reinforcement",
+      "url": "https://doi.org/10.1109/72.935097",
+      "authors": "John Moody, Matthew Saffell",
+      "year": 2001,
+      "claim": "Direct/recurrent reinforcement learning (RRL) — the policy outputs a trading position directly with no value function or price forecast, trained by gradient ascent on a risk-adjusted utility — discovers profitable trading systems while accounting for transaction costs. RRL outperforms Q-learning, and optimizing the differential Sharpe ratio yields more consistent results than maximizing profit; both beat a forecast/MSE-based trader. Demonstrates predictability in the monthly S&P 500 (1970-1994).",
+      "approach": "A recurrent policy maps recent returns/indicators plus its own prior position directly to a new long/short/neutral position; parameters trained by online gradient ascent on a risk-adjusted utility (the differential Sharpe ratio, an incrementally-updatable per-step reward), with an explicit transaction-cost penalty in the reward so the agent learns not to over-trade.",
+      "claimedMetrics": {
+        "transaction_cost_pct": 0.5,
+        "sp500_test_years": 25
+      },
+      "assumptions": {
+        "fees": true,
+        "frictionless": false,
+        "netOfCosts": true,
+        "multiAsset": false,
+        "retrainCadence": "Online/incremental adaptive updating; reported on a single rolling historical path rather than a formal repeated walk-forward protocol.",
+        "notes": "Single-asset (one index / one FX pair), single historical path; monthly S&P 500 (1970-1994) and half-hourly USD/GBP FX. Costs modelled at ~0.5% round-trip on instruments far cheaper/less volatile than crypto. No multiple-trials / deflated-Sharpe correction, no formal multi-fold walk-forward, effectively single in-sample-tuned evaluation. Deliberately low turnover. Predates modern backtest-overfitting controls."
+      },
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "reppo-custom",
+          "reward_model": "differential_sharpe",
+          "timeframe": "1d",
+          "use_indicators": true,
+          "position_sizing": "fixed",
+          "allow_shorting": true,
+          "lookback_window": 32
+        },
+        "sweep": {
+          "walk_forward_window": [
+            2022,
+            2023,
+            2024
+          ]
+        },
+        "seeds": 3
+      },
+      "verdictNote": "Genuinely seminal POSITIVE method — the long/short single-asset RRL framing maps almost 1:1 onto long-biased single-BTC spot with optional shorting, and the in-reward transaction-cost term plus differential Sharpe are directly portable (this is the seed for our differential_sharpe reward). BUT original evidence is weak by the registry's bar: single historical path, no walk-forward / deflated-Sharpe, low turnover, ~0.5% costs on monthly/half-hourly traditional instruments. Crypto at 0.1%/trade with higher vol and far more decision points means cost drag and overfit risk are materially worse. Whether DSR-RRL clears 0.1% fees out-of-sample walk-forward on BTC is precisely the open question to TEST. Treat 2001 results as method-validation, not transferable numbers.",
+      "tags": [
+        "positive-method",
+        "reinforcement-learning",
+        "recurrent-rl",
+        "RRL",
+        "direct-reinforcement",
+        "differential-sharpe-ratio",
+        "transaction-costs",
+        "single-asset",
+        "long-short",
+        "seminal",
+        "reward-seed"
+      ],
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "borrageiro-rrl-crypto-2022",
+      "title": "The Recurrent Reinforcement Learning Crypto Agent",
+      "url": "https://arxiv.org/abs/2201.04699",
+      "authors": "Gabriel Borrageiro, Nick Firoozye, Paolo Barucca",
+      "year": 2022,
+      "claim": "An echo-state-network feature space feeds a direct, recurrent reinforcement learning agent that trades the BitMEX XBTUSD Bitcoin perpetual swap intraday, maximizing a quadratic risk-adjusted utility with a transaction-cost penalty and online transfer learning. The agent reportedly realizes a 350% total return net of transaction costs over ~5 years, 71% of which is funding profit, at an annualized information ratio of 1.46.",
+      "approach": "A direct/recurrent RL agent (Moody-Saffell lineage) takes features from an echo state network (reservoir RNN) and outputs trading positions, trained online via transfer learning to maximize a quadratic risk-adjusted utility including an explicit transaction-cost penalty. Single instrument (XBTUSD perpetual swap on BitMEX), capturing directional moves and funding-rate carry.",
+      "claimedMetrics": {
+        "return_pct": 350,
+        "information_ratio": 1.46,
+        "funding_profit_pct": 71,
+        "years": 5
+      },
+      "assumptions": {
+        "fees": true,
+        "frictionless": false,
+        "netOfCosts": true,
+        "multiAsset": false,
+        "retrainCadence": "Online (sequential/continual update each step via transfer learning); no fixed periodic retrain cadence.",
+        "notes": "Single historical path / one backtest over ~5 years; no deflated-Sharpe / multiple-trials correction, so headline IR is optimistic given many design choices. Online learning is expanding-window, not clean blocked walk-forward; no explicit OOS protocol/benchmark in abstract. Instrument is a leveraged PERPETUAL SWAP, not spot: 71% of the 350% is funding-rate harvest (structural carry absent on spot), so only ~29% is directional alpha. Exact bps cost not disclosed in abstract."
+      },
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "reppo-custom",
+          "reward_model": "differential_sharpe",
+          "timeframe": "1h",
+          "fidelity_set": "1h+1d",
+          "use_indicators": true,
+          "position_sizing": "fixed",
+          "allow_shorting": true,
+          "lookback_window": 64
+        },
+        "sweep": {
+          "walk_forward_window": [
+            2022,
+            2023,
+            2024
+          ]
+        },
+        "seeds": 3
+      },
+      "verdictNote": "Closest published match to the registry's setup (single-BTC, cost-aware, risk-adjusted reward, direct/recurrent RL) and a genuine positive method — but headline 350% / IR 1.46 will NOT transfer to a spot, long-biased, 0.1%-fee walk-forward mandate. ~71% of the return is perpetual funding carry that is structurally ABSENT on spot; residual directional alpha is only ~29% (~15%/yr gross). It trades a leveraged derivative, so leverage and funding distort the comparison. One historical path, no deflated-Sharpe / no clear blocked walk-forward or benchmark. The replicable kernel is the architecture (ESN/recurrent features + direct RL + utility with a cost penalty to suppress over-trading); treat the dollar/IR claims as derivative-and-funding-inflated, not spot directional edge.",
+      "tags": [
+        "positive-method",
+        "reinforcement-learning",
+        "recurrent-rl",
+        "direct-rl",
+        "echo-state-network",
+        "single-asset",
+        "bitcoin",
+        "perpetual-swap",
+        "funding-rate",
+        "transaction-costs",
+        "online-learning",
+        "funding-inflated"
+      ],
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "lim-deep-momentum-2019",
+      "title": "Enhancing Time Series Momentum Strategies Using Deep Neural Networks (Deep Momentum Networks)",
+      "url": "https://arxiv.org/abs/1904.04912",
+      "authors": "Bryan Lim, Stefan Zohren, Stephen Roberts",
+      "year": 2019,
+      "claim": "Deep Momentum Networks inject deep-learning trading rules into the time-series-momentum vol-scaling framework, jointly learning trend estimation and position sizing by training the network directly on the Sharpe ratio of the signal. On 88 continuous futures, the Sharpe-optimized LSTM improved traditional momentum by more than 2x in the absence of transaction costs, and continued to outperform up to 2-3 bps of costs; a turnover-regularisation term lets the network internalise costs at run-time.",
+      "approach": "A supervised hybrid: an LSTM (and other DNNs) replaces hand-crafted trend/sizing rules in the classic time-series-momentum pipeline, outputting a position directly. Trained to maximise realised Sharpe (custom loss) rather than predict returns, with optional turnover regularisation for cost-awareness.",
+      "claimedMetrics": {
+        "return_improvement_multiple": 2,
+        "cost_breakeven_bps": 2.5,
+        "num_futures_contracts": 88
+      },
+      "assumptions": {
+        "fees": true,
+        "frictionless": false,
+        "netOfCosts": true,
+        "multiAsset": true,
+        "retrainCadence": "Expanding-window walk-forward: retrained periodically (~every 5 years) and evaluated on the subsequent OOS block over a multi-decade futures history.",
+        "notes": "Headline '>2x' is GROSS of costs. Results are a cross-sectional PORTFOLIO of 88 liquid futures, NOT single-asset and NOT crypto/spot. Outperformance is vol-scaled and diversified; the cost test uses a turnover-proportional model where edge survives only to ~2-3 bps. Walk-forward OOS is done properly, but no deflated-Sharpe / multiple-testing correction on the architecture/hyperparameter search."
+      },
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "duel-dqn-custom-lstm",
+          "reward_model": "differential_sharpe",
+          "timeframe": "1d",
+          "use_indicators": true,
+          "position_sizing": "vol_target",
+          "vol_target": 0.15,
+          "allow_shorting": true,
+          "lookback_window": 64
+        },
+        "sweep": {
+          "walk_forward_window": [
+            2022,
+            2023,
+            2024
+          ]
+        },
+        "seeds": 3
+      },
+      "verdictNote": "Seminal, but likely FLUFF as-is for this registry. (1) Cost cliff: the paper's own tests show edge dies past ~2-3 bps; the registry's 0.1% = 10 bps is ~4x that level, so the advantage almost certainly does NOT survive without aggressive turnover regularisation, and even then net edge is unproven. (2) Diversification dependence: the '>2x' gain is for an 88-contract portfolio where idiosyncratic noise averages out; on single BTC there is no cross-sectional averaging, so realised Sharpe will be far lower/noisier. (3) Slow mean-trending futures vs high-vol 24/7 crypto spot. (4) Symmetric long/short vol-scaled vs long-biased spot. Replicate ONLY as a learned-direction-plus-vol-scaling baseline with the turnover penalty cranked up and cost sensitivity re-validated at the full 10 bps before any 'genuinely good' claim.",
+      "tags": [
+        "positive-method",
+        "deep-learning",
+        "LSTM",
+        "time-series-momentum",
+        "sharpe-optimization",
+        "position-sizing",
+        "volatility-scaling",
+        "turnover-regularization",
+        "futures",
+        "supervised",
+        "transaction-costs",
+        "walk-forward",
+        "cost-cliff"
+      ],
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "jiang-portfolio-drl-2017",
+      "title": "A Deep Reinforcement Learning Framework for the Financial Portfolio Management Problem",
+      "url": "https://arxiv.org/abs/1706.10059",
+      "authors": "Zhengyao Jiang, Dixing Xu, Jinjun Liang",
+      "year": 2017,
+      "claim": "A model-free deep RL framework (EIIE topology + Portfolio-Vector Memory + Online Stochastic Batch Learning, realized as CNN/RNN/LSTM, trained by deterministic policy gradient on a log-return reward) for cryptocurrency portfolio management achieves at least 4-fold returns in 50 days even at a high 0.25% commission rate, with all three network instances occupying the top three positions against benchmark portfolio-selection algorithms.",
+      "approach": "An Ensemble of Identical Independent Evaluators (EIIE) — weight-shared CNN/RNN/LSTM scoring each asset independently — outputs portfolio weights via softmax; trained end-to-end by deterministic policy gradient to maximize average log accumulated return, with a Portfolio-Vector Memory feeding prior weights to penalize turnover and Online Stochastic Batch Learning for continual updates.",
+      "claimedMetrics": {
+        "return_multiple": 4,
+        "backtest_days": 50,
+        "commission_pct": 0.25,
+        "num_assets": 12,
+        "bar_minutes": 30
+      },
+      "assumptions": {
+        "fees": true,
+        "frictionless": false,
+        "netOfCosts": true,
+        "multiAsset": true,
+        "retrainCadence": "Online Stochastic Batch Learning (continual mini-batch updates); reported results are a single chronological train/backtest split, not rolling walk-forward.",
+        "notes": "Models 0.25% commission (above the 0.1% target) but NO slippage/market-impact or liquidity/fill constraints. Pre-set top-12 coins by volume introduces survivorship/look-ahead bias. Single short ~50-day OOS window over the 2017 bull run; no Sharpe, no deflated/multiple-testing correction. Self-reported by the model's authors; high turnover at 30-min bars."
+      },
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "ppo-custom",
+          "reward_model": "profit_all2",
+          "timeframe": "1h",
+          "fidelity_set": "1h+1d",
+          "use_indicators": true,
+          "position_sizing": "fixed",
+          "allow_shorting": false,
+          "no_sell_action": false,
+          "lookback_window": 32
+        },
+        "sweep": {
+          "walk_forward_window": [
+            2022,
+            2023,
+            2024
+          ]
+        },
+        "seeds": 3
+      },
+      "verdictNote": "Seminal and heavily cited (foundational to the EIIE/PVM lineage behind FinRL), but the headline 4x/50-day result is the textbook FLUFF-to-disprove case. It is a 12-COIN PORTFOLIO, not single-asset BTC, so not directly comparable to a long-biased BTC spot target. The backtest is a single ~2-month OOS window inside the 2017 bull regime — almost certainly regime-overfit; pre-selected top-volume coins inject survivorship/look-ahead bias. 0.25% commission is modelled (above target) but there is no slippage/market-impact, and 30-min rebalancing implies heavy turnover real fills would erode. No Sharpe, no PBO/deflated-Sharpe, no rolling walk-forward. Use as a methodology/architecture reference (EIIE, PVM, policy-gradient log-return reward), NOT as a credible return claim — a single-asset port loses the cross-asset weighting that is the whole mechanism.",
+      "tags": [
+        "positive-method",
+        "drl",
+        "policy-gradient",
+        "portfolio-management",
+        "crypto",
+        "eiie",
+        "pvm",
+        "cnn-rnn-lstm",
+        "multi-asset",
+        "seminal",
+        "overfit-risk",
+        "bull-regime",
+        "high-turnover",
+        "architecture-reference"
+      ],
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "moskowitz-tsmom-2012",
+      "title": "Time Series Momentum",
+      "url": "https://doi.org/10.1016/j.jfineco.2011.11.003",
+      "authors": "Tobias J. Moskowitz, Yao Hua Ooi, Lasse Heje Pedersen",
+      "year": 2012,
+      "claim": "A simple time-series momentum rule — go long (short) over the next month if the past 12-month excess return was positive (negative), sizing each position to a constant ex-ante volatility target — generates significant, persistent abnormal returns. Significant for each of 58 liquid futures/forwards across equity indices, currencies, commodities and bonds; a diversified TSM portfolio earns substantial alpha with little factor exposure and performs best in extreme markets.",
+      "approach": "A single-instrument trend rule: the sign of the trailing 12-month excess return sets a long/short position for the next month, each position scaled by inverse ex-ante (rolling) volatility to target constant risk (the diversified portfolio scaled to ~40% vol, realizing ~12%). Positions are equal-risk-weighted and aggregated across 58 futures/forwards.",
+      "claimedMetrics": {
+        "sharpe": 1.2,
+        "num_instruments": 58,
+        "lookback_months_max": 12,
+        "lookback_months_min": 1,
+        "portfolio_target_vol_pct": 40,
+        "realized_portfolio_vol_pct": 12,
+        "sample_start_year": 1985,
+        "sample_end_year": 2009
+      },
+      "assumptions": {
+        "fees": false,
+        "frictionless": false,
+        "netOfCosts": false,
+        "multiAsset": true,
+        "retrainCadence": "None — fixed parametric rule (12-month lookback, 1-month hold), no training/refit; full-sample in-sample parameter choice.",
+        "notes": "Headline results are GROSS of transaction costs (robust to low futures costs, but reported Sharpe is essentially pre-cost); long-AND-short; uses leverage/vol-targeting to ~40% vol (12% realized); 58-instrument DIVERSIFIED portfolio — the ~1.2 Sharpe is cross-asset, NOT single-asset; sample 1985-2009 predates crypto; full-sample parameter selection (single lookback/hold, no walk-forward optimization but also no OOS holdout)."
+      },
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "hodl",
+          "reward_model": "profit_percentage_direct",
+          "timeframe": "1d",
+          "use_indicators": true,
+          "position_sizing": "vol_target",
+          "vol_target": 0.15,
+          "allow_shorting": true
+        },
+        "sweep": {
+          "walk_forward_window": [
+            2022,
+            2023,
+            2024
+          ]
+        },
+        "seeds": 1
+      },
+      "verdictNote": "Seminal, but transplanting the ~1.2 Sharpe to single-asset spot BTC under 0.1% fees + walk-forward is unjustified for three compounding reasons. (1) Diversification: the strong Sharpe is a 58-instrument cross-asset portfolio; a single asset loses nearly all the variance reduction — expect single-asset TSM Sharpe far lower (often <0.5). (2) Costs: results are essentially GROSS; 0.1%/trade spot fees plus a vol-scaled frequently-resized rule bleed materially, and crypto's high vol forces more turnover. (3) The registry is long-biased spot, so the short leg (TSM's crisis-alpha) is constrained, cutting return. Net: TSM is the RIGHT honest, parameter-light non-ML CONTROL to beat — a deep model that cannot beat this adapted, net-of-fee, walk-forward control is fluff.",
+      "tags": [
+        "non-ML-control",
+        "momentum",
+        "trend-following",
+        "time-series-momentum",
+        "volatility-scaling",
+        "risk-targeting",
+        "benchmark",
+        "multi-asset",
+        "futures",
+        "managed-futures",
+        "foundational",
+        "baseline-to-beat"
+      ],
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "bysik-slepaczuk-btc-costs-2026",
+      "title": "Machine Learning-Based Bitcoin Trading Under Transaction Costs: Evidence From Walk-Forward Forecasting",
+      "url": "https://arxiv.org/abs/2606.00060",
+      "authors": "Andrei Bysik, Robert Ślepaczuk",
+      "year": 2026,
+      "claim": "Machine-learning forecasts (XGBoost, LSTM, iTransformer) of hourly BTC-USDT returns produce positive GROSS trading returns, but naive sign-based strategies COLLAPSE once 10 bps (0.1%) per-trade costs are imposed; a cost-aware turnover/execution filter that trades only when forecast magnitude exceeds the cost threshold restores net profitability for selected configurations, with the strongest long-only XGBoost variant reaching ~65.4% annualized return and Sharpe ~1.09 — only marginally above buy-and-hold (~56.3% / Sharpe 0.82).",
+      "approach": "Forecast-then-trade supervised ML (NOT reinforcement learning): XGBoost, LSTM, iTransformer forecast next-hour BTC-USDT returns; point predictions are converted to long/short (or long-only) positions via sign rules, optionally gated by a cost-aware filter suppressing trades unless the predicted move exceeds round-trip cost. Evaluated OOS in a 27-fold walk-forward over ~70k hourly bars (2018-2026), all returns net of 10 bps per-position-change.",
+      "claimedMetrics": {
+        "sharpe": 1.09,
+        "annualized_return_pct": 65.4,
+        "transaction_cost_bps": 10,
+        "walk_forward_folds": 27,
+        "hourly_observations": 70000,
+        "buy_and_hold_annualized_return_pct": 56.3,
+        "buy_and_hold_sharpe": 0.82
+      },
+      "assumptions": {
+        "fees": true,
+        "frictionless": false,
+        "netOfCosts": true,
+        "multiAsset": false,
+        "retrainCadence": "Walk-forward: model refit each of 27 sequential folds (rolling/expanding train -> next OOS block).",
+        "notes": "Single-asset BTC-USDT, hourly. 10 bps treated as an 'all-in effective' per-trade cost per unit of turnover, not just exchange fees — matches the registry's 0.1% standard. No slippage/market-impact beyond the flat 10 bps. Genuine multi-fold walk-forward OOS. Holm correction on bootstrap dominance tests, BUT the 'restored' Sharpe>1 result is for SELECTED winning configurations across many model/feature/threshold specs -> config-selection bias; no Deflated Sharpe / PBO on the winning config."
+      },
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "supervised-gbm",
+          "reward_model": "profit_percentage_direct",
+          "timeframe": "1h",
+          "fidelity_set": "1h+1d",
+          "use_indicators": true,
+          "position_sizing": "fixed",
+          "allow_shorting": false,
+          "no_sell_action": false,
+          "lookback_window": 32
+        },
+        "sweep": {
+          "walk_forward_window": [
+            2022,
+            2023,
+            2024
+          ]
+        },
+        "seeds": 3
+      },
+      "verdictNote": "HIGH constructive-skeptic value: directly demonstrates the registry's central thesis — sign-based ML that looks great gross is FLUFF once a realistic 0.1% per-trade fee applies, because turnover dominates the edge. The restored result is fragile: cost-aware long-only XGBoost Sharpe ~1.09 / ~65.4% barely exceeds B&H (~0.82 / ~56.3%), so most apparent edge is just BTC's bull drift, and the win is a SELECTED configuration with no DSR/PBO deflation. The 27-fold walk-forward and net-of-cost reporting are sound; under the registry's 0.1% + walk-forward bar, naive strategies clearly FAIL and the filtered strategy only marginally survives, likely losing Sharpe>1 after deflation. Best as a calibration/skeptical anchor and a single-asset BTC walk-forward template — replicate the cost-aware filter and apply DSR/PBO to its winning spec.",
+      "tags": [
+        "skeptical",
+        "transaction-costs",
+        "walk-forward",
+        "out-of-sample",
+        "single-asset",
+        "BTC",
+        "forecast-then-trade",
+        "XGBoost",
+        "LSTM",
+        "iTransformer",
+        "cost-aware-filter",
+        "multiple-testing",
+        "methodology",
+        "long-biased",
+        "hourly"
+      ],
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "bailey-deflated-sharpe-2014",
+      "title": "The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting and Non-Normality",
+      "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2460551",
+      "authors": "David H. Bailey, Marcos López de Prado",
+      "year": 2014,
+      "claim": "The Deflated Sharpe Ratio (DSR) is a statistical correction returning the probability a reported Sharpe reflects genuine skill rather than the luck of multiple testing. It deflates the observed Sharpe for (a) the number of independent trials N — via the expected maximum Sharpe under the null (the 'False Strategy Theorem') — and (b) the non-normality of returns (skewness/kurtosis) and finite track-record length T, separating legitimate findings from statistical flukes.",
+      "approach": "Compute DSR = Φ((SR* − SR₀)·√(T−1) / √(1 − γ₃·SR* + ((γ₄−1)/4)·SR*²)), where SR₀ is the expected maximum Sharpe of N unskilled trials (depends on N and cross-trial variance of Sharpe estimates), and γ₃, γ₄ are return skewness/kurtosis. A high DSR (near 1) means the Sharpe survives correction for selection bias and fat tails; a low DSR flags an overfit/lucky result.",
+      "assumptions": {
+        "fees": false,
+        "frictionless": true,
+        "netOfCosts": false,
+        "multiAsset": false,
+        "retrainCadence": "N/A — an evaluation/significance metric, not a trained strategy; applied post hoc to any candidate's OOS Sharpe and to the count of trials tried during selection.",
+        "notes": "Methodology/metrics paper (no return/Sharpe of its own; models no costs). Requires an HONEST count of independent trials N (estimated via clustering of correlated trials) — under-reporting N defeats the deflation. The False Strategy Theorem uses an extreme-value approximation under a normal null; skewness/kurtosis corrections are first-order finite-sample estimates."
+      },
+      "verdictNote": "A SKEPTICAL/methodology entry — not a strategy to replicate. It does not 'survive fees' or 'beat buy-and-hold'; it is the GATE to apply to every RL/ML candidate's OOS Sharpe. The single most actionable multiple-testing correction for this registry given crypto's fat tails and the dozens of hyperparameter/feature/seed configs that will be tried. CRITICAL: the DSR is only as honest as the logged trial count N — if the registry under-reports the true number of independent configs explored (or treats correlated trials as one), the deflation is silently defeated. Note DSR deflates a Sharpe but does NOT incorporate the 0.1% fee drag, so apply it to the net-of-fees, walk-forward Sharpe. Widely cited, no replication controversy (it is math).",
+      "tags": [
+        "skeptical",
+        "methodology",
+        "deflated-sharpe",
+        "multiple-testing",
+        "selection-bias",
+        "backtest-overfitting",
+        "non-normality",
+        "significance-gate",
+        "lopez-de-prado",
+        "evaluation-metric"
+      ],
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "bailey-pseudo-math-2014",
+      "title": "Pseudo-Mathematics and Financial Charlatanism: The Effects of Backtest Overfitting on Out-of-Sample Performance",
+      "url": "https://www.ams.org/notices/201405/rnoti-p458.pdf",
+      "authors": "David H. Bailey, Jonathan M. Borwein, Marcos López de Prado, Qiji Jim Zhu",
+      "year": 2014,
+      "claim": "Trying even a modest number of alternative strategy configurations on the same data almost guarantees a high in-sample Sharpe with zero expected out-of-sample performance; the more configurations tried, the higher the probability the backtest is overfit. They derive a 'Minimum Backtest Length' (MinBTL): the backtest must be long enough relative to the number of independent trials N, otherwise the best in-sample Sharpe is pure overfitting. Because analysts rarely report how many configurations were tried, the degree of overfitting is usually unknowable.",
+      "approach": "A statistical/theoretical proof: under repeated trials, the expected maximum in-sample Sharpe of N independent random strategies grows with N (roughly proportional to sqrt(2 ln N)), so selecting the best backtest yields a strategy whose true OOS Sharpe is ~0. They invert this into MinBTL = minimum years of (IID) returns needed before the highest-in-sample Sharpe among N trials can be distinguished from luck.",
+      "claimedMetrics": {
+        "expected_oos_sharpe": 0
+      },
+      "assumptions": {
+        "fees": false,
+        "frictionless": true,
+        "netOfCosts": false,
+        "multiAsset": false,
+        "retrainCadence": "N/A — a methodology/theory paper; the result concerns how many configurations/trials are run, not a training cadence.",
+        "notes": "Methodology paper, no own returns to net of costs. Core bound assumes (near-)IID Gaussian returns and a researcher optimizing/selecting on the evaluation window; real trials are usually correlated, so the EFFECTIVE number of independent trials N (and thus MinBTL) must be estimated. Under serial-dependence the OOS expectation is NEGATIVE, not merely zero. It quantifies the danger of selection across trials; not a per-strategy verdict."
+      },
+      "verdictNote": "A SKEPTICAL/methodology cornerstone — does not 'survive 0.1% fees + walk-forward OOS' because it makes no return claim; it is the calibration tool for judging everything else. Direct application: if a candidate model does not report how many configs/hyperparameters/seeds/lookbacks were tried, its walk-forward Sharpe cannot be trusted, and the Deflated Sharpe is the companion correction. MinBTL tells us whether our walk-forward windows are even long enough given how many BlackSwan presets we sweep. Caveat: its clean bound assumes IID-ish returns and test-window optimization, so it OVER-states danger for genuinely held-out walk-forward and UNDER-states it when trials are highly correlated — estimate the effective N. Highly cited, not subject to replication failure (it is a proof).",
+      "tags": [
+        "skeptical",
+        "methodology",
+        "backtest-overfitting",
+        "deflated-sharpe",
+        "minimum-backtest-length",
+        "multiple-testing",
+        "selection-bias",
+        "out-of-sample",
+        "calibration",
+        "lopez-de-prado"
+      ],
+      "status": "untested",
+      "source": "manual"
     }
   ],
   "eta": {

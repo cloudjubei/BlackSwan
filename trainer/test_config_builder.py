@@ -106,6 +106,25 @@ def test_build_data_config_lookback_window_override(monkeypatch):
     assert cfg.lookback_window_size == 64
 
 
+def test_is_supervised_detects_supervised_model_names():
+    assert config_builder.is_supervised({"model_name": "supervised-logreg"})
+    assert config_builder.is_supervised({"model_name": "supervised-gbm"})
+    assert config_builder.is_supervised({"model_type": "supervised"})
+    assert not config_builder.is_supervised({"model_name": "reppo-custom"})
+    assert not config_builder.is_supervised({"model_name": "hodl"})
+
+
+def test_build_model_config_supervised_maps_levers():
+    config = config_builder.build_model_config(
+        {"model_name": "supervised-gbm", "forward_horizon": 3, "prob_threshold": 0.6, "seed": 7}
+    )
+    assert config.model_type == "supervised"
+    assert config.model_supervised.model_name == "supervised-gbm"
+    assert config.model_supervised.forward_horizon == 3
+    assert config.model_supervised.prob_threshold == 0.6
+    assert config.model_supervised.seed == 7
+
+
 def test_require_data_present_checks_the_selected_window(monkeypatch):
     seen = set()
 

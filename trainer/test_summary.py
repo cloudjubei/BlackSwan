@@ -101,6 +101,28 @@ def test_realized_cost_bps_zero_without_fees():
     assert out["metrics"]["realized_cost_bps"] == 0.0
 
 
+def test_checkpoint_artifact_only_for_models_that_produce_one():
+    env = _two_trade_env()
+    state = _state(n_trades=2, win=50.0, total_profit=2000.0, sls=1)
+
+    class _RLModel:
+        id = "rl-123"
+
+        def produces_checkpoint(self):
+            return True
+
+    class _SupervisedModel:
+        id = "sup-123"
+
+        def produces_checkpoint(self):
+            return False
+
+    rl_out = summary_mod.build_summary(env, state, _CFG, _RLModel(), "2026-01-01T00:00:00Z", True)
+    sup_out = summary_mod.build_summary(env, state, _CFG, _SupervisedModel(), "2026-01-01T00:00:00Z", True)
+    assert rl_out.get("artifacts", {}).get("checkpoint") == "checkpoints/rl-123.zip"
+    assert "checkpoint" not in sup_out.get("artifacts", {})
+
+
 def test_reconstructs_round_trips_with_reasons_and_pnl():
     out, _, _ = _two_trade_summary()
     ledger = out["ledger"]

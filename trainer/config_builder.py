@@ -16,7 +16,7 @@ from omegaconf import OmegaConf
 
 from src.conf.data_config import DataConfig
 from src.conf.env_config import EnvConfig
-from src.conf.model_config import ModelConfigSearch, model_rl
+from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervisedConfig, model_rl
 from src.model.model_factory import get_model_combinations
 from trainer.fidelity import resolve_fidelity
 from trainer.walk_forward import resolve_walk_forward_window
@@ -142,11 +142,26 @@ def is_hodl(cfg):
     return str(cfg.get("model_name", "")).lower() == "hodl" or cfg.get("model_type") == "hodl"
 
 
+def is_supervised(cfg):
+    return str(cfg.get("model_name", "")).lower().startswith("supervised") or cfg.get("model_type") == "supervised"
+
+
 def build_model_config(cfg):
     """Return one concrete ModelConfig for the lever values in ``cfg``."""
     if is_hodl(cfg):
         hodl = OmegaConf.structured(ModelConfigSearch(model_type="hodl"))
         config = get_model_combinations(hodl)[0]
+        config.iterations_to_pick_best = 1
+        return config
+
+    if is_supervised(cfg):
+        supervised = ModelSupervisedConfig(
+            model_name=str(cfg.get("model_name", "supervised-logreg")),
+            forward_horizon=int(cfg.get("forward_horizon", 1)),
+            prob_threshold=float(cfg.get("prob_threshold", 0.5)),
+            seed=int(cfg["seed"]) if cfg.get("seed") is not None else None,
+        )
+        config = ModelConfig(model_type="supervised", model_supervised=supervised)
         config.iterations_to_pick_best = 1
         return config
 

@@ -8,7 +8,7 @@ import sbx.common.type_aliases
 import sbx.core
 import sbx.dqn
 import sbx.ppo
-from src.conf.model_config import ModelConfigSearch, ModelConfig, ModelTechnicalConfig, ModelTimeConfig, ModelRLConfig, ModelRegressionConfig
+from src.conf.model_config import ModelConfigSearch, ModelConfig, ModelTechnicalConfig, ModelTimeConfig, ModelRLConfig, ModelRegressionConfig, ModelSupervisedConfig
 from src.model.custom.agent57.agent57 import Agent57
 from src.model.custom.customqnetwork import CustomQNetwork
 from src.model.custom.dgwo import DGWO
@@ -19,6 +19,7 @@ from src.model.dqn_lstm_policy import LSTMFCE
 from src.model.dueling_dqn.dueling_dqn import DuelingDQN
 from src.model.dueling_dqn.policies import DuelingDQNPolicy
 from src.model.hodl_model import HodlModel
+from src.model.supervised_model import SupervisedModel
 from src.model.iqn.iqn import IQN
 from src.model.munchhausen_dqn.munchhausen_dqn import MunchausenDQN
 from src.model.rainbow.rainbow_dqn_agent import RainbowDQNAgent
@@ -137,6 +138,13 @@ def get_model_combinations(config: ModelConfigSearch) -> List[ModelConfig]:
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="regression", model_regression=ModelRegressionConfig(**get_combo(c, list_keys, non_lists))), combinations))
+    if config.model_type == "supervised":
+        data = config.model_supervised
+        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
+        list_values = [value for value in data.values() if type(value) == ListConfig]
+        non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
+        combinations = itertools.product(*list_values)
+        return list(map(lambda c: ModelConfig(model_type="supervised", model_supervised=ModelSupervisedConfig(**get_combo(c, list_keys, non_lists))), combinations))
     elif config.model_type == "technical":
         data = config.model_technical
         list_keys = [key for key, value in data.items() if type(value) == ListConfig]
@@ -161,6 +169,8 @@ def create_model(config: ModelConfig, env: AbstractEnv, device: str):
         return create_rl_model(config, env, device)
     if config.model_type == "regression":
         return create_regression_model(config, env, device)
+    if config.model_type == "supervised":
+        return SupervisedModel(config)
     elif config.model_type == "time":
         return TimeStrategyModel(config)
     elif config.model_type == "technical":

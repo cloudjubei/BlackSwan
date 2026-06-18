@@ -478,7 +478,7 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     if run_chart:
         artifacts["runChart"] = run_chart
     checkpoint = getattr(model, "id", None)
-    if is_rl and checkpoint:
+    if getattr(model, "produces_checkpoint", lambda: False)() and checkpoint:
         artifacts["checkpoint"] = f"checkpoints/{checkpoint}.zip"
         artifacts["best"] = False
     if artifacts:
