@@ -128,15 +128,10 @@ def test_global_context_tall_nonsquare_3d_should_work():
     assert th.isfinite(out).all()
 
 
-@pytest.mark.xfail(
-    reason="SEPARATE WORK: GlobalContextAttention's 3-D bmm path is now correct, but it still "
-    "requires a 3-D input. Running it inside CustomQNetwork's flat 2-D (batch, features) MLP "
-    "needs a separate 2-D integration redesign; a bare (batch, features) tensor still raises "
-    "IndexError on transpose(1, 2)",
-    strict=True,
-)
 def test_global_context_2d_mlp_input_should_work():
-    # As wired into CustomQNetwork's flat MLP the block receives (batch, features) and should run.
+    # As wired into CustomQNetwork's flat MLP the block receives a 2-D (batch, features) tensor; it
+    # is treated as a single-step sequence and returns the same (batch, features) shape so it chains.
     m = GlobalContextAttention(8)
     out = m(th.randn(4, 8))
-    assert tuple(out.shape)[0] == 4
+    assert tuple(out.shape) == (4, 8)
+    assert th.isfinite(out).all()

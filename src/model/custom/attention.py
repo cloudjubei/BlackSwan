@@ -83,7 +83,11 @@ class GlobalContextAttention(nn.Module):
         self.conv = nn.Conv1d(in_channels=hidden_dim, out_channels=hidden_dim, kernel_size=1)
 
     def forward(self, x):
-        # batch_size, seq_len = x.size()
+        # A 2-D (batch, hidden) input — e.g. inside CustomQNetwork's flat MLP — is treated as a
+        # single-step sequence: unsqueeze to (batch, 1, hidden), attend, then squeeze back.
+        squeeze = x.dim() == 2
+        if squeeze:
+            x = x.unsqueeze(1)
         query = self.query(x)  # (batch_size, seq_len, hidden_dim)
         key = self.key(x)  # (batch_size, seq_len, hidden_dim)
         value = self.value(x)  # (batch_size, seq_len, hidden_dim)
@@ -95,6 +99,8 @@ class GlobalContextAttention(nn.Module):
         context = self.conv(context)  # (batch_size, hidden_dim, seq_len)
         context = context.mean(dim=-1)  # (batch_size, hidden_dim)
         output = x * context.unsqueeze(1)  # (batch_size, seq_len, hidden_dim)
+        if squeeze:
+            output = output.squeeze(1)  # back to (batch, hidden)
         return output
 
     
