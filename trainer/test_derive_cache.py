@@ -49,13 +49,14 @@ def test_to_ms_from_datetime64():
     assert _to_ms(s).tolist() == [_BASE, _BASE + 60_000]
 
 
-def test_to_ms_bare_ints_are_treated_as_nanoseconds():
-    # Characterization: the docstring claims "raw ms ints" are supported, but pd.to_datetime on a
-    # bare int Series interprets the value as NANOSECONDS, so 1.6e12 ns collapses to 1_600_000 ms
-    # (1970), NOT the intended 1.6e12 ms. The production path always feeds datetime64 (from
-    # pd.read_json) so this never bites, but the docstring's "or raw ms ints" claim is misleading.
+def test_to_ms_bare_ints_are_treated_as_ms():
+    # Honouring the docstring's "or raw ms ints": a bare integer/numeric ms Series is treated as
+    # milliseconds (not nanoseconds), so it round-trips back to the same ms value.
     s = pd.Series([_BASE])
-    assert _to_ms(s).tolist() == [_BASE // 10**6]
+    assert _to_ms(s).tolist() == [_BASE]
+    # A multi-row numeric series also round-trips ms-for-ms.
+    multi = pd.Series([_BASE, _BASE + 60_000])
+    assert _to_ms(multi).tolist() == [_BASE, _BASE + 60_000]
 
 
 # --- derive_bars: aggregation contract (open=first, high=max, low=min, close=last, sums) ---
@@ -181,13 +182,14 @@ def test_derive_bars_empty_typed_frame_returns_empty_with_columns():
     assert "timestamp" in out.columns and "price" in out.columns
 
 
-def test_derive_bars_truly_empty_frame_raises_keyerror():
-    # Characterization + latent footgun: a column-less empty frame (what pd.read_json("[]") of an
-    # empty month file produces) hits the d["timestamp"] access and raises KeyError. ensure_derived
-    # would propagate this rather than emit an empty cache file. Realistic source files are non-empty.
+def test_derive_bars_truly_empty_frame_returns_empty_typed_frame():
+    # A column-less empty frame (what pd.read_json("[]") of an empty month file produces) is
+    # short-circuited to an empty frame with the kline output columns — no KeyError('timestamp').
     empty = pd.read_json(io.StringIO("[]"))
-    with pytest.raises(KeyError):
-        derive_bars(empty, _HOUR_MS)
+    out = derive_bars(empty, _HOUR_MS)
+    assert len(out) == 0
+    expected = {"timestamp", "price_open", "price_high", "price_low", "price", "timestamp_close", *_OHLCV_SUM}
+    assert set(out.columns) == expected
 
 
 def test_derive_bars_does_not_mutate_input():

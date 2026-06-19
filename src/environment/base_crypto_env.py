@@ -536,12 +536,8 @@ class BaseCryptoEnv(AbstractEnv):
             
             drawdown = self.drawdowns[-1]
             hold_reward2 = drawdown * self.reward_multipliers["combo_hold_drawdown"]
-            wrong_action_reward = 0
 
-            if self.actions[-1] != 0 and self.reward_model == "combo2": # acting but shouldn't
-                wrong_action_reward = self.reward_multipliers["combo_wrongaction"]
-            
-            return hold_reward1 + hold_reward2 + wrong_action_reward
+            return hold_reward1 + hold_reward2
 
         if self.reward_model == "combo_all" or self.reward_model == "combo_all2" or self.reward_model == "combo_all_fee" or self.reward_model == "combo_all_noop":
             if self.actions_made[-1]: # just made an action

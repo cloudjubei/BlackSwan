@@ -204,6 +204,43 @@ def test_streak_breaks_and_records_on_unrewarded_dip_prediction():
     assert e.current_streak == 0
 
 
+def test_streak_break_from_zero_records_no_spurious_zero():
+    # Breaking (unrewarded dip prediction) while current_streak is already 0 must NOT append a 0.
+    # A back-to-back / first-step false alarm should leave streaks empty, otherwise the avg-streak
+    # metric in get_run_state is biased downward by phantom zeros.
+    e = _env(FakeProvider([1], maxwait=3))
+    assert e.current_streak == 0
+    e._update_streaks(action=1, reward=-2.0, done=False)  # break from 0
+    e._update_streaks(action=1, reward=-2.0, done=False)  # break from 0 again
+    assert e.streaks == []
+    assert e.current_streak == 0
+    # A genuine run still records when it breaks.
+    e.current_streak = 3
+    e._update_streaks(action=1, reward=-2.0, done=False)
+    assert e.streaks == [3]
+
+
+def test_streak_done_with_zero_streak_records_no_spurious_zero():
+    # Reaching done with no active streak (hold path, or winning path that never ran) records nothing.
+    e_hold = _env(FakeProvider([1], maxwait=3))
+    e_hold.current_streak = 0
+    e_hold._update_streaks(action=0, reward=0.3, done=True)  # elif-done with zero streak
+    assert e_hold.streaks == []
+
+
+def test_avg_streak_not_polluted_by_break_from_zero():
+    # Two spurious break-from-zero events + one real 4-run: avg-streak should be 4.0, not 4/3.
+    e = _env(FakeProvider([1], maxwait=3))
+    e._update_streaks(action=1, reward=-2.0, done=False)  # break from 0 -> no record
+    e._update_streaks(action=1, reward=-2.0, done=False)  # break from 0 -> no record
+    e.current_streak = 4
+    e._update_streaks(action=1, reward=-2.0, done=False)  # real run breaks -> records 4
+    assert e.streaks == [4]
+    state = e.get_run_state()
+    assert state[7] == pytest.approx(4.0)  # avg_streak = 4/1, not diluted by zeros
+    assert state[8] == 4                   # max_streak
+
+
 def test_streak_finalised_on_done_while_still_winning():
     e = _env(FakeProvider([1], maxwait=3))
     e._update_streaks(action=1, reward=5.0, done=False)  # streak -> 1

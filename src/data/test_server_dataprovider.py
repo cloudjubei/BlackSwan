@@ -1,14 +1,15 @@
-"""Fast unit tests for ServerDataProvider.prepare_signal.
+"""Fast unit tests for ServerDataProvider.
 
-prepare_signal is the only non-network logic on this class: each incoming signal record is round-tripped
-through json -> pandas, fed to the shared AbstractDataProvider.process_df feature pipeline, and its
-``.values`` matrix collected. We exercise it with tiny synthetic full-schema frames (no sockets, no
+ServerDataProvider is the live-inference provider: it has no data files, instead each incoming signal
+record is round-tripped through json -> pandas, fed to the shared AbstractDataProvider.process_df feature
+pipeline, and its ``.values`` matrix collected by prepare_signal (which also caches the latest prices /
+timestamps as instance state). We exercise it with tiny synthetic full-schema frames (no sockets, no
 PriceCache, no live server). The live network/socket consumers of this provider are not present in this
 module and are intentionally not tested here.
 
-ServerDataProvider does NOT implement the AbstractDataProvider abstractmethods, so it cannot be
-instantiated (or even ``__new__``-ed) directly; we subclass it with trivial stubs (the test_abstract
-idiom) and bypass __init__ so no data files are touched.
+ServerDataProvider is a CONCRETE provider: it implements every AbstractDataProvider abstractmethod, so it
+instantiates directly. The forward-looking signal_* getters have no future labels under live inference and
+return a neutral 0; get_values/get_price/get_timesteps derive from the latest prepared signal.
 """
 
 import types
@@ -19,30 +20,8 @@ import pytest
 from src.data.server_dataprovider import ServerDataProvider
 
 
-class _Server(ServerDataProvider):
-    """Concrete stub so the ABC can be instantiated; the stubbed methods are never exercised here."""
-
-    def get_timesteps(self):
-        return 0
-
-    def get_price(self, step):
-        return 0.0
-
-    def get_signal_buy_sell(self, step):
-        return 0
-
-    def get_signal_buy_profitable(self, step):
-        return 0
-
-    def get_signal_buy_drawdown(self, step):
-        return 0
-
-    def get_values(self, step):
-        return None
-
-
 def _server(type="only_price_percent", timestamp="day_of_week", indicator="none"):
-    p = _Server.__new__(_Server)
+    p = ServerDataProvider.__new__(ServerDataProvider)
     # process_df reads only these config fields.
     p.config = types.SimpleNamespace(
         type=type,
@@ -53,6 +32,10 @@ def _server(type="only_price_percent", timestamp="day_of_week", indicator="none"
         use_indicators=False,
         obs_squash="none",
     )
+    # __init__ initialises these state holders; __new__ bypasses it, so seed them here.
+    p.values = []
+    p.prices = []
+    p.timestamps = []
     return p
 
 
@@ -75,11 +58,70 @@ def _signal(n):
     }
 
 
-def test_cannot_instantiate_directly_abstract_methods_unimplemented():
-    # Documents the footgun: the shipped class leaves the 6 abstractmethods unimplemented, so even
-    # ``__new__`` raises — it is effectively uninstantiable without a subclass.
-    with pytest.raises(TypeError):
-        ServerDataProvider.__new__(ServerDataProvider)
+def test_is_concrete_and_instantiates_directly():
+    # ServerDataProvider implements all 6 AbstractDataProvider abstractmethods, so it is concrete and
+    # constructs directly (no stub subclass needed). __init__ seeds empty state holders.
+    config = types.SimpleNamespace(
+        id="latest",
+        type="only_price_percent",
+        timestamp="day_of_week",
+        indicator="none",
+        fidelity_input="1m",
+        fidelity_run="1m",
+        fidelity_input_test="1m",
+        fidelity_run_test="1m",
+        layers=["1h", "1d"],
+        layers_test=["1h", "1d"],
+        lookback_window_size=1,
+        buyreward_percent=0.004,
+        buyreward_maxwait=20,
+        use_indicators=False,
+        obs_squash="none",
+    )
+    p = ServerDataProvider(config)
+    assert isinstance(p, ServerDataProvider)
+    # Before any signal has been prepared the provider is empty / neutral, never raising.
+    assert p.get_timesteps() == 0
+    assert p.get_values(0) == []
+    assert p.get_signal_buy_sell(0) == 0
+    assert p.get_signal_buy_profitable(0) == 0
+    assert p.get_signal_buy_drawdown(0) == 0
+
+
+def test_get_values_returns_prepared_value_matrices():
+    p = _server()
+    out = p.prepare_signal([_signal(5), _signal(6)])
+    # get_values exposes exactly what prepare_signal cached (the list of per-signal value matrices).
+    got = p.get_values(0)
+    assert len(got) == 2
+    assert got is p.values
+    for a, b in zip(got, out):
+        assert np.array_equal(a, b)
+
+
+def test_get_timesteps_counts_prepared_signals():
+    p = _server()
+    p.prepare_signal([_signal(5), _signal(6), _signal(4)])
+    assert p.get_timesteps() == 3
+
+
+def test_get_price_is_latest_price_of_signal_window():
+    p = _server()
+    p.prepare_signal([_signal(5), _signal(6)])
+    # process_df returns the raw prices array per signal; get_price reads its last (most recent) entry.
+    expected_0 = 100.0 * (1.01**4)
+    expected_1 = 100.0 * (1.01**5)
+    assert p.get_price(0) == pytest.approx(expected_0)
+    assert p.get_price(1) == pytest.approx(expected_1)
+
+
+def test_signal_getters_return_neutral_zero():
+    # Live inference has no future labels, so the forward-looking signal_* getters default to 0.
+    p = _server()
+    p.prepare_signal([_signal(5)])
+    assert p.get_signal_buy_sell(0) == 0
+    assert p.get_signal_buy_profitable(0) == 0
+    assert p.get_signal_buy_drawdown(0) == 0
 
 
 def test_prepare_signal_one_array_per_input_signal():

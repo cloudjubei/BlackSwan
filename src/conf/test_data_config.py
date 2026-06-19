@@ -1,5 +1,3 @@
-import pytest
-
 from src.conf.data_config import (
     DataConfig,
     get_datas_1h_1d,
@@ -8,12 +6,11 @@ from src.conf.data_config import (
 
 
 # ---------------------------------------------------------------------------
-# DataConfig dataclass defaults (layers must be supplied; see xfail below)
+# DataConfig dataclass defaults
 # ---------------------------------------------------------------------------
 
 
 def test_data_config_defaults():
-    # layers / layers_test cannot be defaulted (broken factory), so they are passed explicitly here.
     c = DataConfig(
         id="t", train_data_paths=[[]], test_data_paths=[[]], layers=["1d"], layers_test=["1d"]
     )
@@ -28,18 +25,16 @@ def test_data_config_defaults():
     assert c.obs_squash == "none"
 
 
-@pytest.mark.xfail(
-    reason="BUG: layers/layers_test use field(default_factory=[]); an empty-list literal is not "
-    "callable, so constructing DataConfig without those args raises 'list object is not callable'. "
-    "Should be default_factory=list.",
-    strict=False,
-    raises=TypeError,
-)
 def test_data_config_constructs_with_default_layers():
-    # Intended contract: layers/layers_test default to empty lists.
+    # layers/layers_test default to independent empty lists (default_factory=list).
     c = DataConfig(id="t", train_data_paths=[[]], test_data_paths=[[]])
     assert c.layers == []
     assert c.layers_test == []
+    # the two defaults must be distinct list instances, not a shared mutable default.
+    assert c.layers is not c.layers_test
+    c2 = DataConfig(id="t2", train_data_paths=[[]], test_data_paths=[[]])
+    assert c.layers is not c2.layers
+    assert c.layers_test is not c2.layers_test
 
 
 # ---------------------------------------------------------------------------

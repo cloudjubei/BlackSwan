@@ -1,4 +1,3 @@
-import pytest
 from hydra.core.config_store import ConfigStore
 
 from src.conf import structured_config as sc
@@ -63,20 +62,23 @@ def test_config_accepts_overrides():
     assert c.data_configs == [1]
 
 
-@pytest.mark.xfail(
-    reason="BUG: data_configs/env_configs/model_configs use field(default_factory=List) where "
-    "List is typing.List (a generic alias), not the list constructor. Constructing Config() with "
-    "no list args raises 'Type List cannot be instantiated; use list() instead'. Should be "
-    "default_factory=list.",
-    strict=False,
-    raises=TypeError,
-)
 def test_config_constructs_with_default_lists():
     # The intended contract: Config() yields empty lists for the *_configs fields.
     c = Config()
     assert c.data_configs == []
     assert c.env_configs == []
     assert c.model_configs == []
+
+
+def test_config_default_lists_are_independent_per_instance():
+    # default_factory=list builds a fresh list per Config; distinct instances must not share mutable state.
+    a = Config()
+    b = Config()
+    assert a.data_configs is not b.data_configs
+    assert a.env_configs is not b.env_configs
+    assert a.model_configs is not b.model_configs
+    a.data_configs.append("x")
+    assert b.data_configs == []
 
 
 # ---------------------------------------------------------------------------

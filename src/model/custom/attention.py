@@ -84,11 +84,11 @@ class GlobalContextAttention(nn.Module):
 
     def forward(self, x):
         # batch_size, seq_len = x.size()
-        query = self.query(x).transpose(1, 2)  # (batch_size, hidden_dim, seq_len)
+        query = self.query(x)  # (batch_size, seq_len, hidden_dim)
         key = self.key(x)  # (batch_size, seq_len, hidden_dim)
         value = self.value(x)  # (batch_size, seq_len, hidden_dim)
 
-        scores = th.bmm(query.transpose(1, 2), key)  # (batch_size, seq_len, seq_len)
+        scores = th.bmm(query, key.transpose(1, 2))  # (batch_size, seq_len, seq_len)
         attn_weights = th.nn.functional.softmax(scores, dim=-1)  # (batch_size, seq_len, seq_len)
         context = th.bmm(attn_weights, value)  # (batch_size, seq_len, hidden_dim)
         context = context.transpose(1, 2)  # (batch_size, hidden_dim, seq_len)

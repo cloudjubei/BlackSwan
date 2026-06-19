@@ -2,8 +2,9 @@
 
 Tiny CPU tensors only. These blocks sit *inside* a flat MLP, so the realistic input is a 2-D
 (batch, features) tensor. We assert each block's forward runs and preserves the feature width
-where the contract implies it should, and document the GlobalContextAttention shape restriction
-(only square 3-D inputs work) as an xfail bug.
+where the contract implies it should. GlobalContextAttention now handles any 3-D
+(batch, seq, hidden) input; the remaining 2-D-MLP-input case is a separate integration
+redesign and stays xfail.
 """
 
 import pytest
@@ -99,34 +100,40 @@ def test_additive_attention_preserves_shape(shape):
 
 
 # --- GlobalContextAttention -------------------------------------------------
-# Comment claims (batch, seq, hidden), but bmm(query.transpose(1,2), key) silently transposes the
-# query back, so the contraction only aligns when seq_len == hidden_dim. Anything else raises.
+# scores = bmm(query, key.transpose(1,2)) -> (batch, seq, seq); works for any 3-D
+# (batch, seq, hidden) input regardless of whether seq_len == hidden_dim.
 
 
 def test_global_context_square_3d_preserves_shape():
-    # seq_len == hidden_dim is the only shape that currently works.
+    # Square seq_len == hidden_dim case.
     m = GlobalContextAttention(8)
     out = m(th.randn(4, 8, 8))
     assert tuple(out.shape) == (4, 8, 8)
     assert th.isfinite(out).all()
 
 
-@pytest.mark.xfail(
-    reason="BUG: GlobalContextAttention transposes query and then transposes it back before bmm, "
-    "so scores only align when seq_len == hidden_dim; a generic (batch, seq, hidden) input raises",
-    strict=False,
-)
 def test_global_context_nonsquare_3d_should_work():
-    # The documented contract is a general (batch, seq, hidden) input; seq != hidden should be fine.
+    # A general (batch, seq, hidden) input with seq != hidden is now handled correctly.
     m = GlobalContextAttention(8)
     out = m(th.randn(4, 3, 8))
     assert tuple(out.shape) == (4, 3, 8)
+    assert th.isfinite(out).all()
+
+
+def test_global_context_tall_nonsquare_3d_should_work():
+    # seq_len > hidden_dim also works (regression guard for the dropped redundant transpose).
+    m = GlobalContextAttention(8)
+    out = m(th.randn(4, 16, 8))
+    assert tuple(out.shape) == (4, 16, 8)
+    assert th.isfinite(out).all()
 
 
 @pytest.mark.xfail(
-    reason="BUG: GlobalContextAttention requires 3-D input (uses transpose(1,2)), but in a "
-    "CustomQNetwork MLP it is fed a 2-D (batch, features) tensor and crashes with IndexError",
-    strict=False,
+    reason="SEPARATE WORK: GlobalContextAttention's 3-D bmm path is now correct, but it still "
+    "requires a 3-D input. Running it inside CustomQNetwork's flat 2-D (batch, features) MLP "
+    "needs a separate 2-D integration redesign; a bare (batch, features) tensor still raises "
+    "IndexError on transpose(1, 2)",
+    strict=True,
 )
 def test_global_context_2d_mlp_input_should_work():
     # As wired into CustomQNetwork's flat MLP the block receives (batch, features) and should run.

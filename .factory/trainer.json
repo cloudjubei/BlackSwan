@@ -8,8 +8,14 @@
     "name": "traded_return",
     "direction": "max"
   },
-  "pipelineVersion": "3",
+  "pipelineVersion": "4",
   "pipelineChangelog": [
+    {
+      "version": "4",
+      "date": "2026-06-19",
+      "breaking": true,
+      "summary": "Correctness bug-fix sweep — scores are NOT comparable to v3 for affected setups. (1) Prioritized replay (DQN/Rainbow PER) was effectively UNIFORM: add() seeded each new transition into the wrong slot from an all-zero max, and a full buffer could NaN-crash sampling; new transitions now get the correct max-priority seed and sampling is stable, so PER models train differently. (2) Multi-timeline get_values with lookback<=1 now CONCATENATES layer features instead of element-wise SUMMING them, correcting observations for multi-layer lookback<=1 data configs. (3) Removed the dead 'combo2' reward model (it silently fell through to profit_percentage). Other fixes with no impact on the main training path: reward-multiplier scalar defaults (were (0,) tuples), dataclass default_factory landmines (net_arch / layers / Config lists), process_df 'expanded' timestamp_close coercion (feature-identical in production), GlobalContextAttention non-square contraction, env_factory error message, derive_cache _to_ms / empty-frame guards, R2Loss / SquaredMeanLoss numerics, the dip-env streak metric, and the (dead) ServerDataProvider / ServerCryptoEnv server path. Removed the duplicate dead 'duel-dqn-custom-lstm8' factory branch."
+    },
     {
       "version": "3",
       "date": "2026-06-16",
@@ -59,7 +65,6 @@
         "combo_all_fee",
         "combo_all_noop",
         "combo",
-        "combo2",
         "profit_all2",
         "profit_percentage3",
         "profit_percentage_direct",

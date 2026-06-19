@@ -35,14 +35,15 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         done: np.ndarray,
         infos: List[Dict[str, Any]],
     ) -> None:
-        max_priority = self.priorities.max() if self.buffer_size > 0 else 1.0
+        max_priority = self.priorities.max() if self.priorities.max() > 0 else 1.0
+        slot = self.pos
         super().add(obs, next_obs, action, reward, done, infos)
-        self.priorities[self.pos] = max_priority
+        self.priorities[slot] = max_priority
 
 
     def sample(self, batch_size: int, env: Optional[VecNormalize] = None):
         # Ensure priorities are not zero and normalize
-        priorities = self.priorities[:self.buffer_size] if self.full else self.priorities[:self.pos] + 1e-6
+        priorities = (self.priorities[:self.buffer_size] if self.full else self.priorities[:self.pos]) + self.epsilon
         probabilities = priorities ** self.alpha
         probabilities /= probabilities.sum()
 

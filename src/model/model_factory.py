@@ -506,58 +506,6 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                                "lstm_hidden_size": 3
                            }
                        })
-    elif config.model_rl.model_name == "duel-dqn-custom-lstm8":
-        rl_model = DuelingDQN(policy=CustomDuelingDQNPolicy, env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
-                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
-                       tau= config.model_rl.tau, 
-                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
-                       learning_starts=config.model_rl.learning_starts,
-                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
-                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
-                       policy_kwargs= {
-                           "normalize_images": False,
-                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                           "optimizer_kwargs": {
-                            #    "eps": config.model_rl.optimizer_eps,
-                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
-                            #    "alpha": config.model_rl.optimizer_alpha,
-                            #    "momentum": config.model_rl.optimizer_momentum,
-                            #    "centered": config.model_rl.optimizer_centered,
-                           },
-                           "activation_fn": activation_fns[config.model_rl.activation_fn],
-                           "net_arch": config.model_rl.net_arch,
-                           "custom_net_arch": config.model_rl.custom_net_arch,
-                           "features_extractor_class": LSTMFCE,
-                           "features_extractor_kwargs": {
-                               "lstm_hidden_size": 8
-                           }
-                       })
-    elif config.model_rl.model_name == "duel-dqn-custom-lstm8":
-        rl_model = DuelingDQN(policy=CustomDuelingDQNPolicy, env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
-                       buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
-                       tau= config.model_rl.tau, 
-                       exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
-                       learning_starts=config.model_rl.learning_starts,
-                       train_freq=config.model_rl.train_freq, gradient_steps=config.model_rl.gradient_steps,
-                       target_update_interval=config.model_rl.target_update_interval, max_grad_norm=config.model_rl.max_grad_norm,
-                       policy_kwargs= {
-                           "normalize_images": False,
-                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
-                           "optimizer_kwargs": {
-                            #    "eps": config.model_rl.optimizer_eps,
-                            #    "weight_decay": config.model_rl.optimizer_weight_decay,
-                            #    "alpha": config.model_rl.optimizer_alpha,
-                            #    "momentum": config.model_rl.optimizer_momentum,
-                            #    "centered": config.model_rl.optimizer_centered,
-                           },
-                           "activation_fn": activation_fns[config.model_rl.activation_fn],
-                           "net_arch": config.model_rl.net_arch,
-                           "custom_net_arch": config.model_rl.custom_net_arch,
-                           "features_extractor_class": LSTMFCE,
-                           "features_extractor_kwargs": {
-                               "lstm_hidden_size": 8
-                           }
-                       })
     elif config.model_rl.model_name == "duel-dqn-lstm":
         rl_model = DuelingDQN(env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
                        buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 

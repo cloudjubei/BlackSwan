@@ -493,6 +493,19 @@ def test_process_df_timestamp_expanded_adds_calendar_features():
     assert "timestamp" not in out.columns
 
 
+def test_process_df_expanded_handles_int_epoch_timestamp_close():
+    # Regression (option-a fix): days_in_month reads timestamp_close.year/.month, so the "expanded"
+    # branch must coerce timestamp_close to datetime first (mirroring process_df_simple). On-disk
+    # frames store timestamp_close as a bare int-epoch; without the conversion this raised
+    # AttributeError ('numpy.int64' has no attribute 'year').
+    out, *_ = _provider().process_df(
+        _df_full(close_datetime=False).copy(), "standard", "expanded", "none", 0.004, 20
+    )
+    for col in ["month", "day", "time", "day_of_week"]:
+        assert col in out.columns
+    assert "days_in_month" not in out.columns
+
+
 # ---------------------------------------------------------------------------
 # process_df_simple : windowing, scaling, taker guard, timestamp modes
 # ---------------------------------------------------------------------------

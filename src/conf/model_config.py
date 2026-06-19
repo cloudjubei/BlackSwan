@@ -3,51 +3,51 @@ from typing import List
 
 @dataclass
 class ModelRLConfigSearch:
-    model_name: List[str] = field(default_factory=[]), # possible ["ppo", "a2c", "dqn"]
-    reward_model: List[str] = field(default_factory=[]) # possible ["combo_all", "combo_actions", "combo_old"],
-    learning_rate: List[float] = field(default_factory=[]) 
-    batch_size: List[int] = field(default_factory=[]) 
-    buffer_size: List[int] = field(default_factory=[]) 
-    gamma: List[float] = field(default_factory=[]) 
-    tau: List[float] = field(default_factory=[])
-    exploration_fraction: List[float] = field(default_factory=[]) 
-    exploration_final_eps: List[float] = field(default_factory=[]) 
-    learning_starts: List[int] = field(default_factory=[]) 
-    train_freq: List[int] = field(default_factory=[]) 
-    gradient_steps: List[int] = field(default_factory=[]) 
-    target_update_interval: List[int] = field(default_factory=[]) 
-    max_grad_norm: List[float] = field(default_factory=[]) 
-    optimizer_class: List[str] = field(default_factory=[])
-    optimizer_eps: List[float] = field(default_factory=[]) 
-    optimizer_weight_decay: List[float] = field(default_factory=[]) 
-    optimizer_centered: List[bool] = field(default_factory=[])
-    optimizer_alpha: List[float] = field(default_factory=[]) 
-    optimizer_momentum: List[float] = field(default_factory=[]) 
-    activation_fn: List[str] = field(default_factory=[])
-    net_arch: List[List[int]] = field(default_factory=[])
-    custom_net_arch: List[List[str]] = field(default_factory=[])
+    model_name: List[str] = field(default_factory=list) # possible ["ppo", "a2c", "dqn"]
+    reward_model: List[str] = field(default_factory=list) # possible ["combo_all", "combo_actions", "combo_old"],
+    learning_rate: List[float] = field(default_factory=list) 
+    batch_size: List[int] = field(default_factory=list) 
+    buffer_size: List[int] = field(default_factory=list) 
+    gamma: List[float] = field(default_factory=list) 
+    tau: List[float] = field(default_factory=list)
+    exploration_fraction: List[float] = field(default_factory=list) 
+    exploration_final_eps: List[float] = field(default_factory=list) 
+    learning_starts: List[int] = field(default_factory=list) 
+    train_freq: List[int] = field(default_factory=list) 
+    gradient_steps: List[int] = field(default_factory=list) 
+    target_update_interval: List[int] = field(default_factory=list) 
+    max_grad_norm: List[float] = field(default_factory=list) 
+    optimizer_class: List[str] = field(default_factory=list)
+    optimizer_eps: List[float] = field(default_factory=list) 
+    optimizer_weight_decay: List[float] = field(default_factory=list) 
+    optimizer_centered: List[bool] = field(default_factory=list)
+    optimizer_alpha: List[float] = field(default_factory=list) 
+    optimizer_momentum: List[float] = field(default_factory=list) 
+    activation_fn: List[str] = field(default_factory=list)
+    net_arch: List[List[int]] = field(default_factory=list)
+    custom_net_arch: List[List[str]] = field(default_factory=list)
 
-    episodes: List[int] = field(default_factory=[])
+    episodes: List[int] = field(default_factory=list)
 
-    reward_multiplier_combo_noaction: List[float] = field(default_factory=[])
-    reward_multiplier_combo_wrongaction: List[float] = field(default_factory=[])
-    reward_multiplier_combo_positionprofitpercentage: List[float] = field(default_factory=[])
-    reward_multiplier_combo_buy: List[float] = field(default_factory=[])
-    reward_multiplier_combo_sell: List[float] = field(default_factory=[])
+    reward_multiplier_combo_noaction: List[float] = field(default_factory=list)
+    reward_multiplier_combo_wrongaction: List[float] = field(default_factory=list)
+    reward_multiplier_combo_positionprofitpercentage: List[float] = field(default_factory=list)
+    reward_multiplier_combo_buy: List[float] = field(default_factory=list)
+    reward_multiplier_combo_sell: List[float] = field(default_factory=list)
 
-    reward_multiplier_combo_sell_profit: List[float] = field(default_factory=[])
-    reward_multiplier_combo_sell_profit_prev: List[float] = field(default_factory=[])
-    reward_multiplier_combo_sell_perfect: List[float] = field(default_factory=[])
-    reward_multiplier_combo_sell_drawdown: List[float] = field(default_factory=[])
-    reward_multiplier_combo_buy_profit: List[float] = field(default_factory=[])
-    reward_multiplier_combo_buy_perfect: List[float] = field(default_factory=[])
-    reward_multiplier_combo_buy_profitable_offset: List[int] = field(default_factory=[])
-    reward_multiplier_combo_buy_profitable: List[float] = field(default_factory=[])
-    reward_multiplier_combo_buy_drawdown: List[float] = field(default_factory=[])
-    reward_multiplier_combo_hold_profit: List[float] = field(default_factory=[])
-    reward_multiplier_combo_hold_drawdown: List[float] = field(default_factory=[])
-    reward_multiplier_combo_fee_penalty: List[float] = field(default_factory=[])
-    reward_multiplier_combo_noop_penalty: List[float] = field(default_factory=[])
+    reward_multiplier_combo_sell_profit: List[float] = field(default_factory=list)
+    reward_multiplier_combo_sell_profit_prev: List[float] = field(default_factory=list)
+    reward_multiplier_combo_sell_perfect: List[float] = field(default_factory=list)
+    reward_multiplier_combo_sell_drawdown: List[float] = field(default_factory=list)
+    reward_multiplier_combo_buy_profit: List[float] = field(default_factory=list)
+    reward_multiplier_combo_buy_perfect: List[float] = field(default_factory=list)
+    reward_multiplier_combo_buy_profitable_offset: List[int] = field(default_factory=list)
+    reward_multiplier_combo_buy_profitable: List[float] = field(default_factory=list)
+    reward_multiplier_combo_buy_drawdown: List[float] = field(default_factory=list)
+    reward_multiplier_combo_hold_profit: List[float] = field(default_factory=list)
+    reward_multiplier_combo_hold_drawdown: List[float] = field(default_factory=list)
+    reward_multiplier_combo_fee_penalty: List[float] = field(default_factory=list)
+    reward_multiplier_combo_noop_penalty: List[float] = field(default_factory=list)
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
@@ -76,8 +76,8 @@ class ModelRLConfig:
     optimizer_alpha: float = 0.99
     optimizer_momentum: float = 0
     activation_fn: str = 'ReLU'
-    net_arch: List[int] = field(default_factory=[])
-    custom_net_arch: List[str] = field(default_factory=[])
+    net_arch: List[int] = field(default_factory=list)
+    custom_net_arch: List[str] = field(default_factory=list)
 
     episodes: int = 1
 
@@ -87,17 +87,17 @@ class ModelRLConfig:
     reward_multiplier_combo_buy: float = 0
     reward_multiplier_combo_sell: float = 0
     
-    reward_multiplier_combo_sell_profit: float = 0,
-    reward_multiplier_combo_sell_profit_prev: float = 0,
-    reward_multiplier_combo_sell_perfect: float = 0,
-    reward_multiplier_combo_sell_drawdown: float = 0,
-    reward_multiplier_combo_buy_profit: float = 0,
-    reward_multiplier_combo_buy_perfect: float = 0,
-    reward_multiplier_combo_buy_profitable_offset: int = 0,
-    reward_multiplier_combo_buy_profitable: float = 0,
-    reward_multiplier_combo_buy_drawdown: float = 0,
-    reward_multiplier_combo_hold_profit: float = 0,
-    reward_multiplier_combo_hold_drawdown: float = 0,
+    reward_multiplier_combo_sell_profit: float = 0
+    reward_multiplier_combo_sell_profit_prev: float = 0
+    reward_multiplier_combo_sell_perfect: float = 0
+    reward_multiplier_combo_sell_drawdown: float = 0
+    reward_multiplier_combo_buy_profit: float = 0
+    reward_multiplier_combo_buy_perfect: float = 0
+    reward_multiplier_combo_buy_profitable_offset: int = 0
+    reward_multiplier_combo_buy_profitable: float = 0
+    reward_multiplier_combo_buy_drawdown: float = 0
+    reward_multiplier_combo_hold_profit: float = 0
+    reward_multiplier_combo_hold_drawdown: float = 0
     reward_multiplier_combo_fee_penalty: float = 1.0
     reward_multiplier_combo_noop_penalty: float = 0.001
 
@@ -108,25 +108,25 @@ class ModelRLConfig:
 
 @dataclass
 class ModelRegressionConfigSearch:
-    model_name: List[str] = field(default_factory=[]) # possible ["mlp"]
+    model_name: List[str] = field(default_factory=list) # possible ["mlp"]
     
-    loss_fn: List[str] = field(default_factory=[]) # possible ["mse", "l1", "kldiv", "smoothl1"]
-    loss_fn_reduction: List[str] = field(default_factory=[]) # possible ["none", "mean"]
+    loss_fn: List[str] = field(default_factory=list) # possible ["mse", "l1", "kldiv", "smoothl1"]
+    loss_fn_reduction: List[str] = field(default_factory=list) # possible ["none", "mean"]
 
-    learning_rate: List[float] = field(default_factory=[]) 
-    weight_decay: List[float] = field(default_factory=[]) 
+    learning_rate: List[float] = field(default_factory=list) 
+    weight_decay: List[float] = field(default_factory=list) 
 
-    optimizer_class: List[str] = field(default_factory=[])
-    optimizer_eps: List[float] = field(default_factory=[]) 
-    optimizer_weight_decay: List[float] = field(default_factory=[]) 
-    optimizer_centered: List[bool] = field(default_factory=[])
-    optimizer_alpha: List[float] = field(default_factory=[]) 
-    optimizer_momentum: List[float] = field(default_factory=[]) 
-    activation_fn: List[str] = field(default_factory=[])
-    net_arch: List[List[int]] = field(default_factory=[])
-    custom_net_arch: List[List[str]] = field(default_factory=[])
+    optimizer_class: List[str] = field(default_factory=list)
+    optimizer_eps: List[float] = field(default_factory=list) 
+    optimizer_weight_decay: List[float] = field(default_factory=list) 
+    optimizer_centered: List[bool] = field(default_factory=list)
+    optimizer_alpha: List[float] = field(default_factory=list) 
+    optimizer_momentum: List[float] = field(default_factory=list) 
+    activation_fn: List[str] = field(default_factory=list)
+    net_arch: List[List[int]] = field(default_factory=list)
+    custom_net_arch: List[List[str]] = field(default_factory=list)
 
-    episodes: List[int] = field(default_factory=[])
+    episodes: List[int] = field(default_factory=list)
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
@@ -150,8 +150,8 @@ class ModelRegressionConfig:
     optimizer_alpha: float = 0.99
     optimizer_momentum: float = 0
     activation_fn: str = 'ReLU'
-    net_arch: List[int] = field(default_factory=[])
-    custom_net_arch: List[str] = field(default_factory=[])
+    net_arch: List[int] = field(default_factory=list)
+    custom_net_arch: List[str] = field(default_factory=list)
 
     episodes: int = 1
 
@@ -164,9 +164,9 @@ class ModelRegressionConfig:
 
 @dataclass
 class ModelSupervisedConfigSearch:
-    model_name: List[str] = field(default_factory=[])  # possible ["supervised-logreg", "supervised-gbm"]
-    forward_horizon: List[int] = field(default_factory=[])
-    prob_threshold: List[float] = field(default_factory=[])
+    model_name: List[str] = field(default_factory=list)  # possible ["supervised-logreg", "supervised-gbm"]
+    forward_horizon: List[int] = field(default_factory=list)
+    prob_threshold: List[float] = field(default_factory=list)
     seed: int | None = None
     checkpoint_to_load: str | None = None
 @dataclass
@@ -178,18 +178,18 @@ class ModelSupervisedConfig:
     checkpoint_to_load: str | None = None
 @dataclass
 class ModelTimeConfigSearch:
-    time_buy: List[int] = field(default_factory=[1200])
-    time_sell: List[int] = field(default_factory=[1400])
+    time_buy: List[int] = field(default_factory=lambda: [1200])
+    time_sell: List[int] = field(default_factory=lambda: [1400])
 @dataclass
 class ModelTimeConfig:
     time_buy: int
     time_sell: int
 @dataclass
 class ModelTechnicalConfigSearch:
-    buy_indicator: List[str] = field(default_factory=[])
-    buy_amount_threshold: List[float] = field(default_factory=[])
-    sell_indicator: List[str] = field(default_factory=[])
-    sell_amount_threshold: List[float] = field(default_factory=[])
+    buy_indicator: List[str] = field(default_factory=list)
+    buy_amount_threshold: List[float] = field(default_factory=list)
+    sell_indicator: List[str] = field(default_factory=list)
+    sell_amount_threshold: List[float] = field(default_factory=list)
     buy_amount_is_multiplier: bool = False
     buy_is_price_check: bool = False
     buy_is_down_check: bool = True
@@ -371,7 +371,6 @@ model_rl = ModelConfigSearch(
         # reward_model= ["combo"],
         # reward_model= ["combo_all", "combo"],
         reward_model= ["combo_all2"],
-        # reward_model= ["combo2"],
 
         # learning_rate= [0.0001, 0.0005, 0.001],
         learning_rate= [0.0001],
@@ -852,8 +851,8 @@ class ModelRLConfig:
     optimizer_alpha: float = 0.99
     optimizer_momentum: float = 0
     activation_fn: str = 'ReLU'
-    net_arch: List[int] = field(default_factory=[])
-    custom_net_arch: List[str] = field(default_factory=[])
+    net_arch: List[int] = field(default_factory=list)
+    custom_net_arch: List[str] = field(default_factory=list)
 
     episodes: int = 1
 
@@ -863,17 +862,17 @@ class ModelRLConfig:
     reward_multiplier_combo_buy: float = 0
     reward_multiplier_combo_sell: float = 0
 
-    reward_multiplier_combo_sell_profit: float = 0,
-    reward_multiplier_combo_sell_profit_prev: float = 0,
-    reward_multiplier_combo_sell_perfect: float = 0,
-    reward_multiplier_combo_sell_drawdown: float = 0,
-    reward_multiplier_combo_buy_profit: float = 0,
-    reward_multiplier_combo_buy_perfect: float = 0,
-    reward_multiplier_combo_buy_profitable_offset: int = 0,
-    reward_multiplier_combo_buy_profitable: float = 0,
-    reward_multiplier_combo_buy_drawdown: float = 0,
-    reward_multiplier_combo_hold_profit: float = 0,
-    reward_multiplier_combo_hold_drawdown: float = 0,
+    reward_multiplier_combo_sell_profit: float = 0
+    reward_multiplier_combo_sell_profit_prev: float = 0
+    reward_multiplier_combo_sell_perfect: float = 0
+    reward_multiplier_combo_sell_drawdown: float = 0
+    reward_multiplier_combo_buy_profit: float = 0
+    reward_multiplier_combo_buy_perfect: float = 0
+    reward_multiplier_combo_buy_profitable_offset: int = 0
+    reward_multiplier_combo_buy_profitable: float = 0
+    reward_multiplier_combo_buy_drawdown: float = 0
+    reward_multiplier_combo_hold_profit: float = 0
+    reward_multiplier_combo_hold_drawdown: float = 0
     reward_multiplier_combo_fee_penalty: float = 1.0
     reward_multiplier_combo_noop_penalty: float = 0.001
 

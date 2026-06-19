@@ -84,10 +84,9 @@ def test_unknown_type_raises_value_error(monkeypatch):
         env_factory.create_environment(config, object(), "cpu")
 
 
-@pytest.mark.xfail(reason="BUG: error string is missing the f-prefix so {config.type} is not interpolated", strict=False)
 def test_unknown_type_error_message_interpolates_type(monkeypatch):
-    # CONTRACT: the error should name the offending type. The source uses a plain (non-f) string
-    # literal "{config.type} - env not supported", so the type is NOT interpolated -> documents the bug.
+    # CONTRACT: the error names the offending type. The source uses an f-string so the unsupported
+    # config.type is interpolated into the raised ValueError message.
     _patch_all(monkeypatch)
     config = EnvConfig(type="totally_bogus")
     with pytest.raises(ValueError) as exc:

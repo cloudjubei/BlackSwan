@@ -15,10 +15,10 @@ class DataConfig:
     buyreward_maxwait: int = 20
     fidelity_input: str = "1m" # possible ["1m", "1h", "1d"]
     fidelity_run: str = "1m"
-    layers: List[str] = field(default_factory=[])  # possible ["1h"], ["1h", "4h", "1d", "1w"], ["1m", "15m", "1h", "4h", "1d", "1w"]
+    layers: List[str] = field(default_factory=list)  # possible ["1h"], ["1h", "4h", "1d", "1w"], ["1m", "15m", "1h", "4h", "1d", "1w"]
     fidelity_input_test: str = "1m"
     fidelity_run_test: str = "1m"
-    layers_test: List[str] = field(default_factory=[])
+    layers_test: List[str] = field(default_factory=list)
     buyreward_percent_test: float = 0.004
     buyreward_maxwait_test: int = 20
     # Observation squashing experiment: several base features exceed the declared Box(-1,1) bound and

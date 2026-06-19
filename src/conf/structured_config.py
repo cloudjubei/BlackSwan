@@ -20,9 +20,9 @@ class Config:
     # device: str = "mps"
     device: str = "cpu"
 
-    data_configs: List[DataConfig] = field(default_factory=List)
-    env_configs: List[EnvConfig] = field(default_factory=List)
-    model_configs: List[ModelConfigSearch] = field(default_factory=List)
+    data_configs: List[DataConfig] = field(default_factory=list)
+    env_configs: List[EnvConfig] = field(default_factory=list)
+    model_configs: List[ModelConfigSearch] = field(default_factory=list)
 
     dagshub_repo: Repo = field(default_factory=Repo)
     local_only: bool = True

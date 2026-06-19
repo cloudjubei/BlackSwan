@@ -18,13 +18,19 @@ _OHLCV_SUM = ["volume", "asset_volume_quote", "trades_number", "asset_volume_tak
 
 def _to_ms(series):
     """Coerce a timestamp column (datetime64 after pd.read_json, or raw ms ints) to integer ms."""
-    return pd.to_datetime(series).astype("int64") // 10**6
+    s = pd.Series(series)
+    if pd.api.types.is_numeric_dtype(s):
+        return pd.to_datetime(s, unit="ms").astype("int64") // 10**6
+    return pd.to_datetime(s).astype("int64") // 10**6
 
 
 def derive_bars(df, bucket_ms):
     """Aggregate 1m klines into fixed-width buckets (e.g. 3_600_000 for 1h) — open=first, high=max,
     low=min, close=last, the volume/quote/trade/taker columns summed. Matches the exchange's native
     higher-fidelity bar (verified: summed 1m == native 1h)."""
+    if df.empty or "timestamp" not in df.columns:
+        cols = ["timestamp", "price_open", "price_high", "price_low", "price", "timestamp_close", *_OHLCV_SUM]
+        return pd.DataFrame({c: pd.Series([], dtype="float64") for c in cols})
     d = df.copy()
     open_ms = _to_ms(d["timestamp"])
     close_ms = _to_ms(d["timestamp_close"])

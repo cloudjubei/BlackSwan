@@ -13,13 +13,13 @@ class ServerCryptoEnv(BaseCryptoEnv):
             return self.get_observation_buy(values)
 
     def get_observation_buy(self, values: np.ndarray) -> np.ndarray:
-        values = self.data_provider.get_values(self.current_step)
-        return self.get_observation(values, np.zeros_like(values), np.zeros_like(values), np.zeros_like(values), np.zeros_like(values))
-    
+        z = np.zeros(len(values))
+        return self.get_observation(values, z, z, z, z)
+
     def get_observation(self, values: np.ndarray, percent_profits: np.ndarray, stoploss_closeness: np.ndarray, drawdowns: np.ndarray, positions: np.ndarray) -> np.ndarray:
-        
+
         out = []
         for i in range(len(values)):
-            out = out + values[i] + [percent_profits[i], stoploss_closeness[i], drawdowns[i], positions[i]]
+            out = out + list(values[i]) + [percent_profits[i], stoploss_closeness[i], drawdowns[i], positions[i]]
         return out
         

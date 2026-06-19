@@ -1,4 +1,3 @@
-import numpy as np
 import pytest
 import torch
 
@@ -57,64 +56,67 @@ def test_squared_mean_loss_returns_tensor_with_grad():
     assert inp.grad is not None
 
 
-def test_squared_mean_loss_target_zero_yields_nan_or_inf():
-    # Division by a zero target is a genuine footgun: term -> inf, mean -> inf (characterization).
+def test_squared_mean_loss_target_zero_is_finite():
+    # The denominator is guarded (target + 1e-8) so a zero target no longer blows up to inf/nan.
     out = SquaredMeanLoss()(torch.tensor([1.0, 2.0]), torch.tensor([0.0, 4.0]))
-    assert torch.isinf(out) or torch.isnan(out)
+    assert torch.isfinite(out)
 
 
 # ---------------------------------------------------------------------------
-# R2Loss : delegates to sklearn.metrics.r2_score(input, target)
+# R2Loss : R2 = 1 - SS_res / SS_tot, computed in pure torch.
+# `target` is ground truth, `input` is the prediction, matching the sklearn
+# convention r2_score(y_true=target, y_pred=input).
 # ---------------------------------------------------------------------------
 
 
 def test_r2_loss_perfect_fit_is_one():
-    # When the two series match exactly, r2_score is 1.0.
+    # When the two series match exactly, R2 is 1.0.
     out = R2Loss()(torch.tensor([1.0, 2.0, 3.0]), torch.tensor([1.0, 2.0, 3.0]))
     assert float(out) == pytest.approx(1.0)
 
 
 def test_r2_loss_matches_sklearn_reference():
-    # The forward simply calls sklearn r2_score with (input, target) in THAT order.
-    from sklearn.metrics import r2_score
-
-    a = torch.tensor([2.5, 0.0, 2.0, 8.0])
-    b = torch.tensor([3.0, -0.5, 2.0, 7.0])
-    out = R2Loss()(a, b)
-    assert float(out) == pytest.approx(r2_score(a, b))
-
-
-def test_r2_loss_argument_order_is_input_then_target():
-    # r2_score is asymmetric in its args; this pins that R2Loss passes (input, target)
-    # (NOT the sklearn-canonical (y_true, y_pred) = (target, input)).
+    # R2 matches sklearn with (y_true=target, y_pred=input).
     from sklearn.metrics import r2_score
 
     inp = torch.tensor([2.5, 0.0, 2.0, 8.0])
     tgt = torch.tensor([3.0, -0.5, 2.0, 7.0])
     out = R2Loss()(inp, tgt)
-    # equals r2_score(input, target), and differs from the swapped order.
-    assert float(out) == pytest.approx(r2_score(inp, tgt))
-    assert float(out) != pytest.approx(r2_score(tgt, inp))
+    assert float(out) == pytest.approx(r2_score(tgt, inp))
 
 
-@pytest.mark.xfail(
-    reason="BUG: R2Loss.forward is annotated -> Tensor but sklearn.r2_score returns a "
-    "numpy float; the returned value is not a torch.Tensor and cannot backprop.",
-    strict=False,
-)
+def test_r2_loss_argument_order_is_input_then_target():
+    # R2 is asymmetric in its args; this pins that R2Loss treats target as ground truth
+    # and input as prediction (the sklearn-canonical (y_true, y_pred) = (target, input)).
+    from sklearn.metrics import r2_score
+
+    inp = torch.tensor([2.5, 0.0, 2.0, 8.0])
+    tgt = torch.tensor([3.0, -0.5, 2.0, 7.0])
+    out = R2Loss()(inp, tgt)
+    # equals r2_score(y_true=target, y_pred=input), and differs from the swapped order.
+    assert float(out) == pytest.approx(r2_score(tgt, inp))
+    assert float(out) != pytest.approx(r2_score(inp, tgt))
+
+
 def test_r2_loss_should_return_tensor():
+    # Computed in pure torch, the result is a torch.Tensor that can backprop.
     out = R2Loss()(torch.tensor([1.0, 2.0, 3.0]), torch.tensor([1.1, 1.9, 3.2]))
     assert isinstance(out, torch.Tensor)
 
 
-def test_r2_loss_currently_returns_numpy_scalar():
-    # Characterization of the actual return type (the contract-violating behaviour above).
-    out = R2Loss()(torch.tensor([1.0, 2.0, 3.0]), torch.tensor([1.1, 1.9, 3.2]))
-    assert isinstance(out, np.floating)
+def test_r2_loss_returns_tensor_with_grad():
+    # A prediction that requires grad flows through and yields a differentiable scalar tensor.
+    inp = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+    tgt = torch.tensor([1.1, 1.9, 3.2])
+    out = R2Loss()(inp, tgt)
+    assert isinstance(out, torch.Tensor)
+    assert out.requires_grad
+    out.backward()
+    assert inp.grad is not None
 
 
 def test_r2_loss_reduction_argument_is_accepted_but_unused():
-    # _Loss base accepts reduction; forward ignores it (sklearn has its own averaging).
+    # _Loss base accepts reduction; forward ignores it (R2 has its own normalisation).
     out_mean = R2Loss(reduction="mean")(torch.tensor([1.0, 2.0, 3.0]), torch.tensor([1.0, 2.0, 3.0]))
     out_sum = R2Loss(reduction="sum")(torch.tensor([1.0, 2.0, 3.0]), torch.tensor([1.0, 2.0, 3.0]))
     assert float(out_mean) == pytest.approx(float(out_sum))

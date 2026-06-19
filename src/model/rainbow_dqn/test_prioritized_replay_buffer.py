@@ -6,11 +6,10 @@ adds proportional prioritization. We exercise ``add`` / ``sample`` /
 Discrete action space (no env, no GPU, no training loop). RNG-driven sampling
 is seeded for determinism.
 
-Several tests assert the INTENDED contract (priority bookkeeping that actually
-stores per-transition priorities, importance-sampling weights, a non-degenerate
-full-buffer sample) and are marked ``xfail`` because the current ``add`` writes
-the priority to the wrong slot, leaving every priority at 0. See the module
-docstring's bug notes in the agent report.
+These tests assert the INTENDED contract: ``add`` seeds each new transition with
+a positive max priority in the correct slot, ``update_priorities`` applies the
+epsilon offset, and a full buffer is samplable without NaN probabilities (the
+epsilon floor binds to both the full and not-full branches of ``sample``).
 """
 
 import os
@@ -90,34 +89,34 @@ def test_add_wraps_and_marks_full():
 # add: priority bookkeeping (BUG — see xfail)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(reason="BUG: add() writes priority to self.pos AFTER super().add() "
-                          "incremented it, and reads max from an all-zero array, so the "
-                          "just-added transition never gets a priority.", strict=False)
 def test_add_assigns_max_priority_to_new_transition():
     buf = _buffer(buffer_size=4)
     _add(buf, 0)
-    # the very first transition should receive a positive (default 1.0) priority so it
-    # can ever be sampled; intended PER behaviour. Currently it stays 0.0.
-    assert buf.priorities[0] > 0.0
+    # the very first transition receives a positive (default 1.0) priority, seeded in
+    # the slot written by super().add() (captured BEFORE pos is incremented).
+    assert buf.priorities[0] == pytest.approx(1.0)
 
 
-@pytest.mark.xfail(reason="BUG: priorities are written to the wrong slot, so after several "
-                          "adds the stored priorities remain entirely zero.", strict=False)
 def test_add_keeps_priorities_positive_after_several_adds():
     buf = _buffer(buffer_size=4)
     for i in range(3):
         _add(buf, i)
-    # each stored transition should have a positive priority.
+    # each stored transition lands its priority in the correct slot and stays positive.
     assert np.all(buf.priorities[:3] > 0.0)
+    # the not-yet-written slot remains zero (priority went to the right place).
+    assert buf.priorities[3] == pytest.approx(0.0)
 
 
-def test_add_currently_leaves_priorities_zero_characterization():
-    # Characterization of the present (buggy) behaviour: priorities never become
-    # non-zero through add() alone.
+def test_add_seeds_new_transition_with_current_max_priority():
+    # After raising one slot's priority, a subsequent add() seeds the new transition
+    # with the current maximum (not the dead all-zero default).
     buf = _buffer(buffer_size=4)
-    for i in range(3):
-        _add(buf, i)
-    assert np.all(buf.priorities == 0.0)
+    _add(buf, 0)
+    buf.update_priorities(np.array([0]), np.array([5.0], dtype=np.float32))
+    _add(buf, 1)
+    # the freshly added slot 1 inherits the running max priority.
+    assert buf.priorities[1] == pytest.approx(buf.priorities[:2].max())
+    assert buf.priorities[1] >= 5.0
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +143,8 @@ def test_update_priorities_single_index():
         _add(buf, i)
     buf.update_priorities(np.array([1]), np.array([5.0], dtype=np.float32))
     assert buf.priorities[1] == pytest.approx(5.0 + buf.epsilon)
-    assert buf.priorities[0] == pytest.approx(0.0)
+    # slot 0 was not updated, so it keeps the default priority seeded by add().
+    assert buf.priorities[0] == pytest.approx(1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +162,8 @@ def test_sample_not_full_returns_valid_indices_and_weights():
     assert len(indices) == 3
     assert isinstance(weights, th.Tensor)
     assert weights.shape == (3,)
-    # uniform (all-zero) priorities -> normalized weights are all 1.
+    # all four transitions seeded to the same default (1.0) priority -> uniform
+    # probabilities -> normalized weights are all 1.
     np.testing.assert_allclose(weights.cpu().numpy(), np.ones(3), rtol=1e-5)
 
 
@@ -195,19 +196,17 @@ def test_sample_weights_normalized_to_unit_max_after_update():
 # sample: full path (BUG — all-zero priorities divide by zero -> NaN)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(reason="BUG: when full, sample() uses raw priorities without the +1e-6 "
-                          "guard; combined with the add() bug they are all zero, so "
-                          "probabilities /= 0 yields NaN and np.random.choice raises.",
-                   strict=False, raises=(ValueError, ZeroDivisionError, FloatingPointError))
 def test_sample_full_buffer_does_not_produce_nan():
     buf = _buffer(buffer_size=4)
     for i in range(4):  # fills the buffer
         _add(buf, i)
     assert buf.full
     np.random.seed(0)
-    # intended: a full buffer is samplable. Currently this raises on NaN probabilities.
+    # a full buffer is samplable: the epsilon floor now binds to the full branch too,
+    # so no zero priorities -> no NaN probabilities.
     samples, weights, indices = buf.sample(batch_size=2)
     assert all(0 <= i < 4 for i in indices)
+    assert len(indices) == 2
     assert not np.any(np.isnan(weights.cpu().numpy()))
 
 
@@ -225,3 +224,38 @@ def test_sample_full_buffer_after_priority_update_recovers():
     w = weights.cpu().numpy()
     assert not np.any(np.isnan(w))
     assert w.max() == pytest.approx(1.0)
+
+
+def test_sample_full_buffer_with_zero_priorities_uses_epsilon_floor():
+    # Guards bug B *independently* of the add()-seeding fix: force a FULL buffer that contains only
+    # zero priorities (the state the seeding fix would normally prevent) and assert the full-branch
+    # epsilon floor keeps probabilities finite. Without the floor on the full branch, 0**alpha = 0
+    # -> divide-by-zero -> NaN -> np.random.choice raises ValueError.
+    buf = _buffer(buffer_size=4)
+    for i in range(4):  # fill -> full
+        _add(buf, i)
+    assert buf.full
+    buf.priorities[:] = 0.0  # pathological: a full buffer with no positive priority
+    np.random.seed(0)
+    samples, weights, indices = buf.sample(batch_size=2)
+    assert all(0 <= i < 4 for i in indices)
+    assert not np.any(np.isnan(weights.cpu().numpy()))
+
+
+def test_sample_floor_uses_configured_epsilon_not_hardcoded():
+    # Guards bug C: the sampling floor must be the configurable self.epsilon, not a hardcoded 1e-6.
+    # With a large epsilon a zero-priority slot still draws meaningful probability; with the old
+    # 1e-6 literal it would be sampled essentially never.
+    buf = _buffer(buffer_size=8, alpha=1.0, epsilon=0.5)
+    _add(buf, 0)
+    _add(buf, 1)  # not full -> sample() uses self.priorities[:pos] (the branch that held the literal)
+    buf.priorities[0] = 1.0
+    buf.priorities[1] = 0.0
+    # alpha=1, epsilon=0.5 -> probabilities ∝ [1.5, 0.5] -> p(slot 1) = 0.25; the old 1e-6 literal
+    # would give p(slot 1) ≈ 1e-6 ≈ 0.
+    np.random.seed(0)
+    n, hits = 4000, 0
+    for _ in range(n):
+        _, _, idx = buf.sample(batch_size=1)
+        hits += int(idx[0] == 1)
+    assert hits / n > 0.12

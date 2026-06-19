@@ -138,28 +138,26 @@ def test_nonfidelity_lookback_one_single_layer_flattens():
     assert v.tolist() == [2.0, 1002.0, 2002.0]
 
 
-def test_nonfidelity_lookback_one_two_layers_should_concatenate_features():
-    # CONTRACT: with multiple layers each layer's features should be laid side-by-side on the feature
-    # axis (that is what the 3-D path does and what _concat_layer_grids/the design comment describe).
-    # BUG: with lookback<=1 the code does ``out += v`` where ``out`` is already a numpy array, so the
-    # higher layer is element-wise ADDED onto the base layer instead of concatenated, corrupting the
-    # feature vector. Expected width = base_features + hi_features.
+def test_nonfidelity_lookback_one_two_layers_concatenates_features():
+    # CONTRACT: with multiple layers each layer's features are laid side-by-side on the feature axis
+    # (that is what the 3-D path does and what _concat_layer_grids/the design comment describe).
+    # Concatenated width = base_features + hi_features, NOT an element-wise sum.
     base = _grid_df(5, 2, base=0.0)
     hi = _grid_df(4, 2, base=900.0)
     p = _nonfid(lookback=1, dfs=[base, hi], index_mappings=[[0, 1, 2, 3, 3]], starting_index=0)
     v = p.get_values(1)  # offset 1 -> base row1 [1,1001]; hi idx mappings[0][1]=1 -> hi row1 [901,1901]
-    pytest.xfail("BUG: lookback<=1 multi-layer get_values element-wise adds layers instead of concatenating")
     assert v.tolist() == [1.0, 1001.0, 901.0, 1901.0]
 
 
-def test_nonfidelity_lookback_one_two_layers_current_buggy_behaviour():
-    # Characterization of the actual (buggy) behaviour so the regression is pinned: layers are summed.
+def test_nonfidelity_lookback_one_two_layers_does_not_sum():
+    # Guard against the old element-wise-add regression: layers must NOT be summed.
     base = _grid_df(5, 2, base=0.0)
     hi = _grid_df(4, 2, base=900.0)
     p = _nonfid(lookback=1, dfs=[base, hi], index_mappings=[[0, 1, 2, 3, 3]], starting_index=0)
     v = p.get_values(1)
-    # base row1 = [1, 1001], hi row1 = [901, 1901] -> element-wise sum.
-    assert v.tolist() == [902.0, 2902.0]
+    # base row1 = [1, 1001], hi row1 = [901, 1901] -> concatenated, not [902.0, 2902.0].
+    assert v.tolist() != [902.0, 2902.0]
+    assert len(v) == 4
 
 
 # --------------------------------------------------------------------------------------------------
@@ -246,28 +244,29 @@ def test_fidelity_lookback_one_single_layer_flattens():
     assert v.tolist() == [0.0, 1000.0, 2000.0]
 
 
-def test_fidelity_lookback_one_two_layers_should_concatenate_features():
-    # Same contract/bug as the non-fidelity lookback-one path: ``out += v`` element-wise adds the
-    # second layer onto the first instead of concatenating their features.
+def test_fidelity_lookback_one_two_layers_concatenates_features():
+    # Same contract as the non-fidelity lookback-one path: layers are concatenated onto the feature
+    # axis, NOT element-wise added.
     layer_a = _grid_df(4, 2, base=0.0)
     layer_b = _grid_df(4, 2, base=900.0)
     raw = _ts_df(["2021-01-01 00:%02d:00" % i for i in range(4)])
     p = _fid(lookback=1, layers=["1h", "1d"], fidelity_run="1h", multipliers=[1, 1],
              fidelity_dfs=[[layer_a], [layer_b]], raw_df=raw)
     v = p.get_values(0)  # layer_a row0 [0,1000]; layer_b row0 [900,1900]
-    pytest.xfail("BUG: lookback<=1 multi-layer get_values element-wise adds layers instead of concatenating")
     assert v.tolist() == [0.0, 1000.0, 900.0, 1900.0]
 
 
-def test_fidelity_lookback_one_two_layers_current_buggy_behaviour():
+def test_fidelity_lookback_one_two_layers_does_not_sum():
+    # Guard against the old element-wise-add regression in the fidelity branch.
     layer_a = _grid_df(4, 2, base=0.0)
     layer_b = _grid_df(4, 2, base=900.0)
     raw = _ts_df(["2021-01-01 00:%02d:00" % i for i in range(4)])
     p = _fid(lookback=1, layers=["1h", "1d"], fidelity_run="1h", multipliers=[1, 1],
              fidelity_dfs=[[layer_a], [layer_b]], raw_df=raw)
     v = p.get_values(0)
-    # layer_a row0 [0,1000] + layer_b row0 [900,1900] element-wise.
-    assert v.tolist() == [900.0, 2900.0]
+    # layer_a row0 [0,1000], layer_b row0 [900,1900] -> concatenated, not [900.0, 2900.0].
+    assert v.tolist() != [900.0, 2900.0]
+    assert len(v) == 4
 
 
 # --------------------------------------------------------------------------------------------------

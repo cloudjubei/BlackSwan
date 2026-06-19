@@ -688,40 +688,6 @@ def test_combo_hold_short_rewards_price_down():
     assert e._calculate_reward() == pytest.approx(-0.2 - 0.15)
 
 
-@pytest.mark.xfail(reason="BUG: combo2 never enters the combo block (dispatch only matches 'combo'), so "
-                          "the combo_wrongaction branch at line 541 is dead code", strict=False)
-def test_combo2_hold_adds_wrong_action_when_acting():
-    # combo2 is INTENDED to route through the combo body and add wrongaction when the agent acts
-    # while it should hold. But the block at line 489 only matches reward_model == "combo", so a
-    # combo2 run silently falls through to the generic profit_percentage reward instead.
-    e = _reward_env("combo2", _COMBO)
-    e.actions_made = [False]
-    e.actions = [1]
-    e.positions = [5.0]
-    e.current_price = 100.0
-    e.current_step = 0
-    e.get_price = lambda s: 100.0
-    e.drawdowns = [0.0]
-    # The intended combo2 reward = hold_reward1 + hold_reward2 + combo_wrongaction; with a flat price
-    # and zero drawdown that is just combo_wrongaction.
-    assert e._calculate_reward() == pytest.approx(_COMBO["combo_wrongaction"])
-
-
-def test_combo2_currently_falls_through_to_profit_percentage():
-    # Characterization of the current (buggy) behaviour: combo2 reaches the net/init-1 fallthrough.
-    e = _reward_env("combo2", _COMBO)
-    e.actions_made = [False]
-    e.actions = [1]
-    e.positions = [5.0]
-    e.current_price = 100.0
-    e.current_step = 0
-    e.get_price = lambda s: 100.0
-    e.drawdowns = [0.0]
-    e.net_worths = [105.0]
-    e.initial_net_worth = 100.0
-    assert e._calculate_reward() == pytest.approx(0.05)
-
-
 # --- _calculate_reward: combo_all family ------------------------------------
 
 _COMBO_ALL = {

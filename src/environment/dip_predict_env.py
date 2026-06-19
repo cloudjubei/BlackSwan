@@ -163,12 +163,13 @@ class DipPredictEnv(AbstractEnv):
         if action == 1:
             if reward > 0:
                 self.current_streak += 1
-                if done:
+                if done and self.current_streak > 0:
                     self.streaks.append(self.current_streak)
             else:
-                self.streaks.append(self.current_streak)
+                if self.current_streak > 0:
+                    self.streaks.append(self.current_streak)
                 self.current_streak = 0
-        elif done:
+        elif done and self.current_streak > 0:
             self.streaks.append(self.current_streak)
 
     def _get_recall(self):

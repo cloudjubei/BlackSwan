@@ -279,6 +279,7 @@ class AbstractDataProvider(ABC):
 
         if timestamp == "expanded":
             result_df['timestamp'] = pd.to_datetime(result_df['timestamp'], unit='ms')
+            result_df['timestamp_close'] = pd.to_datetime(result_df['timestamp_close'], unit='ms')
             result_df['month'] = (result_df['timestamp'].dt.month - 1)/11
             result_df['day'] = result_df['timestamp'].dt.day - 1
             result_df['days_in_month'] = result_df.apply(days_in_month, axis=1) - 1

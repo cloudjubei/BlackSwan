@@ -239,7 +239,7 @@ class MultiTimelineDataProvider(AbstractDataProvider):
                     if len(out) == 0:
                         out = v
                     else:
-                        out += v
+                        out = np.concatenate([out, v])
                 else:
                     out.append(v)
         else:
@@ -266,7 +266,7 @@ class MultiTimelineDataProvider(AbstractDataProvider):
 
                 if self.config.lookback_window_size <= 1:
                     v = v.flatten()
-                    out += v
+                    out = np.concatenate([out, v])
                 else:
                     out.append(v)
 

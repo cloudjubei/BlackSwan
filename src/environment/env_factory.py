@@ -20,4 +20,4 @@ def create_environment(config: EnvConfig, data_provider: AbstractDataProvider, d
         return DipPredictEnv(config, data_provider, device)
     elif config.type == "regression_predict":
         return RegressionPredictEnv(config, data_provider, device)
-    raise ValueError("{config.type} - env not supported")
+    raise ValueError(f"{config.type} - env not supported")

@@ -21,8 +21,8 @@ from src.model.abstract_model import (
 # --- helpers ---------------------------------------------------------------
 
 def _rl_config(**kw):
-    # net_arch / custom_net_arch must be supplied because the dataclass uses a broken
-    # default_factory; the loop env never gets built here so only id-relevant fields matter.
+    # net_arch / custom_net_arch are pinned for stable ids; the loop env never gets built here so
+    # only id-relevant fields matter.
     defaults = dict(
         model_name="dqn",
         reward_model="combo_all",
@@ -192,12 +192,6 @@ def test_base_rl_reward_multipliers_maps_all_18_combo_keys():
         assert getattr(cfg.model_rl, f"reward_multiplier_{key}") == value
 
 
-@pytest.mark.xfail(
-    reason="BUG: trailing commas on ModelRLConfig defaults (model_config.py L90-100) make these "
-    "reward-multiplier DEFAULTS the tuple (0,) instead of the float 0, so get_reward_multipliers() "
-    "leaks tuples for any field the caller didn't override.",
-    strict=False,
-)
 def test_base_rl_reward_multiplier_defaults_are_numeric():
     # When the caller leaves the combo_* multipliers at their defaults, the mapped values should be
     # plain numbers usable in reward arithmetic — not (0,) tuples.
