@@ -9,9 +9,11 @@ import os
 import sys
 import types
 
+import numpy as np
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from src.environment.base_crypto_env import BaseCryptoEnv
+from src.environment.base_crypto_env import BaseCryptoEnv, _concat_layer_grids
 
 
 def _env(position, net_worth, *, entry=100.0, price=130.0, highest=140.0, lowest=0.0,
@@ -93,6 +95,27 @@ def test_resolve_action_agent_close_records_none_kind():
     assert e.tpsls == [0]
     assert e.tpsl_kinds == [None]
     assert e.forced_actions == [0]
+
+
+def test_concat_layer_grids_single_2d_returned_as_is():
+    # SingleDataProvider with lookback>1 returns ONE [lookback, per_bar] grid; np.concatenate(_, axis=1)
+    # would iterate it into 1-D rows and raise — the helper must return it unchanged.
+    grid = np.arange(6).reshape(2, 3)
+    out = _concat_layer_grids(grid)
+    assert out.shape == (2, 3)
+    assert np.array_equal(out, grid)
+
+
+def test_concat_layer_grids_multi_3d_merges_layers():
+    # MultiTimelineDataProvider returns a 3-D [n_layers, lookback, per_bar_layer] array.
+    grids = np.arange(12).reshape(2, 2, 3)  # 2 layers, lookback 2, 3 features each
+    out = _concat_layer_grids(grids)
+    assert out.shape == (2, 6)  # layers merged onto the feature axis
+
+
+def test_concat_layer_grids_list_of_grids_merges():
+    out = _concat_layer_grids([np.zeros((2, 3)), np.ones((2, 4))])
+    assert out.shape == (2, 7)
 
 
 def _run_all():

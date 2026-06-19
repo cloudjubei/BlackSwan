@@ -140,19 +140,93 @@ def _policy_action_values(rl_model, obs, action, want_grad):
         return None, None, None
 
 
-def _group_attribution(per_feature, lookback):
-    """Aggregate per-feature saliency into named groups. When the observation is a clean
-    ``[lookback, per_bar]`` grid, group by lookback BAR (newest→oldest) so the view can show whether the
-    model weights recent bars; otherwise omit grouping (the per-feature vector still ships)."""
-    n = len(per_feature)
-    if lookback and lookback > 1 and n % lookback == 0:
-        per_bar = n // lookback
-        groups = {}
-        for bar in range(lookback):
-            seg = per_feature[bar * per_bar : (bar + 1) * per_bar]
-            groups[f"bar[-{lookback - 1 - bar}]"] = float(sum(abs(x) for x in seg))
-        return groups
-    return None
+# Engineered per-bar extra columns base_crypto_env.get_next_observation appends — in THIS order —
+# after the fidelity-layer columns within each bar. MUST stay in sync with that method's if-chain:
+# attribution grouping is best-effort, but a stale count here shifts the layer/extra boundary and
+# mislabels the last columns (the width check only catches counts that no longer divide the layers).
+_OBSERVATION_EXTRA_ORDER = (
+    "networth_percent_this_trade",
+    "drawdown",
+    "take_profit",
+    "stop_loss",
+    "in_position",
+)
+
+
+def _active_observation_extras(env):
+    """Which engineered extras the env appended to each bar, in emission order — read from env_config
+    the same way get_next_observation gates them (membership for the named flags, not-None for tp/sl)."""
+    cfg = getattr(env, "env_config", None)
+    if cfg is None:
+        return []
+    contains = set(getattr(cfg, "observations_contain", None) or [])
+    active = []
+    for name in _OBSERVATION_EXTRA_ORDER:
+        if name == "take_profit":
+            present = getattr(cfg, "take_profit", None) is not None
+        elif name == "stop_loss":
+            present = getattr(cfg, "stop_loss", None) is not None
+        else:
+            present = name in contains
+        if present:
+            active.append(name)
+    return active
+
+
+def observation_layout(obs_dim, lookback, layer_names, active_extras):
+    """Map a flat observation into named column groups. The observation is a TIME-MAJOR
+    ``[lookback, per_bar]`` grid; within each bar the fidelity layers' columns come first (in
+    ``layer_names`` order, equal width) then one column per active engineered extra. Returns
+    ``{lookback, per_bar, layers, extras}`` or ``None`` when the counts don't reconcile, so attribution
+    degrades to per-feature-only rather than mislabel. Pure."""
+    lookback = int(lookback)
+    if lookback < 1 or obs_dim < 1 or obs_dim % lookback != 0:
+        return None
+    per_bar = obs_dim // lookback
+    n_layers = max(1, len(layer_names))
+    layer_portion = per_bar - len(active_extras)
+    if layer_portion < n_layers or layer_portion % n_layers != 0:
+        return None
+    per_bar_layer = layer_portion // n_layers
+    layers = [
+        {"name": layer_names[i] if i < len(layer_names) else f"layer{i}",
+         "start": i * per_bar_layer, "width": per_bar_layer}
+        for i in range(n_layers)
+    ]
+    extras = [
+        {"name": name, "start": n_layers * per_bar_layer + k, "width": 1}
+        for k, name in enumerate(active_extras)
+    ]
+    return {"lookback": lookback, "per_bar": per_bar, "layers": layers, "extras": extras}
+
+
+def _env_observation_layout(env, obs_dim):
+    provider = getattr(env, "data_provider", None)
+    if provider is None:
+        return None
+    try:
+        lookback = int(provider.get_lookback_window())
+    except Exception:
+        return None
+    layer_names = list(getattr(getattr(provider, "config", None), "layers", None) or [])
+    return observation_layout(obs_dim, lookback, layer_names, _active_observation_extras(env))
+
+
+def _group_attribution(per_feature, env):
+    """Aggregate per-observation-feature saliency into named groups — by fidelity LAYER (`layer:1h`,
+    `layer:1d`) and by engineered extra (`engineered:drawdown`) — summing |saliency| over the lookback
+    window so the Explain view shows which INPUT GROUP drove the decisions. ``None`` when the layout
+    can't be reconciled (the per-feature vector still ships)."""
+    layout = _env_observation_layout(env, len(per_feature))
+    if not layout:
+        return None
+    grid = np.abs(np.asarray(per_feature, dtype=float).reshape(layout["lookback"], layout["per_bar"]))
+    groups = {}
+    for layer in layout["layers"]:
+        groups[f"layer:{layer['name']}"] = float(grid[:, layer["start"] : layer["start"] + layer["width"]].sum())
+    for extra in layout["extras"]:
+        groups[f"engineered:{extra['name']}"] = float(grid[:, extra["start"] : extra["start"] + extra["width"]].sum())
+    return groups or None
 
 
 def replay_enrichment(env, model, want_attribution=True, collect_features=False):
@@ -215,7 +289,7 @@ def replay_enrichment(env, model, want_attribution=True, collect_features=False)
             "method": "gradient-saliency",
             "samples": saliency_count,
         }
-        by_group = _group_attribution(per_feature, summary_mod._lookback(env, {}))
+        by_group = _group_attribution(per_feature, env)
         if by_group:
             attribution["byGroup"] = by_group
     return enrichment, attribution

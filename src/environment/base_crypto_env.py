@@ -14,6 +14,17 @@ import matplotlib.pyplot as plt
 _NOOP_PENALTY = 0.001
 
 
+def _concat_layer_grids(values):
+    """Merge per-fidelity-layer feature grids onto the feature axis into one ``[lookback, per_bar]``
+    grid. The multi-timeline provider yields a 3-D ``[n_layers, lookback, per_bar_layer]`` array which
+    ``np.concatenate(_, axis=1)`` correctly merges layer-by-layer; the SINGLE provider yields ONE 2-D
+    ``[lookback, per_bar]`` grid, which that same call would instead iterate into 1-D rows and raise an
+    AxisError — so a lone 2-D grid (single layer, lookback > 1) is returned as-is."""
+    if isinstance(values, np.ndarray) and values.ndim == 2:
+        return values
+    return np.concatenate(values, axis=1)
+
+
 class BaseCryptoEnv(AbstractEnv):
     """
     Base trading environment for reinforcement learning with crypto.
@@ -124,9 +135,10 @@ class BaseCryptoEnv(AbstractEnv):
                 extra_values += vs
 
         if lookback_window_size > 1:
-            extra_values_T = [list(row) for row in zip(*extra_values)]
-            out = np.concatenate(values, axis=1) # so [[1h, 1h, 1h...], [1d, 1d, 1d...]] = [[1h, 1d], [1h,1d], ...]
-            out = np.concatenate((out, extra_values_T), axis=1)
+            out = _concat_layer_grids(values) # so [[1h, 1h, 1h...], [1d, 1d, 1d...]] = [[1h, 1d], [1h,1d], ...]
+            if extra_values:
+                extra_values_T = [list(row) for row in zip(*extra_values)]
+                out = np.concatenate((out, extra_values_T), axis=1)
             out = out.flatten()
         else:
             out = np.concatenate((values, extra_values), axis=-1)

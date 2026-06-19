@@ -11,8 +11,9 @@ from trainer import decision_trace as dt
 
 
 class _FakeProvider:
-    def __init__(self, lookback=0):
+    def __init__(self, lookback=0, layers=None):
         self._lookback = lookback
+        self.config = types.SimpleNamespace(layers=list(layers) if layers is not None else [])
 
     def get_lookback_window(self):
         return self._lookback
@@ -80,11 +81,13 @@ class _ReplayEnv:
     """A deterministic, steppable env that replays a fixed observation sequence and records
     actions_made / forced_actions (so attribution gating is exercised)."""
 
-    def __init__(self, obs_seq, made=None, forced=None, lookback=0):
+    def __init__(self, obs_seq, made=None, forced=None, lookback=0, layers=None, env_config=None):
         self._obs_seq = [np.asarray(o, dtype=np.float32) for o in obs_seq]
         self._made = list(made) if made is not None else [True] * len(obs_seq)
         self._forced = list(forced) if forced is not None else [0] * len(obs_seq)
-        self.data_provider = _FakeProvider(lookback)
+        self.data_provider = _FakeProvider(lookback, layers)
+        if env_config is not None:
+            self.env_config = env_config
         self.actions = list(range(len(obs_seq)))
         self.forced_actions = list(self._forced)
         self.rewards_history = [0.0] * len(obs_seq)
@@ -170,20 +173,103 @@ def test_runner_up_single_action_is_none():
     assert dt.runner_up([1.0], 0) is None
 
 
+# --- observation_layout (pure) ----------------------------------------------
+
+
+def test_observation_layout_single_layer_no_extras():
+    layout = dt.observation_layout(obs_dim=4, lookback=1, layer_names=["1d"], active_extras=[])
+    assert layout == {
+        "lookback": 1,
+        "per_bar": 4,
+        "layers": [{"name": "1d", "start": 0, "width": 4}],
+        "extras": [],
+    }
+
+
+def test_observation_layout_multi_layer_with_extras():
+    # lookback 2 × per_bar 5 = 10; per bar = [1h(2), 1d(2), drawdown(1)]
+    layout = dt.observation_layout(
+        obs_dim=10, lookback=2, layer_names=["1h", "1d"], active_extras=["drawdown"]
+    )
+    assert layout["per_bar"] == 5
+    assert layout["layers"] == [
+        {"name": "1h", "start": 0, "width": 2},
+        {"name": "1d", "start": 2, "width": 2},
+    ]
+    assert layout["extras"] == [{"name": "drawdown", "start": 4, "width": 1}]
+
+
+def test_observation_layout_unnamed_layer_fallback():
+    layout = dt.observation_layout(obs_dim=6, lookback=1, layer_names=[], active_extras=[])
+    assert layout["layers"] == [{"name": "layer0", "start": 0, "width": 6}]
+
+
+def test_observation_layout_not_divisible_by_lookback_is_none():
+    assert dt.observation_layout(obs_dim=9, lookback=2, layer_names=["1d"], active_extras=[]) is None
+
+
+def test_observation_layout_layers_dont_divide_is_none():
+    # 7 layer columns can't split evenly across 2 layers → bail rather than mislabel.
+    assert (
+        dt.observation_layout(obs_dim=8, lookback=1, layer_names=["1h", "1d"], active_extras=["drawdown"])
+        is None
+    )
+
+
+def test_observation_layout_zero_lookback_is_none():
+    assert dt.observation_layout(obs_dim=4, lookback=0, layer_names=["1d"], active_extras=[]) is None
+
+
+# --- _active_observation_extras ----------------------------------------------
+
+
+def test_active_observation_extras_order_and_gating():
+    cfg = types.SimpleNamespace(
+        observations_contain=["in_position", "drawdown", "networth_percent_this_trade"],
+        take_profit=0.02,
+        stop_loss=None,
+    )
+    env = types.SimpleNamespace(env_config=cfg)
+    # emission order: networth, drawdown, take_profit, stop_loss(off), in_position
+    assert dt._active_observation_extras(env) == [
+        "networth_percent_this_trade",
+        "drawdown",
+        "take_profit",
+        "in_position",
+    ]
+
+
+def test_active_observation_extras_no_config():
+    assert dt._active_observation_extras(types.SimpleNamespace()) == []
+
+
 # --- _group_attribution ------------------------------------------------------
 
 
-def test_group_attribution_grid_groups_by_bar():
-    groups = dt._group_attribution([1.0, 1.0, 2.0, 2.0], lookback=2)
-    assert groups == {"bar[-1]": 2.0, "bar[-0]": 4.0}
+def test_group_attribution_by_layer_and_engineered():
+    env = _ReplayEnv(
+        [[0, 0, 0, 0, 0]],
+        lookback=1,
+        layers=["1h", "1d"],
+        env_config=types.SimpleNamespace(
+            observations_contain=["drawdown"], take_profit=None, stop_loss=None
+        ),
+    )
+    # per_bar 5 = [1h(2), 1d(2), drawdown(1)]; saliency sums |.| per group over the single bar.
+    groups = dt._group_attribution([1.0, 1.0, 3.0, 0.0, 5.0], env)
+    assert groups == {"layer:1h": 2.0, "layer:1d": 3.0, "engineered:drawdown": 5.0}
 
 
-def test_group_attribution_non_grid_is_none():
-    assert dt._group_attribution([1.0, 2.0, 3.0], lookback=2) is None
+def test_group_attribution_sums_over_lookback_bars():
+    env = _ReplayEnv([[0, 0]], lookback=2, layers=["1d"])
+    # [lookback=2, per_bar=2]; bar0=[1,2], bar1=[3,4] → layer:1d = |1|+|2|+|3|+|4| = 10
+    groups = dt._group_attribution([1.0, 2.0, 3.0, 4.0], env)
+    assert groups == {"layer:1d": 10.0}
 
 
-def test_group_attribution_no_lookback_is_none():
-    assert dt._group_attribution([1.0, 2.0], lookback=1) is None
+def test_group_attribution_unreconcilable_is_none():
+    env = _ReplayEnv([[0, 0]], lookback=2, layers=["1d"])
+    assert dt._group_attribution([1.0, 2.0, 3.0], env) is None
 
 
 # --- _policy_action_values ---------------------------------------------------
@@ -244,6 +330,13 @@ def test_replay_enrichment_captures_confidence_and_alternative():
     assert attribution["method"] == "gradient-saliency"
     assert attribution["samples"] == 1  # only the executed buy step is attributed
     assert len(attribution["perFeature"]) == 4
+
+
+def test_replay_enrichment_groups_attribution_by_layer():
+    env = _ReplayEnv([[1.0, 0, 0, 0], [0.0, 0, 0, 0]], lookback=1, layers=["1d"])
+    _, attribution = dt.replay_enrichment(env, _Model(_QPolicy(_q_net(_W, _B))))
+    # the buy step's saliency is [1,0,0,0] (feature 0 drives buy); the single "1d" layer sums it.
+    assert attribution["byGroup"] == {"layer:1d": 1.0}
 
 
 def test_replay_enrichment_skips_unexecuted_for_attribution():
