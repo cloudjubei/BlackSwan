@@ -157,3 +157,177 @@ def test_require_data_present_raises_when_window_data_missing(monkeypatch):
     )
     with pytest.raises(SystemExit):
         config_builder.require_data_present({"walk_forward_window": "2023"})
+
+
+# --- _daily_files: builds binance/ paths and filters to those present on disk ---
+
+
+def test_daily_files_builds_paths_and_filters_to_existing(monkeypatch):
+    # Only the second pair's file "exists" -> only its path survives the os.path.exists filter.
+    present = "binance/BTCUSDT-1d-2021-2.json"
+    monkeypatch.setattr(config_builder.os.path, "exists", lambda p: p == present)
+    out = config_builder._daily_files([(2021, 1), (2021, 2)])
+    assert out == [present]
+
+
+def test_daily_files_honours_symbol_and_returns_empty_when_none_present(monkeypatch):
+    monkeypatch.setattr(config_builder.os.path, "exists", lambda p: False)
+    assert config_builder._daily_files([(2020, 1)], symbol="ETHUSDT") == []
+    # And when everything exists, the built path embeds the requested symbol.
+    monkeypatch.setattr(config_builder.os.path, "exists", lambda p: True)
+    out = config_builder._daily_files([(2020, 3)], symbol="ETHUSDT")
+    assert out == ["binance/ETHUSDT-1d-2020-3.json"]
+
+
+# --- _parse_net_arch: list/tuple coerce to ints vs. comma-string parse ---
+
+
+def test_parse_net_arch_from_list_and_tuple():
+    assert config_builder._parse_net_arch([64, 32]) == [64, 32]
+    assert config_builder._parse_net_arch((128, "64")) == [128, 64]
+
+
+def test_parse_net_arch_from_comma_string_skips_blanks():
+    assert config_builder._parse_net_arch("256, 128 ,") == [256, 128]
+    assert config_builder._parse_net_arch("") == []
+
+
+# --- _optional_float: treats None/""/"null"/0 as "unset" (None), else coerces to float ---
+
+
+@pytest.mark.parametrize("falsy", [None, "", "null", 0])
+def test_optional_float_unset_sentinels_become_none(falsy):
+    assert config_builder._optional_float({"k": falsy}, "k", "default-unused") is None
+
+
+def test_optional_float_uses_default_when_key_absent():
+    # Default 0.02 (a non-sentinel float) is coerced; default None stays None.
+    assert config_builder._optional_float({}, "stop_loss", 0.02) == pytest.approx(0.02)
+    assert config_builder._optional_float({}, "take_profit", None) is None
+
+
+def test_optional_float_coerces_real_value():
+    assert config_builder._optional_float({"tp": "0.05"}, "tp", None) == pytest.approx(0.05)
+
+
+# --- build_env_config: trade_all env with the lever overrides + the optional-float TP/SL fields ---
+
+
+def test_build_env_config_defaults():
+    env = config_builder.build_env_config({})
+    assert env.type == "trade_all"
+    assert env.initial_balance == 100000
+    assert env.transaction_fee == pytest.approx(0.001)
+    assert env.take_profit is None
+    assert env.trailing_take_profit is None
+    assert env.stop_loss == pytest.approx(0.02)
+    assert env.no_sell_action is False
+    assert env.position_sizing == "fixed"
+    assert env.allow_shorting is False
+    assert list(env.observations_contain) == [
+        "networth_percent_this_trade",
+        "in_position",
+        "drawdown",
+    ]
+
+
+def test_build_env_config_applies_levers_and_optional_float_zeroing():
+    # take_profit set; stop_loss=0 and trailing_take_profit=0 are sentinels -> None (disabled).
+    env = config_builder.build_env_config(
+        {
+            "initial_balance": 50000,
+            "transaction_fee": 0.002,
+            "take_profit": 0.1,
+            "trailing_take_profit": 0,
+            "stop_loss": 0,
+            "no_sell_action": True,
+            "position_sizing": "vol_target",
+            "vol_window": 20,
+            "allow_shorting": True,
+            "max_short_size": 0.5,
+        }
+    )
+    assert env.initial_balance == 50000
+    assert env.transaction_fee == pytest.approx(0.002)
+    assert env.take_profit == pytest.approx(0.1)
+    assert env.trailing_take_profit is None
+    assert env.stop_loss is None
+    assert env.no_sell_action is True
+    assert env.position_sizing == "vol_target"
+    assert env.vol_window == 20
+    assert env.allow_shorting is True
+    assert env.max_short_size == pytest.approx(0.5)
+
+
+# --- build_model_config: the hodl baseline path ---
+
+
+def test_build_model_config_hodl_by_model_name():
+    config = config_builder.build_model_config({"model_name": "hodl"})
+    assert config.model_type == "hodl"
+    assert config.iterations_to_pick_best == 1
+
+
+def test_build_model_config_hodl_by_model_type():
+    config = config_builder.build_model_config({"model_type": "hodl"})
+    assert config.model_type == "hodl"
+    assert config.iterations_to_pick_best == 1
+
+
+def test_is_hodl_predicate():
+    assert config_builder.is_hodl({"model_name": "HODL"})
+    assert config_builder.is_hodl({"model_type": "hodl"})
+    assert not config_builder.is_hodl({"model_name": "reppo-custom"})
+
+
+# --- build_model_config (RL): the optional advanced levers each override the tuned default ---
+
+
+def test_build_model_config_non_custom_model_clears_custom_net_arch_tokens():
+    # The tuned custom_net_arch tokens only apply to *-custom models; a plain model name clears them.
+    custom = config_builder.build_model_config({"model_name": "reppo-custom"})
+    plain = config_builder.build_model_config({"model_name": "ppo"})
+    assert custom.model_rl.custom_net_arch  # tuned tokens retained
+    assert plain.model_rl.custom_net_arch == []
+
+
+def test_build_model_config_rl_optional_levers_applied():
+    config = config_builder.build_model_config(
+        {
+            "model_name": "ppo",
+            "checkpoint_to_load": "checkpoints/prev.zip",
+            "net_arch": "64,64",
+            "optimizer_class": "AdamW",
+            "activation_fn": "relu",
+            "exploration_fraction": 0.3,
+            "exploration_final_eps": 0.05,
+        }
+    )
+    rl = config.model_rl
+    assert rl.checkpoint_to_load == "checkpoints/prev.zip"
+    assert rl.net_arch == [64, 64]
+    assert rl.optimizer_class == "AdamW"
+    assert rl.activation_fn == "relu"
+    assert rl.exploration_fraction == pytest.approx(0.3)
+    assert rl.exploration_final_eps == pytest.approx(0.05)
+    assert config.iterations_to_pick_best == 1
+
+
+def test_build_model_config_rl_net_arch_accepts_list():
+    config = config_builder.build_model_config({"model_name": "ppo", "net_arch": [128, 32]})
+    assert config.model_rl.net_arch == [128, 32]
+
+
+def test_build_model_config_rl_seed_passed_through_and_none_when_absent():
+    seeded = config_builder.build_model_config({"model_name": "ppo", "seed": 11})
+    assert seeded.model_rl.seed == 11
+    unseeded = config_builder.build_model_config({"model_name": "ppo"})
+    assert unseeded.model_rl.seed is None
+
+
+# --- build_data_config: intraday on a non-BTC asset is rejected (no intraday altcoin klines) ---
+
+
+def test_build_data_config_intraday_non_btc_fails_fast():
+    with pytest.raises(SystemExit, match="no intraday dataset"):
+        config_builder.build_data_config({"timeframe": "1h", "asset": "ETHUSDT"})

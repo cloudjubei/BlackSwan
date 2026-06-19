@@ -1,3 +1,6 @@
+import types
+
+import numpy as np
 import pytest
 
 from trainer import summary as summary_mod
@@ -344,3 +347,369 @@ def test_trade_gate_mode_none_ungates_a_low_trade_run():
 def test_trade_gate_mode_defaults_to_quadratic():
     out = _build({"timeframe": "1d", "lookback_window_size": 0}, n_trades=10)
     assert out["metrics"]["trade_gate"] == pytest.approx((10 / summary_mod.MIN_TRADES_FOR_FULL_CREDIT) ** 2)
+
+
+# --- _finite: only finite ints/floats pass; NaN/inf/non-numeric fall back to the default ---
+
+
+def test_finite_passes_real_numbers_and_falls_back_otherwise():
+    assert summary_mod._finite(3) == 3.0
+    assert summary_mod._finite(2.5) == pytest.approx(2.5)
+    assert summary_mod._finite(float("nan")) == 0.0
+    assert summary_mod._finite(float("inf")) == 0.0
+    assert summary_mod._finite("x") == 0.0
+    assert summary_mod._finite(None, default=7.0) == 7.0
+
+
+# --- _action_int: vector -> first element; scalar fallback; unparseable -> 0 ---
+
+
+def test_action_int_handles_vectors_scalars_and_garbage():
+    assert summary_mod._action_int([2, 9]) == 2
+    assert summary_mod._action_int(np.array([3])) == 3
+    assert summary_mod._action_int(4) == 4
+    # A non-array, non-int-coercible value exhausts both fallbacks and yields 0.
+    assert summary_mod._action_int("nope") == 0
+    assert summary_mod._action_int(None) == 0
+
+
+# --- _downsample / _downsample_indexed: short series pass through; long series stride down to cap ---
+
+
+def test_downsample_short_series_is_unchanged():
+    assert summary_mod._downsample([1, 2, 3]) == [1.0, 2.0, 3.0]
+
+
+def test_downsample_long_series_caps_and_keeps_endpoints():
+    big = list(range(500))
+    out = summary_mod._downsample(big, cap=10)
+    assert len(out) <= 10
+    assert out[0] == 0.0
+    assert out[-1] == 499.0  # the last point is always retained
+
+
+def test_downsample_indexed_returns_kept_indices():
+    big = list(range(500))
+    vals, idx = summary_mod._downsample_indexed(big, cap=10)
+    assert len(vals) == len(idx)
+    assert idx[0] == 0 and idx[-1] == 499
+    # Returned values correspond to the kept original indices.
+    assert vals == [float(i) for i in idx]
+
+
+def test_downsample_indexed_short_series_indexes_one_to_one():
+    vals, idx = summary_mod._downsample_indexed([5, 6])
+    assert vals == [5.0, 6.0]
+    assert idx == [0, 1]
+
+
+# --- _marker_x: map an original index onto the downsampled grid, snapping to the nearest kept point ---
+
+
+def test_marker_x_snaps_to_nearest_kept_index():
+    kept = [0, 5, 10]
+    assert summary_mod._marker_x(0, kept) == 0
+    assert summary_mod._marker_x(5, kept) == 1  # exact hit
+    assert summary_mod._marker_x(7, kept) == 1  # closer to 5 than to 10
+    assert summary_mod._marker_x(9, kept) == 2  # closer to 10
+    # An index past the last kept point clamps to the final grid position.
+    assert summary_mod._marker_x(100, kept) == 2
+
+
+# --- _run_prices: prefers get_price(i), falls back to a prices array, else empty ---
+
+
+def test_run_prices_returns_empty_without_provider():
+    env = types.SimpleNamespace(data_provider=None)
+    assert summary_mod._run_prices(env, 3) == []
+
+
+def test_run_prices_uses_prices_attr_when_no_get_price():
+    provider = types.SimpleNamespace(prices=[1, 2, 3, 4], get_price=None)
+    env = types.SimpleNamespace(data_provider=provider)
+    assert summary_mod._run_prices(env, 3) == [1.0, 2.0, 3.0]
+
+
+def test_run_prices_get_price_short_series_falls_through_to_empty():
+    # get_price raises after index 0 (<2 collected), and there's no usable prices array -> [].
+    class _Prov:
+        prices = None
+
+        def get_price(self, i):
+            if i > 0:
+                raise IndexError()
+            return 5.0
+
+    env = types.SimpleNamespace(data_provider=_Prov())
+    assert summary_mod._run_prices(env, 5) == []
+
+
+def test_run_prices_get_price_happy_path():
+    class _Prov:
+        prices = None
+
+        def get_price(self, i):
+            return [100.0, 110.0, 120.0][i]
+
+    env = types.SimpleNamespace(data_provider=_Prov())
+    assert summary_mod._run_prices(env, 3) == [100.0, 110.0, 120.0]
+
+
+# --- _run_chart: needs >=2 live actions AND >=2 prices, else None ---
+
+
+def test_run_chart_none_when_too_few_actions():
+    env = _FakeEnv(net_worths=[1], actions=[1], prices=[100, 110])
+    assert summary_mod._run_chart(env, 0, []) is None
+
+
+def test_run_chart_none_when_too_few_prices():
+    class _Prov:
+        prices = None
+
+        def get_price(self, i):
+            return [100.0][i]  # only index 0 -> <2 prices
+
+    env = types.SimpleNamespace(actions=[1, 2], data_provider=_Prov())
+    assert summary_mod._run_chart(env, 0, []) is None
+
+
+# --- _benchmark: None when fewer than 2 positive finite prices; else the hold return ---
+
+
+def test_benchmark_none_with_too_few_prices():
+    env = _FakeEnv(net_worths=[1], actions=[1], prices=[100, 110])
+    assert summary_mod._benchmark(env, 0) is None
+
+
+def test_benchmark_filters_nonpositive_prices_to_none():
+    env = _FakeEnv(net_worths=[1, 2], actions=[1, 2], prices=[0.0, 0.0])
+    assert summary_mod._benchmark(env, 0) is None
+
+
+def test_benchmark_hold_return_first_to_last():
+    env = _FakeEnv(net_worths=[1, 2], actions=[1, 2], prices=[100, 200])
+    assert summary_mod._benchmark(env, 0) == {"hold_return_pct": pytest.approx(100.0)}
+
+
+# --- _reconstruct_trades: empty / price-less envs return empty structures ---
+
+
+def test_reconstruct_trades_empty_env():
+    env = _FakeEnv(net_worths=[], actions=[], prices=[])
+    assert summary_mod._reconstruct_trades(env, 0, 100000.0) == ([], [], [])
+
+
+def test_reconstruct_trades_no_prices_returns_empty_trades():
+    # Actions/net_worths present but get_price raises for every index -> no prices -> no trades.
+    class _Prov:
+        prices = None
+
+        def get_price(self, i):
+            raise IndexError()
+
+    env = types.SimpleNamespace(
+        net_worths=[100000, 101000],
+        actions=[1, 2],
+        actions_made=[True, True],
+        forced_actions=[0, 0],
+        tpsls=[0, 0],
+        tpsl_kinds=[None, None],
+        data_provider=_Prov(),
+    )
+    trades, equity, prices = summary_mod._reconstruct_trades(env, 0, 100000.0)
+    assert trades == [] and equity == [] and prices == []
+
+
+# --- _regime_windows / _regime_trend: guard short / no-initial inputs ---
+
+
+def test_regime_windows_none_for_short_or_no_initial():
+    assert summary_mod._regime_windows([], [100], 100000.0) is None
+    assert summary_mod._regime_windows([], [100, 110, 120], 0) is None
+
+
+def test_regime_trend_none_for_short_or_no_initial():
+    assert summary_mod._regime_trend([], [100, 110], 100000.0) is None
+    assert summary_mod._regime_trend([], [100, 110, 120], 0) is None
+
+
+# --- _iso_from_ms: ms-since-epoch -> ISO UTC, None on garbage ---
+
+
+def test_iso_from_ms_converts_and_handles_garbage():
+    assert summary_mod._iso_from_ms(1577836800000) == "2020-01-01T00:00:00+00:00"
+    assert summary_mod._iso_from_ms("not-a-number") is None
+    assert summary_mod._iso_from_ms(None) is None
+
+
+# --- _dataset: stamps asset/timeframe/window + from/to from provider timestamps ---
+
+
+def test_dataset_includes_from_to_from_timestamps():
+    provider = types.SimpleNamespace(timestamps=[1577836800000, 1580515200000])
+    env = types.SimpleNamespace(data_provider=provider)
+    d = summary_mod._dataset(
+        env, {"asset": "ETHUSDT", "walk_forward_window": "2023"}, "1d", 100
+    )
+    assert d["asset"] == "ETHUSDT"
+    assert d["candles"] == 100
+    assert d["walk_forward_window"] == "2023"
+    assert d["from"] == "2020-01-01T00:00:00+00:00"
+    assert d["to"] == "2020-02-01T00:00:00+00:00"
+
+
+def test_dataset_without_provider_or_timestamps_omits_from_to():
+    d_none = summary_mod._dataset(types.SimpleNamespace(data_provider=None), {}, "1d", 5)
+    assert "from" not in d_none and "to" not in d_none
+    assert d_none["asset"] == "BTCUSDT"  # default
+    # Provider present but no timestamps -> still no from/to.
+    env = types.SimpleNamespace(data_provider=types.SimpleNamespace(timestamps=[]))
+    d_empty = summary_mod._dataset(env, {}, "1d", 5)
+    assert "from" not in d_empty and "to" not in d_empty
+
+
+# --- _lookback: provider.get_lookback_window() wins, else cfg, else default 32 ---
+
+
+def test_lookback_prefers_provider():
+    provider = types.SimpleNamespace(get_lookback_window=lambda: 7)
+    env = types.SimpleNamespace(data_provider=provider)
+    assert summary_mod._lookback(env, {"lookback_window_size": 99}) == 7
+
+
+def test_lookback_falls_back_to_cfg_then_default():
+    env = types.SimpleNamespace(data_provider=None)
+    assert summary_mod._lookback(env, {"lookback_window_size": 5}) == 5
+    assert summary_mod._lookback(env, {}) == 32
+
+
+def test_lookback_provider_error_falls_back_to_cfg():
+    class _Prov:
+        def get_lookback_window(self):
+            raise RuntimeError("boom")
+
+    env = types.SimpleNamespace(data_provider=_Prov())
+    assert summary_mod._lookback(env, {"lookback_window_size": 9}) == 9
+
+
+# --- _health: nan-metric, degenerate-policy, zero/few-trade flags ---
+
+
+def test_health_flags_nan_metrics_and_degenerate_policy():
+    state = [0.0] * 19
+    state[1] = float("nan")  # a NaN core metric
+    state[17] = 5
+    env = types.SimpleNamespace(actions=[1, 1, 1])  # single repeated action -> degenerate policy
+    health = summary_mod._health(env, state, True, 0)
+    assert health["status"] == "degenerate"
+    assert "nan_metrics" in health["flags"]
+    assert "degenerate_policy" in health["flags"]
+
+
+def test_health_flags_zero_trades():
+    state = [0.0] * 19
+    state[17] = 0
+    env = types.SimpleNamespace(actions=[0, 1, 2])
+    assert "zero_trades" in summary_mod._health(env, state, True, 0)["flags"]
+
+
+def test_health_flags_few_trades():
+    state = [0.0] * 19
+    state[17] = summary_mod.DEGENERATE_TRADE_COUNT
+    env = types.SimpleNamespace(actions=[0, 1, 2])
+    flags = summary_mod._health(env, state, True, 0)["flags"]
+    assert "few_trades" in flags and "zero_trades" not in flags
+
+
+def test_health_non_rl_skips_policy_and_trade_flags():
+    state = [0.0] * 19
+    state[17] = 0
+    env = types.SimpleNamespace(actions=[1, 1, 1])
+    health = summary_mod._health(env, state, False, 0)
+    assert health == {"status": "ok", "flags": []}
+
+
+def test_health_ok_for_healthy_rl_run():
+    state = [0.0] * 19
+    state[17] = 25
+    env = types.SimpleNamespace(actions=[0, 1, 2, 0, 2])  # varied actions
+    assert summary_mod._health(env, state, True, 0) == {"status": "ok", "flags": []}
+
+
+# --- build_summary fallback: too-few reconstructed equity points -> state[2] return + raw net_worths ---
+
+
+def test_build_summary_falls_back_to_state_return_when_equity_too_short():
+    class _Prov:
+        prices = None
+
+        def get_price(self, i):
+            return [100.0][i]  # only one price -> reconstruction can't form an equity curve
+
+    env = types.SimpleNamespace(
+        net_worths=[100000],
+        actions=[1],
+        actions_made=[True],
+        forced_actions=[0],
+        tpsls=[0],
+        tpsl_kinds=[None],
+        fees=[],
+        initial_net_worth=100000.0,
+        initial_balance=100000.0,
+        data_provider=_Prov(),
+    )
+    state = _state(n_trades=1)
+    state[2] = 0.05  # 5% return reported by the env state
+    out = summary_mod.build_summary(
+        env, state, _CFG, _FakeModel(), "2026-01-01T00:00:00Z", True
+    )
+    assert out["metrics"]["total_return_pct"] == pytest.approx(5.0)
+    # Equity falls back to the raw (live) net_worths.
+    assert out["series"]["equity"] == [100000.0]
+
+
+# --- build_summary: seed is stamped onto the summary and provenance when present in cfg ---
+
+
+def test_build_summary_stamps_seed():
+    out = _build({"timeframe": "1d", "lookback_window_size": 0, "seed": 42})
+    assert out["seed"] == 42
+    assert out["provenance"]["seed"] == 42
+
+
+def test_build_summary_omits_seed_when_absent():
+    out = _build({"timeframe": "1d", "lookback_window_size": 0})
+    assert "seed" not in out
+    assert "seed" not in out["provenance"]
+
+
+# --- build_summary: a run_chart that raises is swallowed (no runChart artifact, no crash) ---
+
+
+def test_build_summary_swallows_run_chart_errors(monkeypatch):
+    monkeypatch.setattr(
+        summary_mod, "_run_chart", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
+    out, _, _ = _two_trade_summary()
+    assert "runChart" not in out.get("artifacts", {})
+
+
+def test_run_chart_counts_authoritative_while_markers_dedup_on_grid():
+    # Two same-type no-op attempts at original indices 1 & 2 both downsample to the same grid cell, so
+    # the drawn markers collapse to one — but `counts` is tallied over the full series before the
+    # dedup, so it must still report 2 (the legend can't under-count). Exercises the marker dedup path.
+    n = 400  # > _MAX_SERIES_POINTS forces the downsample grid
+    actions = [0] * n
+    made = [True] * n
+    actions[1] = 1
+    made[1] = False  # no-op buy attempt
+    actions[2] = 1
+    made[2] = False  # adjacent no-op buy attempt -> same grid cell as index 1
+    prices = [100.0 + i for i in range(n)]
+    provider = types.SimpleNamespace(get_price=lambda i: prices[i])
+    env = types.SimpleNamespace(actions=actions, actions_made=made, data_provider=provider)
+    chart = summary_mod._run_chart(env, 0, [])
+    assert chart["counts"]["buy_attempt"] == 2
+    drawn = [m for m in chart["markers"] if m["type"] == "buy_attempt"]
+    assert len(drawn) == 1

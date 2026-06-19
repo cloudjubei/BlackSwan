@@ -1,6 +1,11 @@
 pandas==2.1.3
 numpy==1.26.2
-torch==2.5.1+cu124 -f https://download.pytorch.org/whl/torch_stable.html
+# torch: Linux uses the CUDA 12.4 build; macOS (Apple Silicon) uses the standard
+# wheel, which ships the MPS/Metal backend. The +cu124 wheel is CUDA-only and will
+# NOT install on a Mac, so it must be platform-gated.
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==2.5.1+cu124 ; sys_platform == "linux"
+torch==2.5.1 ; sys_platform != "linux"
 mplfinance==0.12.10b0
 hydra_core
 gym
