@@ -9,8 +9,11 @@ from src.data.multitimeline_dataprovider import MultiTimelineDataProvider
 from src.data.single_dataprovider import SingleDataProvider
 
 def create_provider(config: DataConfig, paths: List[List[str]], fidelity_input: str, fidelity_run: str, layers: List[str], buyreward_maxwait: float, buyreward_percent: float) -> AbstractDataProvider:
-    if len(config.layers) == 1:
+    if len(config.layers) < 1:
+        raise ValueError(f"{config.type} - env not supported")
+    # The fast single-timeline path only fits a lone layer that IS the loaded base (no resampling). A
+    # single COARSER layer (e.g. '1d' observed at a 1h step) still needs the multi-timeline provider to
+    # resample it from the base every step — same machinery as a multi-layer stack with one layer.
+    if len(config.layers) == 1 and config.layers[0] == fidelity_input:
         return SingleDataProvider(config, paths[0])
-    elif len(config.layers) > 1:
-        return MultiTimelineDataProvider(config, paths, fidelity_input, fidelity_run, layers, buyreward_maxwait, buyreward_percent)
-    raise ValueError("{config.type} - env not supported")
+    return MultiTimelineDataProvider(config, paths, fidelity_input, fidelity_run, layers, buyreward_maxwait, buyreward_percent)

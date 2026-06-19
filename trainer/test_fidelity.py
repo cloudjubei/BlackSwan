@@ -50,10 +50,13 @@ def test_daily_step_with_single_1h_fails_fast():
         resolve_fidelity({"timeframe": "1d", "fidelity_set": "1h"})
 
 
-def test_hourly_step_with_single_daily_fails_fast():
-    # Single '1d' at an hourly step is incoherent — use '1h' or a multi-layer set like '1d+1w'.
-    with pytest.raises(SystemExit):
-        resolve_fidelity({"timeframe": "1h", "fidelity_set": "1d"})
+def test_hourly_step_with_single_daily_resolves():
+    # A single coarser '1d' layer at an hourly step is '1h+1d' with the '1h' dropped: the agent acts
+    # hourly but observes only the 1d layer (resampled from the 1h base every hour).
+    _, spec = resolve_fidelity({"timeframe": "1h", "fidelity_set": "1d"})
+    assert spec["layers"] == ["1d"]
+    assert spec["fidelity_run"] == "1h"
+    assert spec["fidelity_input"] == "1h"
 
 
 def test_unknown_fidelity_set_fails_fast():

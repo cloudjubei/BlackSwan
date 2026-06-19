@@ -257,7 +257,7 @@
       ],
       "default": "auto",
       "scope": "dataset",
-      "description": "Observation LAYERS — which timeframes the agent sees AT ONCE at each step (separate from the STEP frequency, which is the timeframe lever). Higher layers are resampled from the base, so wider = more context but a bigger input. auto = follow timeframe (1h->1h+1d, 1d->1d). At an HOURLY step (timeframe=1h): 1h (single), 1h+1d, 1h+1d+1w, or 1d+1w (coarser layers fed every hour). At a DAILY step (timeframe=1d): only 1d for now (daily-step + finer/multi layers is a planned data-provider enhancement). DATASET setting — define named datasets (e.g. '1h' vs '1h+1d') in the Datasets tab. An incompatible step×layers combo FAILS FAST at run start with a clear message."
+      "description": "Observation LAYERS — which timeframes the agent sees AT ONCE at each step (separate from the STEP frequency, which is the timeframe lever). Higher layers are resampled from the base, so wider = more context but a bigger input. auto = follow timeframe (1h->1h+1d, 1d->1d). At an HOURLY step (timeframe=1h): 1h (single), 1d (single coarser layer fed every hour, i.e. 1h+1d with the 1h dropped), 1h+1d, 1h+1d+1w, or 1d+1w. At a DAILY step (timeframe=1d): only 1d for now (daily-step + finer/multi layers is a planned data-provider enhancement). DATASET setting — define named datasets (e.g. '1h' vs '1h+1d') in the Datasets tab. An incompatible step×layers combo FAILS FAST at run start with a clear message."
     },
     "walk_forward_window": {
       "type": "choice",

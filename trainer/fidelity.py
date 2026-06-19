@@ -72,8 +72,10 @@ def _validate(run, layers, set_id):
             )
         return
     if run == "1h":
-        # Hourly step on a 1h base: a single layer must be the 1h base itself; a multi-layer stack may
-        # add coarser layers (1d, 1w) the provider resamples from 1h. Nothing FINER than 1h (no upsample).
+        # Hourly step on a 1h base: any layer in {1h, 1d, 1w} is fine — the 1h base IS the finest, and
+        # the multi-timeline provider resamples coarser layers (1d, 1w) from it. A single coarser layer
+        # (e.g. '1d') is just the multi stack with the 1h dropped: act hourly, observe only the 1d layer.
+        # Nothing FINER than 1h (no upsample).
         allowed = {"1h", "1d", "1w"}
         bad = [layer for layer in layers if layer not in allowed]
         if bad:
@@ -81,12 +83,6 @@ def _validate(run, layers, set_id):
                 f"incompatible timeframe × fidelity_set: an hourly-step agent (timeframe=1h) can only "
                 f"observe layers in {sorted(allowed)} (the 1h base resamples coarser layers), not "
                 f"{bad} — a finer layer would need a sub-hourly base."
-            )
-        if len(layers) == 1 and layers[0] != "1h":
-            raise SystemExit(
-                f"incompatible timeframe × fidelity_set: a single-layer hourly-step dataset must be "
-                f"'1h', not {set_id!r} ({label}); for a coarser-only stack use a multi-layer set like "
-                f"'1d+1w'."
             )
         return
     raise SystemExit(f"unsupported timeframe {run!r} — use '1h' or '1d'.")
