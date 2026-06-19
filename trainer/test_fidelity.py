@@ -12,11 +12,14 @@ def test_run_frequency_comes_from_timeframe_not_the_set():
     assert spec["lookback"] == 32
 
 
-def test_auto_follows_timeframe():
+def test_auto_resolves_to_the_concrete_set_id():
+    # "auto" is a launch-form convenience that resolves to the ACTUAL layer-set id, so stored runs carry
+    # the real value (never the synonym) and group cleanly with explicit picks.
     assert resolve_fidelity({"timeframe": "1h"})[1]["layers"] == ["1h", "1d"]
     assert resolve_fidelity({"timeframe": "1d"})[1]["layers"] == ["1d"]
-    assert resolve_fidelity({"timeframe": "1h", "fidelity_set": "auto"})[0] == "auto"
-    assert DEFAULT_FIDELITY_SET == "auto"
+    assert resolve_fidelity({"timeframe": "1h", "fidelity_set": "auto"})[0] == "1h+1d"
+    assert resolve_fidelity({"timeframe": "1d", "fidelity_set": "auto"})[0] == "1d"
+    assert DEFAULT_FIDELITY_SET == "auto"  # still the default INPUT in the launch form
 
 
 def test_default_cfg_is_single_daily():

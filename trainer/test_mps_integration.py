@@ -92,7 +92,7 @@ def test_mps_compute_matches_cpu():
     os.environ.get("BS_MPS") != "1",
     reason="real end-to-end training run (~30s each); set BS_MPS=1 to include the MPS pipeline smoke test",
 )
-@pytest.mark.parametrize("model_name", ["dqn", "ppo"])
+@pytest.mark.parametrize("model_name", ["dqn", "ppo", "rainbow-dqn-custom"])
 def test_simple_model_trains_end_to_end_on_mps(model_name):
     cfg = _fast_cfg(model_name)
     if not _data_present(cfg):

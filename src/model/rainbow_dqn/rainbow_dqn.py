@@ -73,7 +73,6 @@ class RainbowDQN(DQN):
 
         losses = []
         for _ in range(gradient_steps):
-            self._n_updates += 1
             replay_data, weights, indices = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
 
             with th.no_grad():
@@ -94,6 +93,8 @@ class RainbowDQN(DQN):
             # Clip gradient norm
             th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
             self.policy.optimizer.step()
+
+            losses.append(loss.item())
 
         # Increase update counter
         self._n_updates += gradient_steps

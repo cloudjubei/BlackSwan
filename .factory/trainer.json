@@ -45,6 +45,7 @@
         "duel-dqn-custom-lstm",
         "munchausen-dqn-custom",
         "qrdqn-custom",
+        "rainbow-dqn-custom",
         "dqn",
         "ppo",
         "a2c",
@@ -55,7 +56,7 @@
         "hodl"
       ],
       "default": "reppo-custom",
-      "description": "The algorithm / policy. '-custom' RL variants use tuned network internals. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'hodl' is the buy-and-hold control."
+      "description": "The algorithm / policy. '-custom' RL variants use tuned network internals. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'rainbow-dqn-custom' is a DQN with prioritized experience replay (importance-weighted sampling by TD-error). 'hodl' is the buy-and-hold control."
     },
     "reward_model": {
       "type": "choice",

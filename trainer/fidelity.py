@@ -42,8 +42,10 @@ def resolve_fidelity(cfg=None):
     raw = cfg.get("fidelity_set")
     fset = str(raw) if raw not in (None, "", "auto") else "auto"
     if fset == "auto":
+        # Resolve "auto" to its CONCRETE layer-set id (e.g. 1h -> "1h+1d", 1d -> "1d") so stored runs
+        # carry the actual value, not the synonym — "auto" is only a convenience INPUT in the launch form.
         layers = ["1h", "1d"] if run == "1h" else ["1d"]
-        set_id = "auto"
+        set_id = "+".join(layers)
     else:
         if fset not in _LAYER_SETS:
             raise SystemExit(f"unknown fidelity_set {fset!r} — choices: {fidelity_set_ids()}")

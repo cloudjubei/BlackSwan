@@ -321,8 +321,10 @@ def test_dataset_stamps_fidelity_set_and_layers():
 
 def test_dataset_fidelity_defaults_from_timeframe():
     out = _build({"timeframe": "1d", "lookback_window_size": 0})
-    assert out["dataset"]["fidelity_set"] == "auto"
+    # "auto"/default resolves to the concrete set id in BOTH the dataset and the stored config.
+    assert out["dataset"]["fidelity_set"] == "1d"
     assert out["dataset"]["layers"] == ["1d"]
+    assert out["config"]["fidelity_set"] == "1d"
 
 
 def test_trade_gate_modes():

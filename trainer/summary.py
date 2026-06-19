@@ -445,11 +445,16 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
 
     series = {"equity": _downsample(equity)}
 
+    # Store the CONCRETE fidelity_set (never the "auto" synonym) so the run record shows + groups by the
+    # actual value (e.g. "1h+1d") everywhere — "auto" stays a launch-form convenience only.
+    stored_cfg = dict(cfg)
+    stored_cfg["fidelity_set"] = resolve_fidelity(cfg)[0]
+
     summary = {
         "objective": traded_return,
         "metrics": metrics,
         "health": _health(env, state, is_rl, lookback),
-        "config": dict(cfg),
+        "config": stored_cfg,
         "provenance": {"ranAt": ran_at},
         "series": series,
         "dataset": _dataset(env, cfg, fidelity, len(equity)),
