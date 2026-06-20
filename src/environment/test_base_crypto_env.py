@@ -119,6 +119,22 @@ def test_concat_layer_grids_list_of_grids_merges():
     assert out.shape == (2, 7)
 
 
+def test_update_reward_records_additive_components_summing_to_the_reward():
+    e = BaseCryptoEnv.__new__(BaseCryptoEnv)
+    e._calculate_reward = lambda: 5.0
+    e._turnover_penalty = lambda: 0.5
+    e._noop_penalty = lambda: 0.2
+    e.total_reward = 0.0
+    e.rewards = []
+    e.rewards_history = []
+    e.reward_components = []
+    reward = e.update_reward()
+    assert abs(reward - (5.0 - 0.5 - 0.2)) < 1e-9
+    comp = e.reward_components[-1]
+    assert comp == {"base": 5.0, "turnover_penalty": -0.5, "noop_penalty": -0.2}
+    assert abs(sum(comp.values()) - reward) < 1e-9  # components are additive contributions
+
+
 # ---------------------------------------------------------------------------
 # Direct method tests against BaseCryptoEnv via __new__ bypass + SimpleNamespace
 # fakes. These exercise the deterministic trade/PnL/reward/observation logic
@@ -538,6 +554,7 @@ def test_update_reward_subtracts_penalties_and_tracks_totals():
     e.total_reward = 5.0
     e.rewards = []
     e.rewards_history = []
+    e.reward_components = []
     r = e.update_reward()
     assert r == pytest.approx(0.7)
     assert e.total_reward == pytest.approx(5.7)
@@ -1155,6 +1172,7 @@ def _step_env(prices, lookback=1):
     e.total_profits = [0]
     e.current_profits = [0]
     e.rewards_history = [0]
+    e.reward_components = [{"base": 0.0, "turnover_penalty": 0.0, "noop_penalty": 0.0}]
     e.actions = [0]
     e.actions_made = [False]
     e.forced_actions = [0]

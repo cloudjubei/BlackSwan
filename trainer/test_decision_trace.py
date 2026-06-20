@@ -352,6 +352,167 @@ def test_replay_enrichment_without_attribution_has_no_saliency():
     assert attribution is None
 
 
+# --- Adebayo model-randomization sanity check --------------------------------
+
+
+class _TorchPolicy(torch.nn.Module):
+    """A policy whose weights CAN be randomized (a real nn.Module) — to exercise the sanity check."""
+
+    def __init__(self, q_net):
+        super().__init__()
+        self.q_net = q_net
+
+    def obs_to_tensor(self, obs):
+        return torch.as_tensor(np.asarray(obs, dtype=np.float32)).reshape(1, -1), False
+
+
+def test_rank_correlation_identical_reversed_and_degenerate():
+    assert abs(dt._rank_correlation([1, 2, 3, 4], [1, 2, 3, 4]) - 1.0) < 1e-9
+    assert abs(dt._rank_correlation([1, 2, 3, 4], [4, 3, 2, 1]) + 1.0) < 1e-9
+    assert dt._rank_correlation([5, 5, 5], [1, 2, 3]) == 0.0  # constant ⇒ undefined ⇒ 0
+    assert dt._rank_correlation([1, 2, 3], [1, 2]) == 0.0  # length mismatch
+
+
+def test_randomized_saliency_is_none_when_policy_cannot_randomize():
+    # _QPolicy is a plain object (no .parameters()) → best-effort returns None, no sanity check.
+    model = _Model(_QPolicy(_q_net(_W, _B)))
+    assert dt._randomized_saliency(model.rl_model, [np.array([1.0, 0, 0, 0])]) is None
+
+
+def test_sanity_check_emitted_for_a_randomizable_policy():
+    env = _ReplayEnv([[1.0, 0, 0, 0], [0.0, 0, 0, 0]], lookback=1, layers=["1d"])
+    _, attribution = dt.replay_enrichment(env, _Model(_TorchPolicy(_q_net(_W, _B))))
+    sanity = attribution["sanityCheck"]
+    assert sanity["method"] == "model-randomization"
+    assert -1.0 <= sanity["rankCorrelation"] <= 1.0
+    assert isinstance(sanity["passed"], bool)
+
+
+def test_sanity_check_absent_when_policy_cannot_randomize():
+    env = _ReplayEnv([[1.0, 0, 0, 0], [0.0, 0, 0, 0]], lookback=1, layers=["1d"])
+    _, attribution = dt.replay_enrichment(env, _Model(_QPolicy(_q_net(_W, _B))))
+    assert "sanityCheck" not in attribution
+
+
+# --- Integrated Gradients ----------------------------------------------------
+
+
+def test_integrated_gradients_linear_net_equals_input_times_gradient():
+    # For a linear value net IG = obs ⊙ grad; buy(1) row = [1,0,0,0] and obs feature0=1 → ig=[1,0,0,0].
+    ig = dt._integrated_gradients(_Model(_QPolicy(_q_net(_W, _B))).rl_model, np.array([1.0, 0, 0, 0]), 1)
+    assert ig is not None
+    assert abs(ig[0] - 1.0) < 1e-5
+    assert all(abs(v) < 1e-5 for v in ig[1:])
+
+
+def test_integrated_gradients_none_without_a_value_net():
+    policy = types.SimpleNamespace(obs_to_tensor=lambda o: (torch.zeros(1, 4), None))
+    assert dt._integrated_gradients(_Model(policy).rl_model, np.array([1.0, 0, 0, 0]), 0) is None
+
+
+def test_replay_enrichment_uses_integrated_gradients_when_requested():
+    env = _ReplayEnv([[1.0, 0, 0, 0], [0.0, 0, 0, 0]], lookback=1, layers=["1d"])
+    _, attribution = dt.replay_enrichment(
+        env, _Model(_TorchPolicy(_q_net(_W, _B))), method="integrated-gradients"
+    )
+    assert attribution["method"] == "integrated-gradients"
+    assert attribution["byGroup"] == {"layer:1d": 1.0}
+
+
+# --- Occlusion importance ----------------------------------------------------
+
+
+def test_occlusion_importance_flags_the_decisive_feature():
+    # buy(1) value = feature 0; occluding feature 0 (1→0) drops its Q by 1, the rest are no-ops.
+    imp = dt._occlusion_importance(_Model(_QPolicy(_q_net(_W, _B))).rl_model, np.array([1.0, 2.0, 3.0, 4.0]), 1)
+    assert imp is not None
+    assert abs(imp[0] - 1.0) < 1e-5
+    assert all(abs(v) < 1e-5 for v in imp[1:])
+
+
+def test_replay_enrichment_uses_occlusion_when_requested():
+    env = _ReplayEnv([[1.0, 0, 0, 0], [0.0, 0, 0, 0]], lookback=1, layers=["1d"])
+    _, attribution = dt.replay_enrichment(env, _Model(_TorchPolicy(_q_net(_W, _B))), method="occlusion")
+    assert attribution["method"] == "occlusion"
+    assert attribution["byGroup"] == {"layer:1d": 1.0}
+
+
+# --- reward breakdown --------------------------------------------------------
+
+
+def test_reward_breakdown_aggregates_components_and_totals():
+    env = types.SimpleNamespace(
+        reward_components=[
+            {"base": 1.0, "turnover_penalty": -0.1, "noop_penalty": 0.0},
+            {"base": 2.0, "turnover_penalty": -0.2, "noop_penalty": -0.5},
+        ]
+    )
+    bd = dt._reward_breakdown(env, 0)
+    assert bd["base"] == 3.0
+    assert abs(bd["turnover_penalty"] + 0.3) < 1e-9
+    assert bd["noop_penalty"] == -0.5
+    assert abs(bd["total"] - 2.2) < 1e-9  # total == summed reward
+
+
+def test_reward_breakdown_drops_the_lookback_prefix():
+    env = types.SimpleNamespace(reward_components=[{"base": 99.0}, {"base": 2.0}])
+    assert dt._reward_breakdown(env, 1)["base"] == 2.0
+
+
+def test_reward_breakdown_none_without_components():
+    assert dt._reward_breakdown(types.SimpleNamespace(), 0) is None
+
+
+# --- latent state map (Phase 5) ----------------------------------------------
+
+
+def test_latent_map_projects_penultimate_activations_to_2d():
+    env = _ReplayEnv(
+        [[1.0, 0, 0, 0], [0.0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1], [1, 1, 0, 0]],
+        lookback=1,
+        layers=["1d"],
+    )
+    lm = dt._latent_map(env, _Model(_TorchPolicy(_q_net(_W, _B))))
+    assert lm["method"] == "pca"
+    assert lm["dim"] == 4
+    assert 0.0 <= lm["varianceExplained"] <= 1.0
+    assert len(lm["points"]) == 5
+    assert set(lm["points"][0]) == {"x", "y", "action"}
+
+
+def test_latent_map_none_without_a_value_or_action_net():
+    policy = types.SimpleNamespace(obs_to_tensor=lambda o: (torch.zeros(1, 4), None))
+    env = _ReplayEnv([[1.0, 0, 0, 0]] * 4, lookback=1, layers=["1d"])
+    assert dt._latent_map(env, _Model(policy)) is None
+
+
+def test_latent_map_none_with_too_few_steps():
+    env = _ReplayEnv([[1.0, 0, 0, 0], [0.0, 1, 0, 0]], lookback=1, layers=["1d"])
+    assert dt._latent_map(env, _Model(_TorchPolicy(_q_net(_W, _B)))) is None
+
+
+# --- linear probe (Alain & Bengio) -------------------------------------------
+
+
+def test_linear_probe_high_accuracy_when_the_latent_separates_actions():
+    feats = [[i, 0.0] for i in range(-9, 0)] + [[i, 0.0] for i in range(1, 10)]
+    labels = ["sell"] * 9 + ["buy"] * 9  # feature 0 sign perfectly separates them
+    probe = dt._linear_probe(feats, labels)
+    assert probe["classes"] == 2
+    assert probe["method"] == "ridge-linear"
+    assert probe["accuracy"] >= 0.9
+    assert probe["accuracy"] >= probe["baseline"]
+    assert probe["testSize"] == 6
+
+
+def test_linear_probe_none_for_a_single_class():
+    assert dt._linear_probe([[float(i)] for i in range(6)], ["hold"] * 6) is None
+
+
+def test_linear_probe_none_for_too_few_samples():
+    assert dt._linear_probe([[0.0], [1.0]], ["a", "b"]) is None
+
+
 def test_replay_enrichment_collect_features():
     env = _ReplayEnv([[1.0, 2.0, 0, 0]])
     enrichment, _ = dt.replay_enrichment(

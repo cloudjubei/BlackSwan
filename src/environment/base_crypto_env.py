@@ -166,6 +166,7 @@ class BaseCryptoEnv(AbstractEnv):
         self.total_profits = []
         self.current_profits = []
         self.rewards_history = []
+        self.reward_components = []
         self.actions = []
         self.actions_made = []
         self.forced_actions = []
@@ -187,6 +188,7 @@ class BaseCryptoEnv(AbstractEnv):
             self.total_profits.append(self.total_profit)
             self.current_profits.append(0)
             self.rewards_history.append(0)
+            self.reward_components.append({"base": 0.0, "turnover_penalty": 0.0, "noop_penalty": 0.0})
             self.actions.append(0)
             self.actions_made.append(False)
             self.forced_actions.append(0)
@@ -375,10 +377,19 @@ class BaseCryptoEnv(AbstractEnv):
         self.drawdowns.append(self._calculate_drawdown())
 
     def update_reward(self):
-        reward = self._calculate_reward() - self._turnover_penalty() - self._noop_penalty()
+        # Decompose into named, additive contributions (base + the two penalties, stored as the negative
+        # they contribute) so explainability can answer "why this reward". Read-only: the summed reward is
+        # identical to before.
+        base = self._calculate_reward()
+        turnover_penalty = self._turnover_penalty()
+        noop_penalty = self._noop_penalty()
+        reward = base - turnover_penalty - noop_penalty
         self.total_reward += reward
         self.rewards.append(self.total_reward)
         self.rewards_history.append(reward)
+        self.reward_components.append(
+            {"base": base, "turnover_penalty": -turnover_penalty, "noop_penalty": -noop_penalty}
+        )
         return reward
 
     def _noop_penalty(self):
