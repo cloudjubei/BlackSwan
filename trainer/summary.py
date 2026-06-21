@@ -154,15 +154,20 @@ def _benchmark(env, lookback):
     """Buy-and-hold control over the same live window — a display yardstick, NOT a reward target.
 
     Computed from the price series the run already saw (buy at the first live bar, hold to the last),
-    so every run is self-describing against "just holding" without a separate hodl run. The capital
-    base differs from the fixed-stake strategy, so the delta is indicative, not exact.
+    so every run is self-describing against "just holding" without a separate hodl run. Charged the SAME
+    per-trade fee the model pays — once on entry, once on exit — so a strategy that merely buys and holds
+    scores ~0 against it instead of losing by its fee drag. The capital base differs from the fixed-stake
+    strategy, so the delta is indicative, not exact.
     """
     actions = _live(getattr(env, "actions", []), lookback)
     prices = _run_prices(env, len(actions)) if len(actions) >= 2 else []
     prices = [p for p in prices if math.isfinite(p) and p > 0]
     if len(prices) < 2:
         return None
-    return {"hold_return_pct": (prices[-1] / prices[0] - 1.0) * 100}
+    fee = getattr(env, "transaction_fee_multiplier", 0.0)
+    fee = fee if isinstance(fee, (int, float)) and math.isfinite(fee) else 0.0
+    round_trip = (1.0 - fee) ** 2
+    return {"hold_return_pct": (prices[-1] / prices[0] * round_trip - 1.0) * 100}
 
 
 def _trade(entry, exit_step, exit_price, reason, pnl, initial):
@@ -442,6 +447,9 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     if benchmark:
         metrics["hold_return_pct"] = benchmark["hold_return_pct"]
         metrics["return_vs_hold_pct"] = _finite(total_return * 100 - benchmark["hold_return_pct"])
+        # Provenance flag: this run's hold benchmark already nets out the round-trip fee, so the
+        # viewer's one-time migration knows not to re-adjust it.
+        metrics["hold_net_of_fees"] = True
 
     series = {"equity": _downsample(equity)}
 

@@ -1520,27 +1520,15 @@
       "source": "manual"
     }
   ],
-  "models": [
+  "hypotheses": [
     {
-      "id": "arch-attn-ppo",
-      "name": "Attn-PPO — self-attention over the lookback",
-      "modelName": "attn-ppo",
-      "algo": "PPO + SequenceFeaturesExtractor(encoder=attn)",
-      "netArch": "1-block self-attention (d_model 48, 2 heads, learned positional) → mean-pool → 64 → policy MLP",
-      "policyInternals": "Reshapes the flat obs to its [lookback, per_bar] bar grid and runs TRUE temporal self-attention over the bars (the custom_net_arch attention tokens run on the flat vector — this is the real thing)",
-      "rationale": "The cheapest genuinely-new sequence capability: lets the policy weight a few salient bars position-independently. Honest ceiling: parity-to-slightly-better Sharpe vs the tuned LSTM (reppo), not a regime oracle. Best used as an A/B + variance-reduction diagnostic.",
-      "match": {
-        "model_name": "attn-ppo"
-      },
-      "replicateConfig": {
+      "title": "Attn-PPO — self-attention over the lookback",
+      "rationale": "The cheapest genuinely-new sequence capability: lets the policy weight a few salient bars position-independently. Honest ceiling: parity-to-slightly-better Sharpe vs the tuned LSTM (reppo), not a regime oracle. Best used as an A/B + variance-reduction diagnostic. · PPO + SequenceFeaturesExtractor(encoder=attn) · 1-block self-attention (d_model 48, 2 heads, learned positional) → mean-pool → 64 → policy MLP · Reshapes the flat obs to its [lookback, per_bar] bar grid and runs TRUE temporal self-attention over the bars (the custom_net_arch attention tokens run on the flat vector — this is the real thing)",
+      "spec": {
         "fixed": {
-          "model_name": "attn-ppo",
-          "timeframe": "1h",
-          "net_arch": "512,64"
-        },
-        "seeds": 3
+          "model_name": "attn-ppo"
+        }
       },
-      "verdictNote": "Acceptance gate: beat BOTH buy-and-hold AND reppo (tuned LSTM) on walk-forward traded_return across >=3 seeds + multiple windows. Reject if it only wins gross / one fold / before fees. Watch fee-churn (attention can flip positions more).",
       "tags": [
         "rl",
         "ppo",
@@ -1550,29 +1538,16 @@
         "modern-arch",
         "ab-vs-lstm"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-tcn-ppo",
-      "name": "TCN-PPO — dilated causal conv over the lookback",
-      "modelName": "tcn-ppo",
-      "algo": "PPO + SequenceFeaturesExtractor(encoder=tcn)",
-      "netArch": "4 dilated causal residual conv blocks (channels 24, kernel 3, weight-norm + dropout) → pool → 64 → policy MLP",
-      "policyInternals": "Reshapes to the bar grid, transposes to [features, bars], applies a Bai-style TCN (causal left-pad, no lookahead) over the lookback; parallel, parameter-efficient, stable gradients",
-      "rationale": "Strongest fit for this stack — reuses weight-norm / dropout / residual ideas, trains in parallel (no BPTT), causal padding = no leakage. A cheaper / lower-variance swap to TEST whether the edge is architecture- or signal-limited (probably signal).",
-      "match": {
-        "model_name": "tcn-ppo"
-      },
-      "replicateConfig": {
+      "title": "TCN-PPO — dilated causal conv over the lookback",
+      "rationale": "Strongest fit for this stack — reuses weight-norm / dropout / residual ideas, trains in parallel (no BPTT), causal padding = no leakage. A cheaper / lower-variance swap to TEST whether the edge is architecture- or signal-limited (probably signal). · PPO + SequenceFeaturesExtractor(encoder=tcn) · 4 dilated causal residual conv blocks (channels 24, kernel 3, weight-norm + dropout) → pool → 64 → policy MLP · Reshapes to the bar grid, transposes to [features, bars], applies a Bai-style TCN (causal left-pad, no lookahead) over the lookback; parallel, parameter-efficient, stable gradients",
+      "spec": {
         "fixed": {
-          "model_name": "tcn-ppo",
-          "timeframe": "1h",
-          "net_arch": "512,64"
-        },
-        "seeds": 3
+          "model_name": "tcn-ppo"
+        }
       },
-      "verdictNote": "Same gate as attn-ppo (beat B&H AND reppo OOS, multi-seed/fold). Supporting evidence is volatility FORECASTING not fee-gated PnL — treat 'beats hold after 0.1%' as unproven/config-dependent. The [L,F]->[F,L] transpose ordering is unit-tested to avoid silent leakage.",
       "tags": [
         "rl",
         "ppo",
@@ -1582,19 +1557,15 @@
         "modern-arch",
         "ab-vs-lstm"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-reppo-custom",
-      "name": "Reppo-custom — recurrent PPO (default)",
-      "modelName": "reppo-custom",
-      "algo": "RecurrentPPO (sb3-contrib)",
-      "netArch": "512,64 + custom_net_arch tokens (BatchNorm1d · weight_norm · Dropout)",
-      "policyInternals": "LSTM recurrent encoder + a custom actor-critic head (CustomRecurrentActorCriticPolicy)",
-      "rationale": "The project default and most-cited winner: on-policy recurrent PPO whose LSTM carries state across bars, with a regularised custom head. Strong in pre-v3 runs (~+50%); re-prove under v3 walk-forward at 0.1% fees.",
-      "match": {
-        "model_name": "reppo-custom"
+      "title": "Reppo-custom — recurrent PPO (default)",
+      "rationale": "The project default and most-cited winner: on-policy recurrent PPO whose LSTM carries state across bars, with a regularised custom head. Strong in pre-v3 runs (~+50%); re-prove under v3 walk-forward at 0.1% fees. · RecurrentPPO (sb3-contrib) · 512,64 + custom_net_arch tokens (BatchNorm1d · weight_norm · Dropout) · LSTM recurrent encoder + a custom actor-critic head (CustomRecurrentActorCriticPolicy)",
+      "spec": {
+        "fixed": {
+          "model_name": "reppo-custom"
+        }
       },
       "tags": [
         "rl",
@@ -1605,19 +1576,15 @@
         "custom-head",
         "default"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-trpo-custom",
-      "name": "TRPO-custom — trust-region PG",
-      "modelName": "trpo-custom",
-      "algo": "TRPO (sb3-contrib)",
-      "netArch": "512,64 / 512,128,32 + custom_net_arch tokens",
-      "policyInternals": "Trust-region policy gradient (KL-constrained updates) + custom actor-critic head (CustomActorCriticPolicy)",
-      "rationale": "On-policy PG with a KL trust region for stable updates — a frequent runner-up to reppo in pre-v3 runs. Non-recurrent; tests whether the LSTM is what matters.",
-      "match": {
-        "model_name": "trpo-custom"
+      "title": "TRPO-custom — trust-region PG",
+      "rationale": "On-policy PG with a KL trust region for stable updates — a frequent runner-up to reppo in pre-v3 runs. Non-recurrent; tests whether the LSTM is what matters. · TRPO (sb3-contrib) · 512,64 / 512,128,32 + custom_net_arch tokens · Trust-region policy gradient (KL-constrained updates) + custom actor-critic head (CustomActorCriticPolicy)",
+      "spec": {
+        "fixed": {
+          "model_name": "trpo-custom"
+        }
       },
       "tags": [
         "rl",
@@ -1626,19 +1593,15 @@
         "trust-region",
         "custom-head"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-ppo-custom",
-      "name": "PPO-custom — clipped PG",
-      "modelName": "ppo-custom",
-      "algo": "PPO (stable-baselines3)",
-      "netArch": "512,64 + custom_net_arch tokens",
-      "policyInternals": "Clipped-surrogate policy gradient + custom actor-critic head (CustomActorCriticPolicy)",
-      "rationale": "The vanilla on-policy workhorse with the custom head; baseline for the reppo/trpo comparison (clip vs trust-region vs recurrent).",
-      "match": {
-        "model_name": "ppo-custom"
+      "title": "PPO-custom — clipped PG",
+      "rationale": "The vanilla on-policy workhorse with the custom head; baseline for the reppo/trpo comparison (clip vs trust-region vs recurrent). · PPO (stable-baselines3) · 512,64 + custom_net_arch tokens · Clipped-surrogate policy gradient + custom actor-critic head (CustomActorCriticPolicy)",
+      "spec": {
+        "fixed": {
+          "model_name": "ppo-custom"
+        }
       },
       "tags": [
         "rl",
@@ -1646,27 +1609,15 @@
         "ppo",
         "custom-head"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-duel-dqn-custom",
-      "name": "Dueling-DQN-custom — value/advantage heads",
-      "modelName": "duel-dqn-custom",
-      "algo": "DuelingDQN (custom)",
-      "netArch": "512,256,64,32 + custom_net_arch tokens",
-      "policyInternals": "Off-policy Q-learning with separate value + advantage streams (CustomDuelingDQNPolicy), replay buffer + target network",
-      "rationale": "The strongest off-policy family in pre-v3 runs (~+30-60%, high win-rate). Dueling heads separate 'how good is this state' from 'how good is each action' — useful when most actions are similar.",
-      "match": {
-        "model_name": "duel-dqn-custom"
-      },
-      "replicateConfig": {
+      "title": "Dueling-DQN-custom — value/advantage heads",
+      "rationale": "The strongest off-policy family in pre-v3 runs (~+30-60%, high win-rate). Dueling heads separate 'how good is this state' from 'how good is each action' — useful when most actions are similar. · DuelingDQN (custom) · 512,256,64,32 + custom_net_arch tokens · Off-policy Q-learning with separate value + advantage streams (CustomDuelingDQNPolicy), replay buffer + target network",
+      "spec": {
         "fixed": {
-          "model_name": "duel-dqn-custom",
-          "net_arch": "512,256,64,32",
-          "timeframe": "1h"
-        },
-        "seeds": 3
+          "model_name": "duel-dqn-custom"
+        }
       },
       "tags": [
         "rl",
@@ -1676,27 +1627,15 @@
         "replay",
         "custom-head"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-duel-dqn-custom-lstm",
-      "name": "Dueling-DQN-custom-LSTM — recurrent dueling",
-      "modelName": "duel-dqn-custom-lstm",
-      "algo": "DuelingDQN (custom, recurrent)",
-      "netArch": "512,256,64,32 + custom_net_arch tokens",
-      "policyInternals": "Dueling DQN with an LSTM encoder over the lookback window (CustomDuelingDQNPolicy, recurrent variant)",
-      "rationale": "Adds recurrence to the dueling-DQN winner — tests whether sequence memory helps the off-policy family as the LSTM seems to help reppo.",
-      "match": {
-        "model_name": "duel-dqn-custom-lstm"
-      },
-      "replicateConfig": {
+      "title": "Dueling-DQN-custom-LSTM — recurrent dueling",
+      "rationale": "Adds recurrence to the dueling-DQN winner — tests whether sequence memory helps the off-policy family as the LSTM seems to help reppo. · DuelingDQN (custom, recurrent) · 512,256,64,32 + custom_net_arch tokens · Dueling DQN with an LSTM encoder over the lookback window (CustomDuelingDQNPolicy, recurrent variant)",
+      "spec": {
         "fixed": {
-          "model_name": "duel-dqn-custom-lstm",
-          "net_arch": "512,256,64,32",
-          "timeframe": "1h"
-        },
-        "seeds": 3
+          "model_name": "duel-dqn-custom-lstm"
+        }
       },
       "tags": [
         "rl",
@@ -1706,19 +1645,15 @@
         "recurrent",
         "lstm"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-munchausen-dqn-custom",
-      "name": "Munchausen-DQN-custom — log-policy bonus",
-      "modelName": "munchausen-dqn-custom",
-      "algo": "MunchausenDQN (custom)",
-      "netArch": "512,64 + custom_net_arch tokens",
-      "policyInternals": "DQN augmented with the Munchausen term (adds a scaled log-policy bonus to the reward) over a CustomDQNPolicy",
-      "rationale": "Munchausen-RL implicitly does KL-regularised policy iteration and often improves DQN sample-efficiency/stability — worth re-testing under v3 against plain dueling-DQN.",
-      "match": {
-        "model_name": "munchausen-dqn-custom"
+      "title": "Munchausen-DQN-custom — log-policy bonus",
+      "rationale": "Munchausen-RL implicitly does KL-regularised policy iteration and often improves DQN sample-efficiency/stability — worth re-testing under v3 against plain dueling-DQN. · MunchausenDQN (custom) · 512,64 + custom_net_arch tokens · DQN augmented with the Munchausen term (adds a scaled log-policy bonus to the reward) over a CustomDQNPolicy",
+      "spec": {
+        "fixed": {
+          "model_name": "munchausen-dqn-custom"
+        }
       },
       "tags": [
         "rl",
@@ -1727,19 +1662,15 @@
         "munchausen",
         "entropy-regularised"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-qrdqn-custom",
-      "name": "QR-DQN-custom — distributional",
-      "modelName": "qrdqn-custom",
-      "algo": "QRDQN (sb3-contrib)",
-      "netArch": "512,64 + custom_net_arch tokens",
-      "policyInternals": "Distributional Q-learning: predicts a quantile distribution of returns rather than a point estimate (CustomQRDQNPolicy)",
-      "rationale": "Modelling the full return distribution can help under heavy-tailed crypto returns (risk-aware action values). Tests whether distributional RL beats expectation-based DQN here.",
-      "match": {
-        "model_name": "qrdqn-custom"
+      "title": "QR-DQN-custom — distributional",
+      "rationale": "Modelling the full return distribution can help under heavy-tailed crypto returns (risk-aware action values). Tests whether distributional RL beats expectation-based DQN here. · QRDQN (sb3-contrib) · 512,64 + custom_net_arch tokens · Distributional Q-learning: predicts a quantile distribution of returns rather than a point estimate (CustomQRDQNPolicy)",
+      "spec": {
+        "fixed": {
+          "model_name": "qrdqn-custom"
+        }
       },
       "tags": [
         "rl",
@@ -1748,19 +1679,15 @@
         "distributional",
         "quantile-regression"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-dqn-vanilla",
-      "name": "DQN (vanilla baseline)",
-      "modelName": "dqn",
-      "algo": "DQN (stable-baselines3)",
-      "netArch": "MlpPolicy default (e.g. 512,64)",
-      "policyInternals": "Plain deep Q-network, MlpPolicy, replay buffer + target net — no dueling/distributional/Munchausen extras",
-      "rationale": "The un-customised off-policy baseline — the control that shows how much the '-custom' policy internals (dueling/Munchausen/QR/LSTM/regularised head) actually add.",
-      "match": {
-        "model_name": "dqn"
+      "title": "DQN (vanilla baseline)",
+      "rationale": "The un-customised off-policy baseline — the control that shows how much the '-custom' policy internals (dueling/Munchausen/QR/LSTM/regularised head) actually add. · DQN (stable-baselines3) · MlpPolicy default (e.g. 512,64) · Plain deep Q-network, MlpPolicy, replay buffer + target net — no dueling/distributional/Munchausen extras",
+      "spec": {
+        "fixed": {
+          "model_name": "dqn"
+        }
       },
       "tags": [
         "rl",
@@ -1769,29 +1696,18 @@
         "baseline",
         "vanilla"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-supervised-rules",
-      "name": "Supervised + rules (logreg / gbm)",
-      "modelName": "supervised-logreg / supervised-gbm",
-      "algo": "scikit-learn LogisticRegression / HistGradientBoostingClassifier",
-      "netArch": "n/a (linear model / gradient-boosted trees)",
-      "policyInternals": "Predicts next-bar direction from the SAME features the RL agent sees; a fixed rule trades on P(up) > threshold; exits via env TP/SL. NOT reinforcement learning.",
-      "rationale": "The decisive 'is RL even the right tool?' control — research favours supervised prediction + rules for single-asset trading. If this matches or beats the RL family OOS, the RL complexity isn't earning its keep.",
-      "replicateConfig": {
+      "title": "Supervised + rules (logreg / gbm)",
+      "rationale": "The decisive 'is RL even the right tool?' control — research favours supervised prediction + rules for single-asset trading. If this matches or beats the RL family OOS, the RL complexity isn't earning its keep. · scikit-learn LogisticRegression / HistGradientBoostingClassifier · n/a (linear model / gradient-boosted trees) · Predicts next-bar direction from the SAME features the RL agent sees; a fixed rule trades on P(up) > threshold; exits via env TP/SL. NOT reinforcement learning.",
+      "spec": {
         "sweep": {
           "model_name": [
             "supervised-logreg",
             "supervised-gbm"
           ]
-        },
-        "fixed": {
-          "timeframe": "1h",
-          "use_indicators": true
-        },
-        "seeds": 1
+        }
       },
       "tags": [
         "supervised",
@@ -1801,19 +1717,15 @@
         "control",
         "decisive"
       ],
-      "status": "untested",
       "source": "manual"
     },
     {
-      "id": "arch-hodl",
-      "name": "Buy & hold (control)",
-      "modelName": "hodl",
-      "algo": "n/a (passive)",
-      "netArch": "n/a",
-      "policyInternals": "Buys at the first bar, holds to the end — no learning, no trading.",
-      "rationale": "The benchmark every active model must beat OUT-OF-SAMPLE net of fees. In a strong-trend year this bar is high; a model that only matches hodl has earned nothing.",
-      "match": {
-        "model_name": "hodl"
+      "title": "Buy & hold (control)",
+      "rationale": "The benchmark every active model must beat OUT-OF-SAMPLE net of fees. In a strong-trend year this bar is high; a model that only matches hodl has earned nothing. · n/a (passive) · n/a · Buys at the first bar, holds to the end — no learning, no trading.",
+      "spec": {
+        "fixed": {
+          "model_name": "hodl"
+        }
       },
       "tags": [
         "control",
@@ -1821,7 +1733,6 @@
         "passive",
         "buy-and-hold"
       ],
-      "status": "untested",
       "source": "manual"
     }
   ],

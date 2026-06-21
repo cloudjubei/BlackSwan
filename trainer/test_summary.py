@@ -490,8 +490,34 @@ def test_benchmark_filters_nonpositive_prices_to_none():
 
 
 def test_benchmark_hold_return_first_to_last():
+    # No fee multiplier on the fake env → fee-free hold (the absent-fee case).
     env = _FakeEnv(net_worths=[1, 2], actions=[1, 2], prices=[100, 200])
     assert summary_mod._benchmark(env, 0) == {"hold_return_pct": pytest.approx(100.0)}
+
+
+def test_benchmark_charges_entry_and_exit_fee():
+    # A fair buy-and-hold pays the same per-trade fee the model does, on entry AND exit: (1-fee)^2.
+    env = _FakeEnv(net_worths=[1, 2], actions=[1, 2], prices=[100, 200])
+    env.transaction_fee_multiplier = 0.001
+    expected = (200 / 100 * (1 - 0.001) ** 2 - 1) * 100
+    assert summary_mod._benchmark(env, 0) == {"hold_return_pct": pytest.approx(expected)}
+
+
+def test_benchmark_none_fee_multiplier_treated_as_zero():
+    env = _FakeEnv(net_worths=[1, 2], actions=[1, 2], prices=[100, 200])
+    env.transaction_fee_multiplier = None
+    assert summary_mod._benchmark(env, 0) == {"hold_return_pct": pytest.approx(100.0)}
+
+
+def test_build_summary_marks_hold_net_of_fees():
+    env = _FakeEnv(net_worths=[100000, 110000], actions=[1, 2], prices=[100, 110])
+    env.transaction_fee_multiplier = 0.001
+    out = summary_mod.build_summary(
+        env, _state(n_trades=2), _CFG, _FakeModel(), "2026-01-01T00:00:00Z", True
+    )
+    assert out["metrics"]["hold_net_of_fees"] is True
+    # the benchmark is charged the round-trip fee, so it's below the gross price move
+    assert out["metrics"]["hold_return_pct"] < 10.0
 
 
 # --- _reconstruct_trades: empty / price-less envs return empty structures ---
