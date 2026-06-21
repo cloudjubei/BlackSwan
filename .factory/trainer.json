@@ -8,28 +8,28 @@
     "name": "traded_return",
     "direction": "max"
   },
-  "pipelineVersion": "4",
+  "pipelineVersion": "4.0",
   "pipelineChangelog": [
     {
-      "version": "4",
+      "version": "4.0",
       "date": "2026-06-19",
       "breaking": true,
       "summary": "Correctness bug-fix sweep — scores are NOT comparable to v3 for affected setups. (1) Prioritized replay (DQN/Rainbow PER) was effectively UNIFORM: add() seeded each new transition into the wrong slot from an all-zero max, and a full buffer could NaN-crash sampling; new transitions now get the correct max-priority seed and sampling is stable, so PER models train differently. (2) Multi-timeline get_values with lookback<=1 now CONCATENATES layer features instead of element-wise SUMMING them, correcting observations for multi-layer lookback<=1 data configs. (3) Removed the dead 'combo2' reward model (it silently fell through to profit_percentage). Other fixes with no impact on the main training path: reward-multiplier scalar defaults (were (0,) tuples), dataclass default_factory landmines (net_arch / layers / Config lists), process_df 'expanded' timestamp_close coercion (feature-identical in production), GlobalContextAttention non-square contraction, env_factory error message, derive_cache _to_ms / empty-frame guards, R2Loss / SquaredMeanLoss numerics, the dip-env streak metric, and the GlobalContextAttention 2-D path (now usable inside the custom MLP). Removed dead code entirely: the whole server path (ServerCryptoEnv / ServerDataProvider / run_server_model / src.server websocket+cache / src.config) and the duplicate 'duel-dqn-custom-lstm8' factory branch."
     },
     {
-      "version": "3",
+      "version": "3.0",
       "date": "2026-06-16",
       "breaking": false,
       "summary": "Walk-forward evaluation: a walk_forward_window lever tests on 2022/2023/2024 with an expanding train window (default 2024 = train 2020-2023 / test 2024 reproduces the v2 single split EXACTLY, so v2 runs stay comparable to v3 window-2024 runs). Adds sharpe_alpha (risk-adjusted excess over buy-and-hold on the same window) to metrics and stamps the window into the dataset. Adds a sweepable trade_gate_mode (none/linear/quadratic/threshold) for the objective's trade-frequency gate (default quadratic = unchanged). Different windows are separate out-of-sample samples — group them, never compare a 2022 run to a 2024 run as one number."
     },
     {
-      "version": "2",
+      "version": "2.0",
       "date": "2026-06-15",
       "breaking": true,
       "summary": "Data + scoring overhaul: fidelity-scaled rolling windows (QW1) + taker-buy ratio (QW2), 1m-canonical derive-cache + runtime-computed indicators, trade-aware traded_return with a QUADRATIC trade gate, n_trades fixed to completed-trade count, benchmark vs-hold aligned via get_price, combo_noaction default 0 (no synthetic-short bias). Scores are NOT comparable to v1."
     },
     {
-      "version": "1",
+      "version": "1.0",
       "breaking": false,
       "summary": "Original pipeline — the historical results_hour.ods ledger import (Sharpe-era, pre-overhaul). Kept for reference; not comparable to v2."
     }
