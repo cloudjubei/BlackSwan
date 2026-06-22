@@ -590,121 +590,6 @@ def test_reward_direct_zero_when_prev_networth_nonpositive():
     assert e._calculate_reward() == 0.0
 
 
-def test_differential_sharpe_finite_and_updates_state():
-    e = _reward_env("differential_sharpe")
-    e.net_worths = [100.0, 110.0]
-    e._ds_a = 0.0
-    e._ds_b = 0.0
-    dsr = e._calculate_reward()
-    assert math.isfinite(dsr)
-    # first step: denom = (b - a^2)^1.5 = 0 -> dsr 0; running estimates advance.
-    assert dsr == 0.0
-    assert e._ds_a == pytest.approx(0.01 * 0.1)
-    assert e._ds_b == pytest.approx(0.01 * 0.01)
-
-
-def test_differential_sharpe_nonzero_after_state_built_up():
-    e = _reward_env("differential_sharpe")
-    e.net_worths = [100.0, 110.0]
-    e._ds_a = 0.05
-    e._ds_b = 0.02  # b - a^2 = 0.0175 > 0 -> finite nonzero dsr
-    dsr = e._calculate_reward()
-    assert math.isfinite(dsr)
-    assert dsr != 0.0
-
-
-# --- _calculate_reward: combo ----------------------------------------------
-
-_COMBO = {
-    "combo_sell_profit": 2.0,
-    "combo_sell_profit_prev": 3.0,
-    "combo_sell_perfect": 5.0,
-    "combo_sell_drawdown": 7.0,
-    "combo_buy_profit": 2.0,
-    "combo_buy_perfect": 5.0,
-    "combo_buy_profitable_offset": 11.0,
-    "combo_buy_profitable": 0.5,
-    "combo_buy_drawdown": 4.0,
-    "combo_hold_profit": 2.0,
-    "combo_hold_drawdown": 3.0,
-    "combo_wrongaction": -1.0,
-}
-
-
-def test_combo_sell_reward_sums_four_components():
-    e = _reward_env("combo", _COMBO)
-    e.actions_made = [True]
-    e.actions = [2]
-    e.tpsls = [0]
-    e.initial_net_worth = 100.0
-    e.sells = [110.0]
-    e.net_worths = [110.0, 100.0]  # [-2] = 110 -> prev profit 0
-    e.drawdowns = [-0.05]
-    e.current_step = 0
-    e.data_provider = types.SimpleNamespace(get_signal_buy_sell=lambda s: -2)
-    # 0.10*2 (sell_profit) + 0*3 (sell_profit_prev) + 1*5 (perfect) + (-0.05)*7 (drawdown)
-    assert e._calculate_reward() == pytest.approx(0.2 + 5.0 - 0.35)
-
-
-def test_combo_sell_reward_fires_on_tp_flag_without_sell_action():
-    # tpsls[-1] == 1 routes through the SELL branch even though action != 2.
-    e = _reward_env("combo", _COMBO)
-    e.actions_made = [True]
-    e.actions = [0]
-    e.tpsls = [1]
-    e.initial_net_worth = 100.0
-    e.sells = [105.0]
-    e.net_worths = [105.0, 105.0]
-    e.drawdowns = [0.0]
-    e.current_step = 0
-    e.data_provider = types.SimpleNamespace(get_signal_buy_sell=lambda s: 0)
-    # 0.05*2 + 0*3 + 0 + 0
-    assert e._calculate_reward() == pytest.approx(0.1)
-
-
-def test_combo_buy_reward_sums_four_components():
-    e = _reward_env("combo", _COMBO)
-    e.actions_made = [True]
-    e.actions = [1]
-    e.tpsls = [0]
-    e.initial_net_worth = 100.0
-    e.buys = [99.0]
-    e.current_step = 0
-    e.data_provider = types.SimpleNamespace(
-        get_signal_buy_sell=lambda s: 2,
-        get_signal_buy_profitable=lambda s: 3,
-        get_signal_buy_drawdown=lambda s: -0.1,
-    )
-    # (99/100-1)*2 + 1*5 + (11-3)*0.5 + (-0.1)*4
-    assert e._calculate_reward() == pytest.approx(-0.02 + 5.0 + 4.0 - 0.4)
-
-
-def test_combo_hold_long_rewards_price_up():
-    e = _reward_env("combo", _COMBO)
-    e.actions_made = [False]
-    e.actions = [0]
-    e.positions = [5.0]
-    e.current_price = 100.0
-    e.current_step = 0
-    e.get_price = lambda s: 110.0 if s == 1 else 100.0
-    e.drawdowns = [-0.05]
-    # dir +1 * 0.1 * 2 + (-0.05)*3
-    assert e._calculate_reward() == pytest.approx(0.2 - 0.15)
-
-
-def test_combo_hold_short_rewards_price_down():
-    e = _reward_env("combo", _COMBO)
-    e.actions_made = [False]
-    e.actions = [0]
-    e.positions = [-5.0]
-    e.current_price = 100.0
-    e.current_step = 0
-    e.get_price = lambda s: 110.0 if s == 1 else 100.0
-    e.drawdowns = [-0.05]
-    # dir -1 * 0.1 * 2 + (-0.05)*3
-    assert e._calculate_reward() == pytest.approx(-0.2 - 0.15)
-
-
 # --- _calculate_reward: combo_all family ------------------------------------
 
 _COMBO_ALL = {
@@ -1185,8 +1070,6 @@ def _step_env(prices, lookback=1):
     e.total_reward = 0
     e.drawdown_peak = 0
     e.drawdown_trough = 0
-    e._ds_a = 0.0
-    e._ds_b = 0.0
     e.fees = []
     e.buys = []
     e.sells = []
@@ -1328,6 +1211,99 @@ def test_render_prints_without_error():
         e.render()
     out = buf.getvalue()
     assert "net_worth" in out and "105.0" in out
+
+
+# --- combo_unified reward equivalence ----------------------------------------------------------------
+# Proof that the unified, fully-weighted combo reward reproduces each named combo_* model byte-for-byte over
+# a rollout exercising every branch (open, hold-in-position, wrong-open, close, wrong-close, flat-hold). This
+# is the GATE before collapsing the categorical reward_model names into combo_unified + continuous weight
+# levers and migrating historical runs. The named variants stay implemented, so old runs reproduce exactly.
+
+_EQUIV_PRICES = [100, 110, 105, 120, 115, 130, 125, 135]
+# open, hold, wrong-open (buy while long), close, wrong-close (sell while flat), flat-hold
+_EQUIV_ACTIONS = [1, 0, 1, 2, 2, 0]
+
+_BASE_W = {
+    "combo_sell": 1.3,
+    "combo_buy": 0.7,
+    "combo_positionprofitpercentage": 1.1,
+    "combo_noaction": 0.5,
+    "combo_wrongaction": -0.9,
+}
+
+
+def _reward_rollout(reward_model, multipliers, fee=0.0):
+    e = _step_env(_EQUIV_PRICES)
+    e.reward_model = reward_model
+    e.reward_multipliers = dict(multipliers)
+    e.transaction_fee_multiplier = fee
+    out = []
+    for a in _EQUIV_ACTIONS:
+        e.step(a)
+        out.append(e.rewards_history[-1])
+    return out
+
+
+def test_combo_unified_reproduces_combo_all():
+    base = _reward_rollout("combo_all", _BASE_W)
+    uni = _reward_rollout(
+        "combo_unified",
+        {**_BASE_W, "combo_wrongaction": 0.0, "combo_fee_penalty": 0.0, "combo_noop_penalty": 0.0},
+    )
+    assert uni == pytest.approx(base)
+
+
+def test_combo_unified_reproduces_combo_all_fee():
+    base = _reward_rollout("combo_all_fee", {**_BASE_W, "combo_fee_penalty": 1.0}, fee=0.001)
+    uni = _reward_rollout(
+        "combo_unified",
+        {**_BASE_W, "combo_wrongaction": 0.0, "combo_fee_penalty": 1.0, "combo_noop_penalty": 0.0},
+        fee=0.001,
+    )
+    assert uni == pytest.approx(base)
+
+
+def test_combo_unified_reproduces_combo_all_noop():
+    base = _reward_rollout("combo_all_noop", {**_BASE_W, "combo_noop_penalty": 0.02})
+    uni = _reward_rollout(
+        "combo_unified",
+        {**_BASE_W, "combo_wrongaction": 0.0, "combo_fee_penalty": 0.0, "combo_noop_penalty": 0.02},
+    )
+    assert uni == pytest.approx(base)
+
+
+def test_combo_unified_reproduces_combo_all2_when_no_action_weight_zero():
+    w = {**_BASE_W, "combo_noaction": 0.0}
+    base = _reward_rollout("combo_all2", w)
+    uni = _reward_rollout("combo_unified", {**w, "combo_fee_penalty": 0.0, "combo_noop_penalty": 0.0})
+    assert uni == pytest.approx(base)
+
+
+def test_combo_all2_only_unifies_when_no_action_weight_is_zero():
+    # Honest documentation of the one structural difference: combo_all2 REPLACES the no-action term with
+    # combo_wrongaction at a wrong-close, whereas combo_unified ADDS it. With combo_noaction != 0 they differ
+    # at that step, so combo_all2 unifies cleanly ONLY under combo_noaction == 0.
+    base = _reward_rollout("combo_all2", _BASE_W)  # combo_noaction = 0.5
+    uni = _reward_rollout("combo_unified", {**_BASE_W, "combo_fee_penalty": 0.0, "combo_noop_penalty": 0.0})
+    assert uni != pytest.approx(base)
+
+
+def test_combo_unified_combo_direct_reproduces_profit_percentage_direct():
+    # profit_percentage_direct folds into combo_unified as the combo_direct weight: every shaping weight 0,
+    # combo_direct = 1 → the raw per-step portfolio return, byte-for-byte.
+    base = _reward_rollout("profit_percentage_direct", {})
+    uni = _reward_rollout(
+        "combo_unified",
+        {
+            "combo_sell": 0.0,
+            "combo_buy": 0.0,
+            "combo_positionprofitpercentage": 0.0,
+            "combo_noaction": 0.0,
+            "combo_wrongaction": 0.0,
+            "combo_direct": 1.0,
+        },
+    )
+    assert uni == pytest.approx(base)
 
 
 def _run_all():

@@ -172,10 +172,18 @@ def build_model_config(cfg):
     if not model_name.endswith("-custom"):
         # The tuned custom_net_arch tokens only apply to the *-custom models.
         rl.custom_net_arch = [[]]
-    rl.reward_model = [str(cfg.get("reward_model", "combo_all2"))]
+    rl.reward_model = [str(cfg.get("reward_model", "combo_unified"))]
     rl.reward_multiplier_combo_noaction = [float(cfg.get("combo_noaction", 0))]
-    rl.reward_multiplier_combo_fee_penalty = [float(cfg.get("combo_fee_penalty", 1.0))]
-    rl.reward_multiplier_combo_noop_penalty = [float(cfg.get("combo_noop_penalty", 0.001))]
+    # combo_unified defaults the two penalties OFF (0) so a bare combo_unified run ≡ the old combo_all.
+    rl.reward_multiplier_combo_fee_penalty = [float(cfg.get("combo_fee_penalty", 0))]
+    rl.reward_multiplier_combo_noop_penalty = [float(cfg.get("combo_noop_penalty", 0))]
+    # combo_unified exposes the remaining combo weights as levers. Only override the baked model_rl value
+    # when the run actually carries the key, so the existing reward models are unchanged: a migrated
+    # combo_all run sets combo_wrongaction=0 (combo_unified then adds nothing), while a migrated combo_all2
+    # run omits it (inheriting the baked value, which combo_unified adds — reproducing combo_all2).
+    for _k in ("combo_sell", "combo_buy", "combo_positionprofitpercentage", "combo_wrongaction", "combo_direct"):
+        if _k in cfg:
+            setattr(rl, "reward_multiplier_" + _k, [float(cfg[_k])])
     rl.learning_rate = [float(cfg.get("learning_rate", 0.0001))]
     rl.gamma = [float(cfg.get("gamma", 0.99))]
     rl.batch_size = [int(cfg.get("batch_size", 512))]

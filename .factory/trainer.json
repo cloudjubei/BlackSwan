@@ -34,6 +34,31 @@
       "summary": "Original pipeline — the historical results_hour.ods ledger import (Sharpe-era, pre-overhaul). Kept for reference; not comparable to v2."
     }
   ],
+  "migrations": [
+    {
+      "match": { "reward_model": "combo_all" },
+      "set": { "reward_model": "combo_unified", "combo_sell": 1000, "combo_buy": 0.1, "combo_positionprofitpercentage": 10, "combo_wrongaction": 0, "combo_fee_penalty": 0, "combo_noop_penalty": 0 }
+    },
+    {
+      "match": { "reward_model": "combo_all_fee" },
+      "set": { "reward_model": "combo_unified", "combo_sell": 1000, "combo_buy": 0.1, "combo_positionprofitpercentage": 10, "combo_wrongaction": 0, "combo_noop_penalty": 0 },
+      "keepOrDefault": { "combo_fee_penalty": 1.0 }
+    },
+    {
+      "match": { "reward_model": "combo_all_noop" },
+      "set": { "reward_model": "combo_unified", "combo_sell": 1000, "combo_buy": 0.1, "combo_positionprofitpercentage": 10, "combo_wrongaction": 0, "combo_fee_penalty": 0 },
+      "keepOrDefault": { "combo_noop_penalty": 0.001 }
+    },
+    {
+      "match": { "reward_model": "combo_all2", "combo_noaction": 0 },
+      "set": { "reward_model": "combo_unified", "combo_sell": 1000, "combo_buy": 0.1, "combo_positionprofitpercentage": 10, "combo_fee_penalty": 0, "combo_noop_penalty": 0 },
+      "keepOrDefault": { "combo_wrongaction": -0.01 }
+    },
+    {
+      "match": { "reward_model": "profit_percentage_direct" },
+      "set": { "reward_model": "combo_unified", "combo_direct": 1, "combo_sell": 0, "combo_buy": 0, "combo_positionprofitpercentage": 0, "combo_noaction": 0, "combo_wrongaction": 0, "combo_fee_penalty": 0, "combo_noop_penalty": 0 }
+    }
+  ],
   "levers": {
     "model_name": {
       "type": "choice",
@@ -61,48 +86,105 @@
     "reward_model": {
       "type": "choice",
       "choices": [
-        "combo_all2",
-        "combo_all",
-        "combo_all_fee",
-        "combo_all_noop",
-        "combo",
+        "combo_unified",
         "profit_all2",
-        "profit_percentage3",
-        "profit_percentage_direct",
-        "differential_sharpe"
+        "profit_percentage3"
       ],
-      "default": "combo_all",
-      "description": "Which reward function shapes behaviour. The combo_* family weight profit, drawdown and action-quality differently — each is a distinct approach (intentionally kept separate). combo_all_fee = combo_all plus an explicit per-trade turnover penalty. combo_all_noop = combo_all plus an explicit penalty for NO-OP actions — a buy/sell/short/cover the agent emits that doesn't change the position (buy while already long, sell while flat, …); the other combo rewards ignore these wasted/invalid decisions, so this is the one that pushes the agent to stop spamming dead actions. profit_percentage_direct = the raw per-step portfolio return (direct RL); differential_sharpe = Moody & Saffell online risk-adjusted return (the research-favoured kind for trading) — both reward the equity path itself rather than hand-shaped signals."
+      "default": "combo_unified",
+      "description": "Which reward function shapes behaviour. combo_unified is the ONE shaped reward — a per-step WEIGHTED SUM of components, each a continuous lever: combo_sell/combo_buy/combo_positionprofitpercentage reward realized P&L on close / direction on open / held-position P&L; combo_direct adds the raw per-step PORTFOLIO return (direct RL — with every other weight 0 it IS the old profit_percentage_direct); combo_noaction weights price moves while flat; combo_wrongaction penalises wasted actions (a buy while long / sell while flat); combo_fee_penalty and combo_noop_penalty are explicit turnover / no-op penalties. It subsumes the retired combo_all/_fee/_noop/2 + profit_percentage_direct names as POINTS in that weight-space. profit_all2 / profit_percentage3 = older realized-profit variants (different normalisation) kept for comparison."
     },
     "combo_noaction": {
       "type": "choice",
       "choices": [0, -1],
       "default": 0,
+      "appliesWhen": {
+        "reward_model": ["combo_unified"]
+      },
       "description": "Reward multiplier applied to price moves while the agent is FLAT (no position). Default 0 = direction-neutral (a flat agent is neither rewarded nor punished for which way price moves). -1 bakes a synthetic-short incentive (rewards price falling while flat) — kept as a deliberate variant to probe, NOT the default, since the agent is long-only."
+    },
+    "combo_wrongaction": {
+      "type": "number",
+      "default": 0,
+      "range": [
+        -1,
+        0
+      ],
+      "appliesWhen": {
+        "reward_model": ["combo_unified"]
+      },
+      "description": "Penalty (signed weight, ≤ 0) added when the agent emits a WRONG action — opening while already in position, or closing while flat. 0 = off (the default, ≈ the old combo_all). The old combo_all2 was this term turned on."
     },
     "combo_noop_penalty": {
       "type": "number",
-      "default": 0.001,
+      "default": 0,
       "range": [
         0,
         0.05
       ],
       "appliesWhen": {
-        "reward_model": ["combo_all_noop"]
+        "reward_model": ["combo_unified"]
       },
-      "description": "ONLY for reward_model = combo_all_noop: the penalty subtracted each time the agent emits a NO-OP trade — a buy while ALREADY holding the asset, or a sell while holding cash (the action can't change the position). 0 = off. Sweep it to find how hard to discourage dead actions without suppressing real trades."
+      "description": "The penalty subtracted each time the agent emits a NO-OP trade — a buy while ALREADY holding the asset, or a sell while holding cash (the action can't change the position). 0 = off (the default). The old combo_all_noop was this turned on (0.001). Sweep it to find how hard to discourage dead actions without suppressing real trades."
     },
     "combo_fee_penalty": {
       "type": "number",
-      "default": 1,
+      "default": 0,
       "range": [
         0,
         10
       ],
       "appliesWhen": {
-        "reward_model": ["combo_all_fee"]
+        "reward_model": ["combo_unified"]
       },
-      "description": "ONLY for reward_model = combo_all_fee: weight on the per-trade turnover penalty (penalty = transaction_fee × this) that discourages over-trading/churn. 0 = off (combo_all_fee then behaves like combo_all)."
+      "description": "Weight on the per-trade turnover penalty (penalty = transaction_fee × this) that discourages over-trading/churn. 0 = off (the default). The old combo_all_fee was this turned on (1.0)."
+    },
+    "combo_sell": {
+      "type": "number",
+      "default": 1000,
+      "range": [
+        0,
+        2000
+      ],
+      "appliesWhen": {
+        "reward_model": ["combo_unified"]
+      },
+      "description": "combo_unified weight on the REALIZED P&L when a position is closed (sell/cover or TP/SL) — the headline 'did this trade make money' term. Baked default 1000 (the old combo_all value)."
+    },
+    "combo_buy": {
+      "type": "number",
+      "default": 0.1,
+      "range": [
+        0,
+        5
+      ],
+      "appliesWhen": {
+        "reward_model": ["combo_unified"]
+      },
+      "description": "combo_unified weight on the next-step price move in the agent's favour when a position is OPENED (long rewarded for price up, short for down). Baked default 0.1."
+    },
+    "combo_positionprofitpercentage": {
+      "type": "number",
+      "default": 10,
+      "range": [
+        0,
+        100
+      ],
+      "appliesWhen": {
+        "reward_model": ["combo_unified"]
+      },
+      "description": "combo_unified weight on the per-step change in held-position P&L while IN a position. Baked default 10."
+    },
+    "combo_direct": {
+      "type": "number",
+      "default": 0,
+      "range": [
+        0,
+        2
+      ],
+      "appliesWhen": {
+        "reward_model": ["combo_unified"]
+      },
+      "description": "combo_unified weight on the DIRECT per-step portfolio return (net_worth[t]/net_worth[t-1] − 1), added every step. 0 = off (the default). Set to 1 with every other weight 0 to reproduce the old profit_percentage_direct (direct RL); mix with the shaping terms to blend."
     },
     "trade_gate_mode": {
       "type": "choice",
@@ -411,7 +493,7 @@
       "fixed": {
         "timeframe": "1d",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "episodes": 1,
         "device": "cpu"
       },
@@ -425,7 +507,7 @@
       "fixed": {
         "timeframe": "1h",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -446,7 +528,7 @@
         "timeframe": "1h",
         "model_name": "reppo-custom",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -462,7 +544,7 @@
       "fixed": {
         "timeframe": "1h",
         "model_name": "reppo-custom",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -479,7 +561,7 @@
         "timeframe": "1h",
         "model_name": "reppo-custom",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -504,7 +586,7 @@
         "timeframe": "1h",
         "model_name": "reppo-custom",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -525,7 +607,7 @@
         "timeframe": "1h",
         "model_name": "reppo-custom",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -546,7 +628,7 @@
         "timeframe": "1h",
         "model_name": "reppo-custom",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -561,9 +643,10 @@
       "thesisTarget": "position_sizing"
     },
     {
-      "label": "▶ Exp 9 · Direct/recurrent rewards (1h winner)",
-      "sweep": { "reward_model": ["combo_all", "combo_all_noop", "profit_percentage_direct", "differential_sharpe"] },
+      "label": "▶ Exp 9 · Direct vs shaped reward (1h winner)",
+      "sweep": { "combo_direct": [0, 1] },
       "fixed": {
+        "reward_model": "combo_unified",
         "timeframe": "1h",
         "model_name": "reppo-custom",
         "net_arch": "512,64",
@@ -591,7 +674,7 @@
         "timeframe": "1h",
         "model_name": "reppo-custom",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -612,7 +695,7 @@
         "timeframe": "1h",
         "model_name": "reppo-custom",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -639,7 +722,7 @@
         "timeframe": "1h",
         "model_name": "reppo-custom",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -660,7 +743,7 @@
       "fixed": {
         "timeframe": "1h",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "use_indicators": true,
         "stop_loss": 0.02,
         "device": "cpu"
@@ -681,7 +764,7 @@
       "fixed": {
         "timeframe": "1h",
         "net_arch": "512,64",
-        "reward_model": "combo_all",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "batch_size": 512,
         "device": "cpu"
@@ -691,7 +774,7 @@
       "thesisTarget": "model_name"
     },
     {
-      "label": "▶ Exp 15 · No-op penalty sweep (combo_all_noop strength)",
+      "label": "▶ Exp 15 · No-op penalty sweep (combo_noop_penalty strength)",
       "sweep": {
         "combo_noop_penalty": [
           0,
@@ -704,7 +787,7 @@
         "timeframe": "1h",
         "model_name": "reppo-custom",
         "net_arch": "512,64",
-        "reward_model": "combo_all_noop",
+        "reward_model": "combo_unified",
         "learning_rate": 0.0001,
         "learning_starts": 20000,
         "batch_size": 512,
@@ -984,7 +1067,7 @@
       "replicateConfig": {
         "fixed": {
           "model_name": "dqn",
-          "reward_model": "differential_sharpe",
+          "reward_model": "combo_unified", "combo_direct": 1,
           "timeframe": "1d",
           "use_indicators": true,
           "position_sizing": "fixed",
@@ -1042,7 +1125,7 @@
       },
       "replicateConfig": {
         "fixed": {
-          "reward_model": "differential_sharpe",
+          "reward_model": "combo_unified", "combo_direct": 1,
           "timeframe": "1d",
           "use_indicators": true,
           "position_sizing": "vol_target",
@@ -1105,7 +1188,7 @@
       "replicateConfig": {
         "fixed": {
           "model_name": "reppo-custom",
-          "reward_model": "differential_sharpe",
+          "reward_model": "combo_unified", "combo_direct": 1,
           "timeframe": "1d",
           "use_indicators": true,
           "position_sizing": "fixed",
@@ -1163,7 +1246,7 @@
       "replicateConfig": {
         "fixed": {
           "model_name": "reppo-custom",
-          "reward_model": "differential_sharpe",
+          "reward_model": "combo_unified", "combo_direct": 1,
           "timeframe": "1h",
           "fidelity_set": "1h+1d",
           "use_indicators": true,
@@ -1222,7 +1305,7 @@
       "replicateConfig": {
         "fixed": {
           "model_name": "duel-dqn-custom-lstm",
-          "reward_model": "differential_sharpe",
+          "reward_model": "combo_unified", "combo_direct": 1,
           "timeframe": "1d",
           "use_indicators": true,
           "position_sizing": "vol_target",
@@ -1351,7 +1434,7 @@
       "replicateConfig": {
         "fixed": {
           "model_name": "hodl",
-          "reward_model": "profit_percentage_direct",
+          "reward_model": "combo_unified", "combo_direct": 1,
           "timeframe": "1d",
           "use_indicators": true,
           "position_sizing": "vol_target",
@@ -1413,7 +1496,7 @@
       "replicateConfig": {
         "fixed": {
           "model_name": "supervised-gbm",
-          "reward_model": "profit_percentage_direct",
+          "reward_model": "combo_unified", "combo_direct": 1,
           "timeframe": "1h",
           "fidelity_set": "1h+1d",
           "use_indicators": true,

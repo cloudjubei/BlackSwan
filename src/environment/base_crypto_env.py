@@ -199,8 +199,6 @@ class BaseCryptoEnv(AbstractEnv):
         self.total_reward = 0
         self.drawdown_peak = 0
         self.drawdown_trough = 0
-        self._ds_a = 0.0
-        self._ds_b = 0.0
 
         self.fees = []
         self.buys = []
@@ -398,7 +396,14 @@ class BaseCryptoEnv(AbstractEnv):
         # returned False. The combo rewards otherwise ignore these wasted/invalid decisions, leaving
         # the agent free to spam dead actions. A flat per-no-op cost (fee-independent — it's a
         # decision-quality signal, not a real cost) discourages that. Tunable via `combo_noop_penalty`.
-        if self.reward_model != "combo_all_noop":
+        # combo_unified folds the no-op penalty in too, gated purely by the combo_noop_penalty weight
+        # (default OFF so the unified reward with weight 0 ≡ combo_all). combo_all_noop keeps its _NOOP_PENALTY
+        # default so existing runs reproduce byte-for-byte.
+        if self.reward_model == "combo_all_noop":
+            default = _NOOP_PENALTY
+        elif self.reward_model == "combo_unified":
+            default = 0.0
+        else:
             return 0.0
         if not self.actions or self.actions[-1] == 0:
             return 0.0
@@ -407,9 +412,8 @@ class BaseCryptoEnv(AbstractEnv):
         agent_executed = bool(self.actions_made[-1]) and self.forced_actions[-1] == 0
         if agent_executed:
             return 0.0
-        # The multiplier IS the per-no-op penalty value (combo_noop_penalty lever); 0 = off. Defaults to
-        # _NOOP_PENALTY when absent (e.g. a non-RL model whose multipliers dict omits the key).
-        return self.reward_multipliers.get("combo_noop_penalty", _NOOP_PENALTY)
+        # The multiplier IS the per-no-op penalty value (combo_noop_penalty lever); 0 = off.
+        return self.reward_multipliers.get("combo_noop_penalty", default)
 
     def _turnover_penalty(self):
         # RB4: turnover/fee-aware reward VARIANT. The combo rewards already see the realized fee
@@ -417,11 +421,18 @@ class BaseCryptoEnv(AbstractEnv):
         # churn — the "trade often" objective can be gamed by over-trading. The `*_fee` variants add
         # an explicit per-trade penalty scaled by the fee rate, so the agent is pushed to trade WELL,
         # not just often. Tunable via the `combo_fee_penalty` multiplier; zero for every other reward.
-        if self.reward_model != "combo_all_fee":
+        # combo_unified folds the fee penalty in too, gated by the combo_fee_penalty weight (default OFF so
+        # the unified reward with weight 0 ≡ combo_all). combo_all_fee keeps its 1.0 default for byte-for-byte
+        # reproduction of existing runs.
+        if self.reward_model == "combo_all_fee":
+            default = 1.0
+        elif self.reward_model == "combo_unified":
+            default = 0.0
+        else:
             return 0.0
         if not self.actions_made or not self.actions_made[-1]:
             return 0.0
-        weight = self.reward_multipliers.get("combo_fee_penalty", 1.0)
+        weight = self.reward_multipliers.get("combo_fee_penalty", default)
         return self.transaction_fee_multiplier * weight
 
     def step(self, action):
@@ -479,112 +490,72 @@ class BaseCryptoEnv(AbstractEnv):
     
     
     def _calculate_reward(self):
-        # Direct/recurrent-RL rewards on the portfolio's per-step return (research-favoured over the
-        # combo shaping family): profit_percentage_direct = the raw step return; differential_sharpe =
-        # the Moody & Saffell online differential Sharpe (rewards risk-adjusted return without a split).
-        if self.reward_model == "profit_percentage_direct" or self.reward_model == "differential_sharpe":
+        # Direct-RL reward on the portfolio's per-step return (research-favoured over the combo shaping
+        # family): profit_percentage_direct = the raw step return.
+        if self.reward_model == "profit_percentage_direct":
             if len(self.net_worths) < 2 or self.net_worths[-2] <= 0:
                 return 0.0
-            r = self.net_worths[-1] / self.net_worths[-2] - 1.0
-            if self.reward_model == "profit_percentage_direct":
-                return r
-            eta = 0.01
-            a_prev, b_prev = self._ds_a, self._ds_b
-            delta_a, delta_b = r - a_prev, r * r - b_prev
-            denom = (b_prev - a_prev * a_prev) ** 1.5
-            dsr = 0.0 if denom <= 0 else (b_prev * delta_a - 0.5 * a_prev * delta_b) / denom
-            self._ds_a = a_prev + eta * delta_a
-            self._ds_b = b_prev + eta * delta_b
-            return dsr if math.isfinite(dsr) else 0.0
+            return self.net_worths[-1] / self.net_worths[-2] - 1.0
 
-        if self.reward_model == "combo":
+        # The combo family is ONE per-step weighted sum of the same components; the named variants differ
+        # only in which weights/penalties are on. `combo_unified` makes that explicit: the SAME base, with
+        # the combo_wrongaction term added (gated by its weight) and the fee/no-op penalties gated by their
+        # weights in update_reward — so e.g. combo_unified(combo_wrongaction=0, combo_fee_penalty=0,
+        # combo_noop_penalty=0) ≡ combo_all. (combo_all2 REPLACES the no-action term with combo_wrongaction
+        # at a wrong-close, so it only matches combo_unified when combo_noaction == 0 — see the equivalence
+        # tests.) Keeping the named variants here too means existing runs reproduce byte-for-byte.
+        if self.reward_model in ("combo_all", "combo_all2", "combo_all_fee", "combo_all_noop", "combo_unified"):
+            # combo_unified folds the DIRECT per-step portfolio return in as one more weighted component
+            # (combo_direct): with every other weight 0 it IS profit_percentage_direct, and it composes with
+            # the shaping terms. 0 (the default, and for the named variants) leaves the reward unchanged.
+            direct = 0.0
+            if self.reward_model == "combo_unified":
+                cd = self.reward_multipliers.get("combo_direct", 0.0)
+                if cd and len(self.net_worths) >= 2 and self.net_worths[-2] > 0:
+                    direct = cd * (self.net_worths[-1] / self.net_worths[-2] - 1.0)
 
-            if self.actions_made[-1]: # just made an action
-                # SELL
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # SELL action or SL/TP triggered
-                    sell_net_worth = self.sells[-1]
-                    profit_percentage = sell_net_worth/self.initial_net_worth - 1
-                    sell_reward1 = profit_percentage * self.reward_multipliers["combo_sell_profit"]
-
-                    prev_net_worth = self.net_worths[-2]
-                    profit_percentage_prev = sell_net_worth/prev_net_worth - 1
-                    sell_reward2 = profit_percentage_prev * self.reward_multipliers["combo_sell_profit_prev"]
-
-                    signal = self.data_provider.get_signal_buy_sell(self.current_step)
-                    perfect_sell = 1 if signal < -1 else 0
-                    sell_reward3 = perfect_sell * self.reward_multipliers["combo_sell_perfect"]
-
-                    drawdown = self.drawdowns[-1]
-                    sell_reward4 = drawdown * self.reward_multipliers["combo_sell_drawdown"]
-
-                    return sell_reward1 + sell_reward2 + sell_reward3 + sell_reward4
-
-                # BUY
-                if self.actions[-1] == 1:
-                    sell_net_worth = self.buys[-1]
-                    profit_percentage = sell_net_worth/self.initial_net_worth - 1
-                    buy_reward1 = profit_percentage * self.reward_multipliers["combo_buy_profit"]
-
-                    buy_perfect = self.data_provider.get_signal_buy_sell(self.current_step)
-                    buy_perfect_signal = 1 if buy_perfect > 1 else 0
-                    buy_reward2 = buy_perfect_signal * self.reward_multipliers["combo_buy_perfect"]
-
-                    buy_profitable = self.data_provider.get_signal_buy_profitable(self.current_step) # 1 means next step will be profitable, 10 means will be profitable in 10 steps (default profit threshold 0.004)
-                    buy_profitable_signal = self.reward_multipliers["combo_buy_profitable_offset"] - buy_profitable
-                    buy_reward3 = buy_profitable_signal * self.reward_multipliers["combo_buy_profitable"]
-
-                    buy_drawdown = self.data_provider.get_signal_buy_drawdown(self.current_step) # highest negative profit percentage till position is profitable
-                    buy_reward4 = buy_drawdown * self.reward_multipliers["combo_buy_drawdown"]
-
-                    return buy_reward1 + buy_reward2 + buy_reward3 + buy_reward4
-
-            # HOLD
-            price = self.current_price
-            price_next = self.get_price(self.current_step+1)
-            profit_percentage = price_next/price - 1
-            price_direction = 1 if self.positions[-1] > 0 else -1
-            hold_reward1 = (price_direction * profit_percentage) * self.reward_multipliers["combo_hold_profit"]
-            
-            drawdown = self.drawdowns[-1]
-            hold_reward2 = drawdown * self.reward_multipliers["combo_hold_drawdown"]
-
-            return hold_reward1 + hold_reward2
-
-        if self.reward_model == "combo_all" or self.reward_model == "combo_all2" or self.reward_model == "combo_all_fee" or self.reward_model == "combo_all_noop":
             if self.actions_made[-1]: # just made an action
                 if self.actions[-1] in (2, 4) or self.tpsls[-1] != 0: # closed a position (sell/cover) or SL/TP
                     sell_net_worth = self.sells[-1]
                     profit_percentage = sell_net_worth/self.initial_net_worth - 1
-                    return profit_percentage * self.reward_multipliers["combo_sell"]
+                    return profit_percentage * self.reward_multipliers["combo_sell"] + direct
 
                 # opened a position — a long is rewarded for price rising, a short for price falling
                 price = self.current_price
                 price_next = self.get_price(self.current_step+1)
                 price_diff = price_next/price - 1
                 open_direction = 1 if self.actions[-1] == 1 else -1
-                return open_direction * price_diff * self.reward_multipliers["combo_buy"]
+                return open_direction * price_diff * self.reward_multipliers["combo_buy"] + direct
 
             if len(self.positions) > 1 and self.positions[-1] != 0 and self.positions[-2] != 0: # in position is diff than out of position
                 net_worth = self.net_worths[-1]
                 prev_net_worth = self.net_worths[-2]
                 profit_percentage = net_worth/self.initial_net_worth - 1
                 prev_profit_percentage = prev_net_worth/self.initial_net_worth - 1
+                reward = (profit_percentage - prev_profit_percentage) * self.reward_multipliers["combo_positionprofitpercentage"]
 
-                if self.actions[-1] in (1, 3) and self.reward_model == "combo_all2": # opening but already in position
-                    return (profit_percentage - prev_profit_percentage) * self.reward_multipliers["combo_positionprofitpercentage"] + self.reward_multipliers["combo_wrongaction"]
+                # opening while ALREADY in position is a wasted/wrong action — combo_all2 and the unified
+                # reward add the (signed) combo_wrongaction weight here; combo_all/fee/noop leave it (weight 0).
+                if self.actions[-1] in (1, 3) and self.reward_model in ("combo_all2", "combo_unified"):
+                    reward += self.reward_multipliers["combo_wrongaction"]
 
-                return (profit_percentage - prev_profit_percentage) * self.reward_multipliers["combo_positionprofitpercentage"]
+                return reward + direct
 
             if self.current_step > 1:
                 price_prev = self.get_price(self.current_step-1)
                 price = self.current_price
                 price_diff = price/price_prev - 1
 
+                # closing while NOT in position is a wrong action. combo_all2 REPLACES the no-action term with
+                # combo_wrongaction; combo_unified ADDS it (so with combo_noaction=0 it matches combo_all2, and
+                # with combo_wrongaction=0 it matches combo_all/fee/noop — a true weighted sum).
                 if self.actions[-1] in (2, 4) and self.reward_model == "combo_all2": # closing but not in position
                     return self.reward_multipliers["combo_wrongaction"]
+                if self.actions[-1] in (2, 4) and self.reward_model == "combo_unified":
+                    return price_diff * self.reward_multipliers["combo_noaction"] + self.reward_multipliers["combo_wrongaction"] + direct
 
-                return price_diff * self.reward_multipliers["combo_noaction"]
-            return 0
+                return price_diff * self.reward_multipliers["combo_noaction"] + direct
+            return direct
 
         elif self.reward_model == "buy_sell_signal" or self.reward_model == "buy_sell_signal2" or self.reward_model == "buy_sell_signal3" or self.reward_model == "buy_sell_signal4":
             if self.actions_made[-1]: # just made an action

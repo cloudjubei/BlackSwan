@@ -72,6 +72,7 @@ class BaseRLModel(AbstractModel):
             "combo_positionprofitpercentage": self.rl_config.reward_multiplier_combo_positionprofitpercentage,
             "combo_buy": self.rl_config.reward_multiplier_combo_buy,
             "combo_sell": self.rl_config.reward_multiplier_combo_sell,
+            "combo_direct": self.rl_config.reward_multiplier_combo_direct,
 
             "combo_sell_profit": self.rl_config.reward_multiplier_combo_sell_profit,
             "combo_sell_profit_prev": self.rl_config.reward_multiplier_combo_sell_profit_prev,

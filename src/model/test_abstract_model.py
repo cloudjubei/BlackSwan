@@ -173,7 +173,7 @@ def test_base_rl_get_reward_model_uses_config():
     assert _RL(_rl_config(reward_model="profit_all")).get_reward_model() == "profit_all"
 
 
-def test_base_rl_reward_multipliers_maps_all_18_combo_keys():
+def test_base_rl_reward_multipliers_maps_all_combo_keys():
     cfg = _rl_config(
         reward_multiplier_combo_noaction=1.0,
         reward_multiplier_combo_buy=2.0,
@@ -182,7 +182,8 @@ def test_base_rl_reward_multipliers_maps_all_18_combo_keys():
     )
     m = _RL(cfg)
     mults = m.get_reward_multipliers()
-    assert len(mults) == 18
+    assert len(mults) == 19  # 18 combo terms + combo_direct (combo_unified's direct-return weight)
+    assert mults["combo_direct"] == cfg.model_rl.reward_multiplier_combo_direct
     assert mults["combo_noaction"] == 1.0
     assert mults["combo_buy"] == 2.0
     assert mults["combo_fee_penalty"] == 3.0

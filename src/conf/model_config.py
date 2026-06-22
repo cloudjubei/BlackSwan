@@ -34,6 +34,7 @@ class ModelRLConfigSearch:
     reward_multiplier_combo_positionprofitpercentage: List[float] = field(default_factory=list)
     reward_multiplier_combo_buy: List[float] = field(default_factory=list)
     reward_multiplier_combo_sell: List[float] = field(default_factory=list)
+    reward_multiplier_combo_direct: List[float] = field(default_factory=list)
 
     reward_multiplier_combo_sell_profit: List[float] = field(default_factory=list)
     reward_multiplier_combo_sell_profit_prev: List[float] = field(default_factory=list)
@@ -86,7 +87,9 @@ class ModelRLConfig:
     reward_multiplier_combo_positionprofitpercentage: float = 0
     reward_multiplier_combo_buy: float = 0
     reward_multiplier_combo_sell: float = 0
-    
+    # combo_unified: the DIRECT per-step portfolio-return component (folds in profit_percentage_direct).
+    reward_multiplier_combo_direct: float = 0
+
     reward_multiplier_combo_sell_profit: float = 0
     reward_multiplier_combo_sell_profit_prev: float = 0
     reward_multiplier_combo_sell_perfect: float = 0
@@ -861,6 +864,8 @@ class ModelRLConfig:
     reward_multiplier_combo_positionprofitpercentage: float = 0
     reward_multiplier_combo_buy: float = 0
     reward_multiplier_combo_sell: float = 0
+    # combo_unified: the DIRECT per-step portfolio-return component (folds in profit_percentage_direct).
+    reward_multiplier_combo_direct: float = 0
 
     reward_multiplier_combo_sell_profit: float = 0
     reward_multiplier_combo_sell_profit_prev: float = 0
