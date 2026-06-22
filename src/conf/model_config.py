@@ -368,11 +368,6 @@ model_rl = ModelConfigSearch(
         # model_name= ["rainbow-dqn-old", "iqn"], # very slow (12it/s, 10it/s), but can work very well
         # model_name= ["duel-dqn-lstm"], # can have some very good results with hidden size 2,4
 
-        # reward_model= ["combo_all", "profit_percentage3", "profit_percentage4", "profit_all", "profit_all2"],# "combo"],
-        # reward_model= ["profit_percentage3", "profit_percentage4", "profit_all", "profit_all2"],# "combo"],
-        # reward_model= ["combo_all"],
-        # reward_model= ["combo"],
-        # reward_model= ["combo_all", "combo"],
         reward_model= ["combo_all2"],
 
         # learning_rate= [0.0001, 0.0005, 0.001],

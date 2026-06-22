@@ -584,44 +584,9 @@ class BaseCryptoEnv(AbstractEnv):
                 return profit_percentage * self.reward_multipliers["combo_positionprofitpercentage"]
             return 0
         
-        elif self.reward_model == "profit_all" or self.reward_model == "profit_all2":
-            if self.actions_made[-1]: # just made an action
-                if self.actions[-1] == 2 or self.tpsls[-1] == -1 or self.tpsls[-1] == 1: # has made a sell action or SL/TP triggered
-                    net_worth = self.sells[-1] # in $
-                    if self.reward_model == "profit_all2":
-                        net_worth_prev = self.net_worths[-2]
-                        return net_worth/net_worth_prev - 1 + (net_worth/self.initial_net_worth - 1)
-                    return net_worth/self.initial_net_worth - 1
-                if self.actions[-1] == 1:
-                    net_worth = self.buys[-1] # in $
-                    return net_worth/self.initial_net_worth - 1
-            if self.positions[-1] > 0: # in position
-                net_worth = self.net_worths[-1] # in $
-                prev_net_worth = self.net_worths[-2] # in $
-                return net_worth/prev_net_worth - 1
-            
-            if self.positions[-2] == 0: # if currently NOT in position but previous was in position, then it was a sell - ignore, hence 0 at end
-                net_worth = self.net_worths[-1]
-                net_worth_in_position = net_worth / self.current_price # in BTC
-                net_worth_in_position_prev = net_worth / self.get_price(self.current_step-1) # in BTC
-                return net_worth_in_position/net_worth_in_position_prev - 1 
-            return 0
-
-
-
+        # Any reward_model not matched above falls through to the cumulative portfolio return.
         net_worth = self.net_worths[-1]
         profit_percentage = net_worth/self.initial_net_worth - 1
-
-        if (self.reward_model == "profit_percentage4" or self.reward_model == "profit_percentage3" or self.reward_model == "profit_percentage2") and self.actions_made[-1] and (self.actions[-1] == 2 or self.tpsls[-1] == -1):
-            return profit_percentage * self.reward_multipliers["combo_sell"]
-        if (self.reward_model == "profit_percentage4" or self.reward_model == "profit_percentage3"):
-            if self.positions[-1] == 0:
-                profit_percentage = (1 - self.get_price(self.current_step+1)/self.current_price) * self.reward_multipliers["combo_positionprofitpercentage"]
-            elif self.reward_model == "profit_percentage4":
-                price = self.current_price
-                price_next = self.get_price(self.current_step+1)
-                profit_percentage = price_next/price - 1
-
         return profit_percentage
     
     def get_run_state(self):        

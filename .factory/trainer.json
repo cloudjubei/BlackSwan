@@ -57,6 +57,10 @@
     {
       "match": { "reward_model": "profit_percentage_direct" },
       "set": { "reward_model": "combo_unified", "combo_direct": 1, "combo_sell": 0, "combo_buy": 0, "combo_positionprofitpercentage": 0, "combo_noaction": 0, "combo_wrongaction": 0, "combo_fee_penalty": 0, "combo_noop_penalty": 0 }
+    },
+    {
+      "matchNot": { "reward_model": "combo_unified" },
+      "delete": true
     }
   ],
   "levers": {
@@ -86,12 +90,10 @@
     "reward_model": {
       "type": "choice",
       "choices": [
-        "combo_unified",
-        "profit_all2",
-        "profit_percentage3"
+        "combo_unified"
       ],
       "default": "combo_unified",
-      "description": "Which reward function shapes behaviour. combo_unified is the ONE shaped reward — a per-step WEIGHTED SUM of components, each a continuous lever: combo_sell/combo_buy/combo_positionprofitpercentage reward realized P&L on close / direction on open / held-position P&L; combo_direct adds the raw per-step PORTFOLIO return (direct RL — with every other weight 0 it IS the old profit_percentage_direct); combo_noaction weights price moves while flat; combo_wrongaction penalises wasted actions (a buy while long / sell while flat); combo_fee_penalty and combo_noop_penalty are explicit turnover / no-op penalties. It subsumes the retired combo_all/_fee/_noop/2 + profit_percentage_direct names as POINTS in that weight-space. profit_all2 / profit_percentage3 = older realized-profit variants (different normalisation) kept for comparison."
+      "description": "Which reward function shapes behaviour. combo_unified is the ONE shaped reward — a per-step WEIGHTED SUM of components, each a continuous lever: combo_sell/combo_buy/combo_positionprofitpercentage reward realized P&L on close / direction on open / held-position P&L; combo_direct adds the raw per-step PORTFOLIO return (direct RL — with every other weight 0 it IS the old profit_percentage_direct); combo_noaction weights price moves while flat; combo_wrongaction penalises wasted actions (a buy while long / sell while flat); combo_fee_penalty and combo_noop_penalty are explicit turnover / no-op penalties. It subsumes the retired combo_all/_fee/_noop/2 + profit_percentage_direct names as POINTS in that weight-space. The earlier profit_all2 / profit_percentage3 / profit_percentage_direct names were removed (profit_percentage3 had a reward-side look-ahead, like the dropped combo; the others don't fit the weight-space) — combo_unified is the single comparable reward."
     },
     "combo_noaction": {
       "type": "choice",
@@ -1367,7 +1369,7 @@
       "replicateConfig": {
         "fixed": {
           "model_name": "ppo-custom",
-          "reward_model": "profit_all2",
+          "reward_model": "combo_unified",
           "timeframe": "1h",
           "fidelity_set": "1h+1d",
           "use_indicators": true,

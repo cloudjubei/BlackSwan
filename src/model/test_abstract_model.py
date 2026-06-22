@@ -170,7 +170,7 @@ def test_base_rl_produces_checkpoint_true():
 
 
 def test_base_rl_get_reward_model_uses_config():
-    assert _RL(_rl_config(reward_model="profit_all")).get_reward_model() == "profit_all"
+    assert _RL(_rl_config(reward_model="combo_unified")).get_reward_model() == "combo_unified"
 
 
 def test_base_rl_reward_multipliers_maps_all_combo_keys():
