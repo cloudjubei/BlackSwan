@@ -562,6 +562,7 @@ model_rl = ModelConfigSearch(
         reward_multiplier_combo_positionprofitpercentage= [10],
         reward_multiplier_combo_buy= [0.1],
         reward_multiplier_combo_sell= [1000],
+        reward_multiplier_combo_direct= [0],
 
         # reward_multiplier_combo_sell_profit= [1000, 100, 10], #
         reward_multiplier_combo_sell_profit= [1000],

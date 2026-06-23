@@ -132,9 +132,10 @@ def test_build_model_config_maps_penalty_multipliers():
 
 
 def test_build_model_config_penalty_multipliers_default():
+    # combo_unified defaults BOTH penalties OFF (0) so a bare run ≡ the old combo_all (see build_model_config).
     config = config_builder.build_model_config({})
-    assert config.model_rl.reward_multiplier_combo_noop_penalty == 0.001
-    assert config.model_rl.reward_multiplier_combo_fee_penalty == 1.0
+    assert config.model_rl.reward_multiplier_combo_noop_penalty == 0.0
+    assert config.model_rl.reward_multiplier_combo_fee_penalty == 0.0
 
 
 def test_require_data_present_checks_the_selected_window(monkeypatch):
@@ -224,6 +225,7 @@ def test_build_env_config_defaults():
     assert env.no_sell_action is False
     assert env.position_sizing == "fixed"
     assert env.allow_shorting is False
+    assert env.position_mode == "long_only"
     assert list(env.observations_contain) == [
         "networth_percent_this_trade",
         "in_position",
@@ -256,7 +258,24 @@ def test_build_env_config_applies_levers_and_optional_float_zeroing():
     assert env.position_sizing == "vol_target"
     assert env.vol_window == 20
     assert env.allow_shorting is True
+    assert env.position_mode == "both"  # legacy allow_shorting=True derives "both"
     assert env.max_short_size == pytest.approx(0.5)
+
+
+def test_build_env_config_position_mode_is_authoritative_and_back_compatible():
+    # The 3-way position_mode lever drives both fields; legacy allow_shorting is the fallback.
+    long_only = config_builder.build_env_config({"position_mode": "long_only"})
+    assert long_only.position_mode == "long_only" and long_only.allow_shorting is False
+    short_only = config_builder.build_env_config({"position_mode": "short_only"})
+    assert short_only.position_mode == "short_only" and short_only.allow_shorting is True
+    both = config_builder.build_env_config({"position_mode": "both"})
+    assert both.position_mode == "both" and both.allow_shorting is True
+    # position_mode wins over a stale/contradictory allow_shorting.
+    pinned = config_builder.build_env_config({"position_mode": "long_only", "allow_shorting": True})
+    assert pinned.position_mode == "long_only" and pinned.allow_shorting is False
+    # legacy-only config (no position_mode) still derives the mode.
+    legacy = config_builder.build_env_config({"allow_shorting": False})
+    assert legacy.position_mode == "long_only"
 
 
 # --- build_model_config: the hodl baseline path ---

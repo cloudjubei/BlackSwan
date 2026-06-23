@@ -150,6 +150,38 @@ def _run_chart(env, lookback, trades):
     return {"price": ds_price, "markers": markers, "counts": counts}
 
 
+def _signal_noise(env, lookback):
+    """Out-of-position / redundant SIGNAL diagnostic: how much of the agent's non-hold output was a
+    no-op — a buy emitted while already long, a sell emitted while flat — that ``take_action`` refused,
+    so it never moved the book. A high ``blocked_signal_ratio`` means the raw action stream is unusable
+    as a standalone signal even when the EXECUTED trades are good (the model spams entries/exits it
+    cannot take). 'Executed' = the agent's own action moved the position (made AND not a forced TP/SL),
+    matching ``combo_noop_penalty``'s no-op definition so the metric measures exactly what that lever
+    penalizes."""
+    actions = [_action_int(a) for a in _live(getattr(env, "actions", []), lookback)]
+    if not actions:
+        return None
+    made = list(_live(getattr(env, "actions_made", []), lookback))
+    forced = [_action_int(f) for f in _live(getattr(env, "forced_actions", []), lookback)]
+    blocked = 0
+    executed = 0
+    for i, a in enumerate(actions):
+        if a == 0:
+            continue
+        agent_executed = (i < len(made) and bool(made[i])) and (forced[i] if i < len(forced) else 0) == 0
+        if agent_executed:
+            executed += 1
+        else:
+            blocked += 1
+    emitted = blocked + executed
+    return {
+        "blocked_signals": blocked,
+        "executed_signals": executed,
+        "blocked_signal_ratio": (blocked / emitted) if emitted else 0.0,
+        "signal_noise_pct": 100.0 * blocked / len(actions),
+    }
+
+
 def _benchmark(env, lookback):
     """Buy-and-hold control over the same live window — a display yardstick, NOT a reward target.
 
@@ -450,6 +482,13 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         # Provenance flag: this run's hold benchmark already nets out the round-trip fee, so the
         # viewer's one-time migration knows not to re-adjust it.
         metrics["hold_net_of_fees"] = True
+
+    # RL-only: the share of the agent's buy/sell output that was a no-op (a signal it couldn't act on).
+    # The headline number for "can I trust the raw signal stream?" — see _signal_noise.
+    if is_rl:
+        noise = _signal_noise(env, lookback)
+        if noise:
+            metrics.update(noise)
 
     series = {"equity": _downsample(equity)}
 

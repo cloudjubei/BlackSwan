@@ -9,6 +9,16 @@ import os
 
 # based on https://stable-baselines3.readthedocs.io/en/master/modules/base.html
 
+# RecurrentPPO-backed models (see model_factory): their LSTM hidden state MUST be threaded across
+# predict() calls at eval. Miss one and SB3 re-zeros the memory every step, so a model trained WITH
+# memory is evaluated WITHOUT it — a silent train/eval mismatch. "reppo-custom" was previously omitted.
+RECURRENT_MODEL_NAMES = ("reppo", "reppo-custom")
+
+
+def is_recurrent_model_name(model_name) -> bool:
+    return model_name in RECURRENT_MODEL_NAMES
+
+
 class RLModel(BaseRLModel):
     def __init__(self, config: ModelConfig, rl_model: BaseAlgorithm):
         super(RLModel, self).__init__(config)
@@ -39,7 +49,7 @@ class RLModel(BaseRLModel):
             progress.on_training_start({"total_timesteps": progress.num_timesteps}, {})
             self.progress = progress
 
-        if self.rl_config.model_name == "reppo":
+        if is_recurrent_model_name(self.rl_config.model_name):
             lstm_states = None
             num_envs = 1
             episode_starts = np.ones((num_envs,), dtype=bool)

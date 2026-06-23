@@ -270,6 +270,63 @@ def test_run_chart_counts_executed_and_attempts_authoritatively():
     assert counts.get("buy_attempt") == 1
 
 
+def test_blocked_signal_ratio_flags_out_of_position_noise():
+    # buy(open)@0, a no-op buy while already long@1, agent sell(close)@2, hold@3 → 2 executed, 1 blocked.
+    env = _FakeEnv(
+        net_worths=[100000, 110000, 120000, 120000],
+        actions=[1, 1, 2, 0],
+        prices=[100, 110, 120, 115],
+        positions=[1, 1, 0, 0],
+        actions_made=[True, False, True, False],
+        forced_actions=[0, 0, 0, 0],
+    )
+    out = summary_mod.build_summary(
+        env, _state(n_trades=1, win=100.0, total_profit=20000.0), _CFG, _FakeModel(), "2026-01-01T00:00:00Z", True
+    )
+    m = out["metrics"]
+    assert m["blocked_signals"] == 1
+    assert m["executed_signals"] == 2
+    assert m["blocked_signal_ratio"] == pytest.approx(1 / 3)
+    assert m["signal_noise_pct"] == pytest.approx(25.0)
+
+
+def test_blocked_signal_counts_forced_tpsl_close_as_an_agent_noop():
+    # buy@0 executes; @1 the agent emits a buy (no-op while long) but a forced TP/SL (2) does the close —
+    # the agent's own action was still a no-op, matching combo_noop_penalty's definition.
+    env = _FakeEnv(
+        net_worths=[100000, 110000, 100000],
+        actions=[1, 1, 0],
+        prices=[100, 110, 105],
+        positions=[1, 0, 0],
+        actions_made=[True, True, False],
+        forced_actions=[0, 2, 0],
+    )
+    out = summary_mod.build_summary(
+        env, _state(n_trades=1, win=100.0, total_profit=10000.0), _CFG, _FakeModel(), "2026-01-01T00:00:00Z", True
+    )
+    m = out["metrics"]
+    assert m["blocked_signals"] == 1
+    assert m["executed_signals"] == 1
+    assert m["blocked_signal_ratio"] == pytest.approx(0.5)
+
+
+def test_signal_noise_metrics_only_emitted_for_rl_runs():
+    env = _FakeEnv(
+        net_worths=[100000, 110000],
+        actions=[1, 2],
+        prices=[100, 110],
+        actions_made=[True, True],
+        forced_actions=[0, 0],
+    )
+    out = summary_mod.build_summary(env, _state(n_trades=1), _CFG, _FakeModel(), "2026-01-01T00:00:00Z", False)
+    assert "blocked_signal_ratio" not in out["metrics"]
+
+
+def test_signal_noise_empty_actions_is_none():
+    env = _FakeEnv(net_worths=[], actions=[], prices=[], actions_made=[], forced_actions=[])
+    assert summary_mod._signal_noise(env, 0) is None
+
+
 def test_run_chart_marks_short_and_cover():
     env = _FakeEnv(
         net_worths=[100000, 100000, 120000],

@@ -121,12 +121,12 @@
       "default": 0,
       "range": [
         0,
-        0.05
+        0.5
       ],
       "appliesWhen": {
         "reward_model": ["combo_unified"]
       },
-      "description": "The penalty subtracted each time the agent emits a NO-OP trade — a buy while ALREADY holding the asset, or a sell while holding cash (the action can't change the position). 0 = off (the default). The old combo_all_noop was this turned on (0.001). Sweep it to find how hard to discourage dead actions without suppressing real trades."
+      "description": "The penalty subtracted each time the agent emits a NO-OP trade — a buy while ALREADY holding the asset, or a sell while holding cash (the action can't change the position). 0 = off (the default). The old combo_all_noop was this turned on (0.001). It only bites RELATIVE to the trade reward (combo_sell): at the baked combo_sell=1000 a tiny penalty is washed out, so the range allows up to 0.5 and Exp 15 sweeps it AGAINST combo_sell. Sweep it to find how hard to discourage dead actions without suppressing real trades."
     },
     "combo_fee_penalty": {
       "type": "number",
@@ -459,7 +459,17 @@
     "allow_shorting": {
       "type": "boolean",
       "default": false,
-      "description": "Allow SHORT positions — adds short(3)/cover(4) so the action space becomes 5-way and the agent can profit when price FALLS (essential in down years where long-only can only sit out). Long-only behaviour is unchanged when off; short exits respect TP/SL (mirrored)."
+      "description": "Legacy shorting flag (superseded by position_mode). off = long-only, on = both. Kept for back-compat; position_mode wins when set."
+    },
+    "position_mode": {
+      "type": "choice",
+      "choices": [
+        "long_only",
+        "short_only",
+        "both"
+      ],
+      "default": "long_only",
+      "description": "Which directions the agent may TAKE. long_only = buy/close only (the historical default). short_only = short/cover only — long entries are ignored, so it can ONLY profit when price falls. both = long AND short (5-way action space). Sweep all three to test long-only vs short-only vs both as a hypothesis; short exits respect TP/SL (mirrored)."
     },
     "device": {
       "type": "choice",
@@ -603,8 +613,8 @@
       "thesisTarget": "walk_forward_window"
     },
     {
-      "label": "▶ Exp 7 · Shorting on/off (1h winner)",
-      "sweep": { "allow_shorting": [false, true] },
+      "label": "▶ Exp 7 · Long-only vs short-only vs both (1h winner)",
+      "sweep": { "position_mode": ["long_only", "short_only", "both"] },
       "fixed": {
         "timeframe": "1h",
         "model_name": "reppo-custom",
@@ -620,8 +630,8 @@
         "device": "cpu"
       },
       "seeds": 3,
-      "thesis": "does enabling short positions beat long-only (esp. in down windows)?",
-      "thesisTarget": "allow_shorting"
+      "thesis": "long-only vs short-only vs both — which direction policy beats buy-and-hold OOS (esp. in down windows)?",
+      "thesisTarget": "position_mode"
     },
     {
       "label": "▶ Exp 8 · Vol-targeted sizing (1h winner)",
@@ -776,13 +786,22 @@
       "thesisTarget": "model_name"
     },
     {
-      "label": "▶ Exp 15 · No-op penalty sweep (combo_noop_penalty strength)",
+      "label": "▶ Exp 15 · No-op / wrong-action penalty × reward-scale sweep",
       "sweep": {
         "combo_noop_penalty": [
           0,
-          0.001,
-          0.005,
-          0.02
+          0.02,
+          0.1,
+          0.5
+        ],
+        "combo_sell": [
+          1000,
+          100,
+          1
+        ],
+        "combo_wrongaction": [
+          0,
+          -1
         ]
       },
       "fixed": {
@@ -800,7 +819,7 @@
         "device": "cpu"
       },
       "seeds": 3,
-      "thesis": "how hard should no-op buys/sells (buy while already long, sell while holding cash) be penalized? 0 = off (≈ combo_all) up to a strong penalty.",
+      "thesis": "Out-of-position and redundant signals are reward-INDIFFERENT under combo_unified: with combo_noop_penalty / combo_wrongaction / combo_noaction all 0, a hold, a blocked-buy (buy while long) and a blocked-sell (sell while flat) earn identical reward, so the deterministic eval policy emits junk there (blocked_signal_ratio ~0.95 even on great-return runs). Hypothesis: enabling combo_noop_penalty and/or combo_wrongaction drives blocked_signal_ratio toward 0 WITHOUT collapsing traded_return — and the effect is GATED BY REWARD SCALE (a penalty up to 0.5 is dwarfed by combo_sell=1000, so it should only bite as combo_sell shrinks toward 1). Falsified if suppressing the noise also kills returns everywhere, or if no in-range penalty moves blocked_signal_ratio at any combo_sell.",
       "thesisTarget": "combo_noop_penalty"
     },
     {
@@ -1605,219 +1624,188 @@
       "source": "manual"
     }
   ],
-  "hypotheses": [
+  "models": [
     {
-      "title": "Attn-PPO — self-attention over the lookback",
-      "rationale": "The cheapest genuinely-new sequence capability: lets the policy weight a few salient bars position-independently. Honest ceiling: parity-to-slightly-better Sharpe vs the tuned LSTM (reppo), not a regime oracle. Best used as an A/B + variance-reduction diagnostic. · PPO + SequenceFeaturesExtractor(encoder=attn) · 1-block self-attention (d_model 48, 2 heads, learned positional) → mean-pool → 64 → policy MLP · Reshapes the flat obs to its [lookback, per_bar] bar grid and runs TRUE temporal self-attention over the bars (the custom_net_arch attention tokens run on the flat vector — this is the real thing)",
-      "spec": {
-        "fixed": {
-          "model_name": "attn-ppo"
-        }
-      },
-      "tags": [
-        "rl",
-        "ppo",
-        "self-attention",
-        "transformer",
-        "sequence-extractor",
-        "modern-arch",
-        "ab-vs-lstm"
-      ],
+      "id": "reppo-custom",
+      "slug": "reppo-custom",
+      "name": "Recurrent PPO (custom LSTM)",
+      "description": "On-policy PPO with an LSTM that carries state across bars plus a regularised custom actor-critic head. The default/winner and the closest practical realisation of direct/recurrent RL on a risk-adjusted utility.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["reppo-custom"],
+      "implPath": "src/model/custom/policies.py",
+      "paperIds": ["moody-saffell-rrl-2001", "borrageiro-rrl-crypto-2022", "lim-deep-momentum-2019"],
       "source": "manual"
     },
     {
-      "title": "TCN-PPO — dilated causal conv over the lookback",
-      "rationale": "Strongest fit for this stack — reuses weight-norm / dropout / residual ideas, trains in parallel (no BPTT), causal padding = no leakage. A cheaper / lower-variance swap to TEST whether the edge is architecture- or signal-limited (probably signal). · PPO + SequenceFeaturesExtractor(encoder=tcn) · 4 dilated causal residual conv blocks (channels 24, kernel 3, weight-norm + dropout) → pool → 64 → policy MLP · Reshapes to the bar grid, transposes to [features, bars], applies a Bai-style TCN (causal left-pad, no lookahead) over the lookback; parallel, parameter-efficient, stable gradients",
-      "spec": {
-        "fixed": {
-          "model_name": "tcn-ppo"
-        }
-      },
-      "tags": [
-        "rl",
-        "ppo",
-        "tcn",
-        "dilated-causal-conv",
-        "sequence-extractor",
-        "modern-arch",
-        "ab-vs-lstm"
-      ],
+      "id": "ppo-custom",
+      "slug": "ppo-custom",
+      "name": "PPO (custom head)",
+      "description": "Clipped-surrogate on-policy PPO with the custom regularised actor-critic head (no recurrence).",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["ppo-custom"],
+      "implPath": "src/model/custom/policies.py",
+      "paperIds": ["jiang-portfolio-drl-2017"],
       "source": "manual"
     },
     {
-      "title": "Reppo-custom — recurrent PPO (default)",
-      "rationale": "The project default and most-cited winner: on-policy recurrent PPO whose LSTM carries state across bars, with a regularised custom head. Strong in pre-v3 runs (~+50%); re-prove under v3 walk-forward at 0.1% fees. · RecurrentPPO (sb3-contrib) · 512,64 + custom_net_arch tokens (BatchNorm1d · weight_norm · Dropout) · LSTM recurrent encoder + a custom actor-critic head (CustomRecurrentActorCriticPolicy)",
-      "spec": {
-        "fixed": {
-          "model_name": "reppo-custom"
-        }
-      },
-      "tags": [
-        "rl",
-        "on-policy",
-        "recurrent",
-        "lstm",
-        "ppo",
-        "custom-head",
-        "default"
-      ],
+      "id": "duel-dqn-custom",
+      "slug": "duel-dqn-custom",
+      "name": "Dueling DQN (custom)",
+      "description": "Off-policy Q-learning with separate value + advantage streams over the custom regularised head, replay buffer + target network.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["duel-dqn-custom"],
+      "implPath": "src/model/dueling_dqn/dueling_dqn.py",
       "source": "manual"
     },
     {
-      "title": "TRPO-custom — trust-region PG",
-      "rationale": "On-policy PG with a KL trust region for stable updates — a frequent runner-up to reppo in pre-v3 runs. Non-recurrent; tests whether the LSTM is what matters. · TRPO (sb3-contrib) · 512,64 / 512,128,32 + custom_net_arch tokens · Trust-region policy gradient (KL-constrained updates) + custom actor-critic head (CustomActorCriticPolicy)",
-      "spec": {
-        "fixed": {
-          "model_name": "trpo-custom"
-        }
-      },
-      "tags": [
-        "rl",
-        "on-policy",
-        "trpo",
-        "trust-region",
-        "custom-head"
-      ],
+      "id": "duel-dqn-custom-lstm",
+      "slug": "duel-dqn-custom-lstm",
+      "name": "Dueling DQN (custom + LSTM)",
+      "description": "Custom dueling DQN with an LSTM features-extractor over the observation window.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["duel-dqn-custom-lstm"],
+      "implPath": "src/model/dqn_lstm_policy.py",
+      "paperIds": ["lim-deep-momentum-2019"],
       "source": "manual"
     },
     {
-      "title": "PPO-custom — clipped PG",
-      "rationale": "The vanilla on-policy workhorse with the custom head; baseline for the reppo/trpo comparison (clip vs trust-region vs recurrent). · PPO (stable-baselines3) · 512,64 + custom_net_arch tokens · Clipped-surrogate policy gradient + custom actor-critic head (CustomActorCriticPolicy)",
-      "spec": {
-        "fixed": {
-          "model_name": "ppo-custom"
-        }
-      },
-      "tags": [
-        "rl",
-        "on-policy",
-        "ppo",
-        "custom-head"
-      ],
+      "id": "munchausen-dqn-custom",
+      "slug": "munchausen-dqn-custom",
+      "name": "Munchausen DQN (custom)",
+      "description": "DQN augmented with the Munchausen term (a scaled log-policy bonus added to the reward) over the custom regularised Q-network — implicit KL-regularised policy iteration.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["munchausen-dqn-custom"],
+      "implPath": "src/model/munchhausen_dqn/munchhausen_dqn.py",
       "source": "manual"
     },
     {
-      "title": "Dueling-DQN-custom — value/advantage heads",
-      "rationale": "The strongest off-policy family in pre-v3 runs (~+30-60%, high win-rate). Dueling heads separate 'how good is this state' from 'how good is each action' — useful when most actions are similar. · DuelingDQN (custom) · 512,256,64,32 + custom_net_arch tokens · Off-policy Q-learning with separate value + advantage streams (CustomDuelingDQNPolicy), replay buffer + target network",
-      "spec": {
-        "fixed": {
-          "model_name": "duel-dqn-custom"
-        }
-      },
-      "tags": [
-        "rl",
-        "off-policy",
-        "dqn",
-        "dueling",
-        "replay",
-        "custom-head"
-      ],
+      "id": "rainbow-dqn-custom",
+      "slug": "rainbow-dqn-custom",
+      "name": "Rainbow DQN (custom)",
+      "description": "DQN with prioritized experience replay (importance-weighted TD-error sampling), NoisyNet exploration, dueling streams and distributional quantiles over the custom head.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["rainbow-dqn-custom"],
+      "implPath": "src/model/rainbow_dqn/rainbow_dqn.py",
       "source": "manual"
     },
     {
-      "title": "Dueling-DQN-custom-LSTM — recurrent dueling",
-      "rationale": "Adds recurrence to the dueling-DQN winner — tests whether sequence memory helps the off-policy family as the LSTM seems to help reppo. · DuelingDQN (custom, recurrent) · 512,256,64,32 + custom_net_arch tokens · Dueling DQN with an LSTM encoder over the lookback window (CustomDuelingDQNPolicy, recurrent variant)",
-      "spec": {
-        "fixed": {
-          "model_name": "duel-dqn-custom-lstm"
-        }
-      },
-      "tags": [
-        "rl",
-        "off-policy",
-        "dqn",
-        "dueling",
-        "recurrent",
-        "lstm"
-      ],
+      "id": "dqn",
+      "slug": "dqn",
+      "name": "DQN",
+      "description": "Plain deep Q-network (replay buffer + target net), the baseline value-based RL arm.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["dqn"],
+      "paperIds": ["theate-ernst-tdqn-2021", "zhang-zohren-roberts-drl-2020"],
       "source": "manual"
     },
     {
-      "title": "Munchausen-DQN-custom — log-policy bonus",
-      "rationale": "Munchausen-RL implicitly does KL-regularised policy iteration and often improves DQN sample-efficiency/stability — worth re-testing under v3 against plain dueling-DQN. · MunchausenDQN (custom) · 512,64 + custom_net_arch tokens · DQN augmented with the Munchausen term (adds a scaled log-policy bonus to the reward) over a CustomDQNPolicy",
-      "spec": {
-        "fixed": {
-          "model_name": "munchausen-dqn-custom"
-        }
-      },
-      "tags": [
-        "rl",
-        "off-policy",
-        "dqn",
-        "munchausen",
-        "entropy-regularised"
-      ],
+      "id": "ppo",
+      "slug": "ppo",
+      "name": "PPO",
+      "description": "Stock SB3 PPO with an MLP policy (no custom internals) — the vanilla on-policy reference.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["ppo"],
       "source": "manual"
     },
     {
-      "title": "QR-DQN-custom — distributional",
-      "rationale": "Modelling the full return distribution can help under heavy-tailed crypto returns (risk-aware action values). Tests whether distributional RL beats expectation-based DQN here. · QRDQN (sb3-contrib) · 512,64 + custom_net_arch tokens · Distributional Q-learning: predicts a quantile distribution of returns rather than a point estimate (CustomQRDQNPolicy)",
-      "spec": {
-        "fixed": {
-          "model_name": "qrdqn-custom"
-        }
-      },
-      "tags": [
-        "rl",
-        "off-policy",
-        "dqn",
-        "distributional",
-        "quantile-regression"
-      ],
+      "id": "attn-ppo",
+      "slug": "attn-ppo",
+      "name": "Attention-PPO",
+      "description": "PPO over a true sequence features-extractor: single-block self-attention with a learned positional embedding over the reshaped bar grid (vs reppo's LSTM).",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["attn-ppo"],
+      "implPath": "src/model/custom/sequence_extractor.py",
+      "paperIds": ["dlinear-transformers-effective-2023", "hf-transformers-effective-tsf-2023"],
       "source": "manual"
     },
     {
-      "title": "DQN (vanilla baseline)",
-      "rationale": "The un-customised off-policy baseline — the control that shows how much the '-custom' policy internals (dueling/Munchausen/QR/LSTM/regularised head) actually add. · DQN (stable-baselines3) · MlpPolicy default (e.g. 512,64) · Plain deep Q-network, MlpPolicy, replay buffer + target net — no dueling/distributional/Munchausen extras",
-      "spec": {
-        "fixed": {
-          "model_name": "dqn"
-        }
-      },
-      "tags": [
-        "rl",
-        "off-policy",
-        "dqn",
-        "baseline",
-        "vanilla"
-      ],
+      "id": "supervised-logreg",
+      "slug": "supervised-logreg",
+      "name": "Supervised (logistic regression)",
+      "description": "Non-RL control: a logistic-regression classifier predicts next-bar direction from the same features and a fixed rule trades on it through the unchanged environment.",
+      "category": "supervised",
+      "status": "implemented",
+      "modelNames": ["supervised-logreg"],
+      "implPath": "src/model/supervised_model.py",
+      "paperIds": ["bysik-slepaczuk-btc-costs-2026"],
       "source": "manual"
     },
     {
-      "title": "Supervised + rules (logreg / gbm)",
-      "rationale": "The decisive 'is RL even the right tool?' control — research favours supervised prediction + rules for single-asset trading. If this matches or beats the RL family OOS, the RL complexity isn't earning its keep. · scikit-learn LogisticRegression / HistGradientBoostingClassifier · n/a (linear model / gradient-boosted trees) · Predicts next-bar direction from the SAME features the RL agent sees; a fixed rule trades on P(up) > threshold; exits via env TP/SL. NOT reinforcement learning.",
-      "spec": {
-        "sweep": {
-          "model_name": [
-            "supervised-logreg",
-            "supervised-gbm"
-          ]
-        }
-      },
-      "tags": [
-        "supervised",
-        "non-rl",
-        "baseline",
-        "rules",
-        "control",
-        "decisive"
-      ],
+      "id": "supervised-gbm",
+      "slug": "supervised-gbm",
+      "name": "Supervised (gradient-boosted trees)",
+      "description": "Non-RL control: a gradient-boosted-tree classifier (the decisive 'is RL even the right tool?' baseline) forecasting next-bar direction.",
+      "category": "supervised",
+      "status": "implemented",
+      "modelNames": ["supervised-gbm"],
+      "implPath": "src/model/supervised_model.py",
+      "paperIds": ["bysik-slepaczuk-btc-costs-2026", "grinsztajn-trees-tabular-2022"],
       "source": "manual"
     },
     {
-      "title": "Buy & hold (control)",
-      "rationale": "The benchmark every active model must beat OUT-OF-SAMPLE net of fees. In a strong-trend year this bar is high; a model that only matches hodl has earned nothing. · n/a (passive) · n/a · Buys at the first bar, holds to the end — no learning, no trading.",
-      "spec": {
-        "fixed": {
-          "model_name": "hodl"
-        }
-      },
-      "tags": [
-        "control",
-        "benchmark",
-        "passive",
-        "buy-and-hold"
-      ],
+      "id": "hodl",
+      "slug": "hodl",
+      "name": "Buy-and-Hold",
+      "description": "Passive control — buys at the first bar and holds to the end; the benchmark every active model must beat out-of-sample net of fees.",
+      "category": "baseline",
+      "status": "implemented",
+      "modelNames": ["hodl"],
+      "implPath": "src/model/hodl_model.py",
+      "paperIds": ["moskowitz-tsmom-2012"],
+      "source": "manual"
+    },
+    {
+      "id": "agent57",
+      "slug": "agent57",
+      "name": "Agent57",
+      "description": "DQN with an Agent57-style intrinsic-reward exploration buffer (count-based + prediction-error + episodic-memory novelty). Implemented in code but not in the active sweep set.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["agent57"],
+      "implPath": "src/model/custom/agent57/agent57.py",
+      "source": "manual"
+    },
+    {
+      "id": "iqn",
+      "slug": "iqn",
+      "name": "Implicit Quantile Network (IQN)",
+      "description": "Distributional RL that samples implicit quantiles of the return distribution (quantile-Huber loss); a custom-head variant also exists. Implemented in code but not in the active sweep set.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["iqn", "iqn-custom"],
+      "implPath": "src/model/iqn/iqn.py",
+      "source": "manual"
+    },
+    {
+      "id": "ensemble",
+      "slug": "ensemble",
+      "name": "Ensemble (4× Dueling DQN)",
+      "description": "A bagged ensemble of four custom dueling-DQN agents with averaged predictions. Implemented in code but not in the active sweep set.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": ["ensemble"],
+      "implPath": "src/model/custom/ensemble/ensemble.py",
+      "source": "manual"
+    },
+    {
+      "id": "itransformer-ppo",
+      "slug": "itransformer-ppo",
+      "name": "iTransformer sequence encoder (PPO)",
+      "description": "PROPOSED: an inverted-attention (iTransformer-style) sequence encoder as a third SequenceFeaturesExtractor variant to A/B against attn-ppo and tcn-ppo.",
+      "category": "rl",
+      "status": "proposed",
+      "modelNames": [],
+      "proposal": "Add an iTransformer-style inverted-attention encoder to src/model/custom/sequence_extractor.py and expose it as an `itransformer-ppo` model_name, then A/B it against attn-ppo/tcn-ppo under walk-forward + fees.",
+      "paperIds": ["dlinear-transformers-effective-2023", "hf-transformers-effective-tsf-2023"],
       "source": "manual"
     }
   ],

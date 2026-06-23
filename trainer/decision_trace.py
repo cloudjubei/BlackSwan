@@ -21,6 +21,7 @@ import json
 
 import numpy as np
 
+from src.model.rl_model import is_recurrent_model_name
 from trainer import summary as summary_mod
 
 # Action integer → generic label. The env encodes 0=hold, 1=buy(open long), 2=sell(close long),
@@ -409,7 +410,7 @@ def replay_enrichment(
     if rl_model is None or not hasattr(rl_model, "predict"):
         return None
 
-    recurrent = getattr(getattr(model, "rl_config", None), "model_name", None) == "reppo"
+    recurrent = is_recurrent_model_name(getattr(getattr(model, "rl_config", None), "model_name", None))
     obs, _ = env.reset()
     enrichment = []
     saliency_sum = None
@@ -576,7 +577,7 @@ def _latent_map(env, model):
     handle = last_linear.register_forward_pre_hook(hook)
     rows, actions = [], []
     try:
-        recurrent = getattr(getattr(model, "rl_config", None), "model_name", None) == "reppo"
+        recurrent = is_recurrent_model_name(getattr(getattr(model, "rl_config", None), "model_name", None))
         obs, _ = env.reset()
         lstm_states = None
         episode_starts = np.ones((1,), dtype=bool)

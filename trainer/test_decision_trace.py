@@ -352,6 +352,33 @@ def test_replay_enrichment_without_attribution_has_no_saliency():
     assert attribution is None
 
 
+class _RecordingRL:
+    """Records the kwargs each predict() call receives — to prove the recurrent branch threads lstm
+    state. Returns hold (0) so the attribution path (which needs a real policy) is skipped."""
+
+    def __init__(self):
+        self.calls = []
+
+    def predict(self, obs, deterministic=True, **kwargs):
+        self.calls.append(kwargs)
+        return np.array([0]), kwargs.get("state")
+
+
+def test_replay_enrichment_threads_lstm_state_for_reppo_custom():
+    rl = _RecordingRL()
+    model = types.SimpleNamespace(rl_model=rl, rl_config=types.SimpleNamespace(model_name="reppo-custom"))
+    dt.replay_enrichment(_ReplayEnv([[0, 0], [0, 0], [0, 0]]), model, want_attribution=False)
+    assert len(rl.calls) == 3
+    assert all("state" in c and "episode_start" in c for c in rl.calls)
+
+
+def test_replay_enrichment_omits_lstm_state_for_non_recurrent():
+    rl = _RecordingRL()
+    model = types.SimpleNamespace(rl_model=rl, rl_config=types.SimpleNamespace(model_name="dqn"))
+    dt.replay_enrichment(_ReplayEnv([[0, 0], [0, 0]]), model, want_attribution=False)
+    assert all("state" not in c for c in rl.calls)
+
+
 # --- Adebayo model-randomization sanity check --------------------------------
 
 

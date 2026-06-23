@@ -11,7 +11,7 @@ import os
 import numpy as np
 
 from src.conf.model_config import ModelConfig, ModelRLConfig
-from src.model.rl_model import RLModel
+from src.model.rl_model import RLModel, is_recurrent_model_name
 
 
 # --- fakes -----------------------------------------------------------------
@@ -126,6 +126,26 @@ def test_test_reppo_branch_uses_recurrent_predict():
     assert sb3.predict_calls[1]["state"] == "lstm"
     # episode_start begins as a True-filled array.
     assert bool(np.all(sb3.predict_calls[0]["episode_start"]))
+
+
+def test_test_reppo_custom_branch_uses_recurrent_predict():
+    # 'reppo-custom' is ALSO RecurrentPPO (model_factory) — it must thread lstm state at eval, not run
+    # memoryless. Regression for the bug where only the bare 'reppo' name took the recurrent branch.
+    sb3 = _FakeSB3(action=1)
+    m = _rl_model(sb3, model_name="reppo-custom")
+    env = _FakeEnv(3)
+    m.test(env, deterministic=True, progress_bar=False)
+    assert len(env.actions) == 3
+    assert sb3.predict_calls[0]["state"] is None
+    assert sb3.predict_calls[1]["state"] == "lstm"
+    assert bool(np.all(sb3.predict_calls[0]["episode_start"]))
+
+
+def test_is_recurrent_model_name_covers_both_reppo_variants():
+    assert is_recurrent_model_name("reppo")
+    assert is_recurrent_model_name("reppo-custom")
+    assert not is_recurrent_model_name("dqn")
+    assert not is_recurrent_model_name(None)
 
 
 # --- predict / predictOnline action remapping ------------------------------
