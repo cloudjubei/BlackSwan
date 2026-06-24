@@ -1632,87 +1632,48 @@
       "description": "On-policy PPO with an LSTM that carries state across bars plus a regularised custom actor-critic head. The default/winner and the closest practical realisation of direct/recurrent RL on a risk-adjusted utility.",
       "category": "rl",
       "status": "implemented",
-      "modelNames": ["reppo-custom"],
+      "modelNames": [
+        "reppo-custom",
+        "reppo"
+      ],
       "implPath": "src/model/custom/policies.py",
-      "paperIds": ["moody-saffell-rrl-2001", "borrageiro-rrl-crypto-2022", "lim-deep-momentum-2019"],
-      "source": "manual"
-    },
-    {
-      "id": "ppo-custom",
-      "slug": "ppo-custom",
-      "name": "PPO (custom head)",
-      "description": "Clipped-surrogate on-policy PPO with the custom regularised actor-critic head (no recurrence).",
-      "category": "rl",
-      "status": "implemented",
-      "modelNames": ["ppo-custom"],
-      "implPath": "src/model/custom/policies.py",
-      "paperIds": ["jiang-portfolio-drl-2017"],
-      "source": "manual"
-    },
-    {
-      "id": "duel-dqn-custom",
-      "slug": "duel-dqn-custom",
-      "name": "Dueling DQN (custom)",
-      "description": "Off-policy Q-learning with separate value + advantage streams over the custom regularised head, replay buffer + target network.",
-      "category": "rl",
-      "status": "implemented",
-      "modelNames": ["duel-dqn-custom"],
-      "implPath": "src/model/dueling_dqn/dueling_dqn.py",
-      "source": "manual"
-    },
-    {
-      "id": "duel-dqn-custom-lstm",
-      "slug": "duel-dqn-custom-lstm",
-      "name": "Dueling DQN (custom + LSTM)",
-      "description": "Custom dueling DQN with an LSTM features-extractor over the observation window.",
-      "category": "rl",
-      "status": "implemented",
-      "modelNames": ["duel-dqn-custom-lstm"],
-      "implPath": "src/model/dqn_lstm_policy.py",
-      "paperIds": ["lim-deep-momentum-2019"],
-      "source": "manual"
-    },
-    {
-      "id": "munchausen-dqn-custom",
-      "slug": "munchausen-dqn-custom",
-      "name": "Munchausen DQN (custom)",
-      "description": "DQN augmented with the Munchausen term (a scaled log-policy bonus added to the reward) over the custom regularised Q-network — implicit KL-regularised policy iteration.",
-      "category": "rl",
-      "status": "implemented",
-      "modelNames": ["munchausen-dqn-custom"],
-      "implPath": "src/model/munchhausen_dqn/munchhausen_dqn.py",
-      "source": "manual"
-    },
-    {
-      "id": "rainbow-dqn-custom",
-      "slug": "rainbow-dqn-custom",
-      "name": "Rainbow DQN (custom)",
-      "description": "DQN with prioritized experience replay (importance-weighted TD-error sampling), NoisyNet exploration, dueling streams and distributional quantiles over the custom head.",
-      "category": "rl",
-      "status": "implemented",
-      "modelNames": ["rainbow-dqn-custom"],
-      "implPath": "src/model/rainbow_dqn/rainbow_dqn.py",
-      "source": "manual"
-    },
-    {
-      "id": "dqn",
-      "slug": "dqn",
-      "name": "DQN",
-      "description": "Plain deep Q-network (replay buffer + target net), the baseline value-based RL arm.",
-      "category": "rl",
-      "status": "implemented",
-      "modelNames": ["dqn"],
-      "paperIds": ["theate-ernst-tdqn-2021", "zhang-zohren-roberts-drl-2020"],
+      "paperIds": [
+        "moody-saffell-rrl-2001",
+        "borrageiro-rrl-crypto-2022",
+        "lim-deep-momentum-2019"
+      ],
       "source": "manual"
     },
     {
       "id": "ppo",
       "slug": "ppo",
       "name": "PPO",
-      "description": "Stock SB3 PPO with an MLP policy (no custom internals) — the vanilla on-policy reference.",
+      "description": "Proximal Policy Optimization (clipped surrogate, on-policy). Covers the stock SB3 MLP policy, the custom regularised actor-critic head (ppo-custom), and the JAX/SBX build.",
       "category": "rl",
       "status": "implemented",
-      "modelNames": ["ppo"],
+      "modelNames": [
+        "ppo",
+        "ppo-custom",
+        "ppo-sbx"
+      ],
+      "implPath": "src/model/custom/policies.py",
+      "paperIds": [
+        "jiang-portfolio-drl-2017"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "trpo-custom",
+      "slug": "trpo-custom",
+      "name": "TRPO",
+      "description": "Trust-region (KL-constrained) policy gradient; covers the custom-head and stock-MLP variants.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": [
+        "trpo-custom",
+        "trpo"
+      ],
+      "implPath": "src/model/custom/policies.py",
       "source": "manual"
     },
     {
@@ -1722,9 +1683,124 @@
       "description": "PPO over a true sequence features-extractor: single-block self-attention with a learned positional embedding over the reshaped bar grid (vs reppo's LSTM).",
       "category": "rl",
       "status": "implemented",
-      "modelNames": ["attn-ppo"],
+      "modelNames": [
+        "attn-ppo"
+      ],
       "implPath": "src/model/custom/sequence_extractor.py",
-      "paperIds": ["dlinear-transformers-effective-2023", "hf-transformers-effective-tsf-2023"],
+      "paperIds": [
+        "dlinear-transformers-effective-2023",
+        "hf-transformers-effective-tsf-2023"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "dqn",
+      "slug": "dqn",
+      "name": "DQN",
+      "description": "Deep Q-network (replay buffer + target net). Covers the stock MLP policy, the custom head, the LSTM features-extractor variant, and the JAX/SBX build.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": [
+        "dqn",
+        "dqn-custom",
+        "dqn-lstm",
+        "dqn-sbx"
+      ],
+      "paperIds": [
+        "theate-ernst-tdqn-2021",
+        "zhang-zohren-roberts-drl-2020"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "duel-dqn-custom",
+      "slug": "duel-dqn-custom",
+      "name": "Dueling DQN",
+      "description": "Off-policy Q-learning with separate value + advantage streams. Consolidates every dueling variant: custom head, the LSTM features-extractor flavours (hidden 2/3/4), and the stock dueling policy.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": [
+        "duel-dqn-custom",
+        "duel-dqn",
+        "duel-dqn-custom-lstm",
+        "duel-dqn-custom-lstm3",
+        "duel-dqn-lstm"
+      ],
+      "implPath": "src/model/dueling_dqn/dueling_dqn.py",
+      "paperIds": [
+        "lim-deep-momentum-2019"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "munchausen-dqn-custom",
+      "slug": "munchausen-dqn-custom",
+      "name": "Munchausen DQN",
+      "description": "DQN augmented with the Munchausen term (a scaled log-policy bonus added to the reward) \u2014 implicit KL-regularised policy iteration. Consolidates the plain, custom-head, and dueling+LSTM Munchausen variants.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": [
+        "munchausen-dqn-custom",
+        "munchausen-dqn",
+        "munchausen-duel-dqn-custom",
+        "munchausen-duel-dqn-custom-lstm"
+      ],
+      "implPath": "src/model/munchhausen_dqn/munchhausen_dqn.py",
+      "source": "manual"
+    },
+    {
+      "id": "rainbow-dqn-custom",
+      "slug": "rainbow-dqn-custom",
+      "name": "Rainbow DQN",
+      "description": "DQN with prioritized experience replay, NoisyNet exploration, dueling streams and distributional quantiles. Consolidates the custom head, the SB3-subclass, and the legacy standalone Rainbow agent.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": [
+        "rainbow-dqn-custom",
+        "rainbow-dqn",
+        "rainbow-dqn-old"
+      ],
+      "implPath": "src/model/rainbow_dqn/rainbow_dqn.py",
+      "source": "manual"
+    },
+    {
+      "id": "iqn",
+      "slug": "iqn",
+      "name": "Implicit Quantile Network (IQN)",
+      "description": "Distributional RL that samples implicit quantiles of the return distribution (quantile-Huber loss); covers the stock and custom-quantile-network variants. Implemented in code, not in the active sweep set.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": [
+        "iqn",
+        "iqn-custom"
+      ],
+      "implPath": "src/model/iqn/iqn.py",
+      "source": "manual"
+    },
+    {
+      "id": "agent57",
+      "slug": "agent57",
+      "name": "Agent57",
+      "description": "DQN with an Agent57-style intrinsic-reward exploration buffer (count-based + prediction-error + episodic-memory novelty). Implemented in code, not in the active sweep set.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": [
+        "agent57"
+      ],
+      "implPath": "src/model/custom/agent57/agent57.py",
+      "source": "manual"
+    },
+    {
+      "id": "ensemble",
+      "slug": "ensemble",
+      "name": "Ensemble (4x Dueling DQN)",
+      "description": "A bagged ensemble of four custom dueling-DQN agents with averaged predictions. Implemented in code, not in the active sweep set.",
+      "category": "rl",
+      "status": "implemented",
+      "modelNames": [
+        "ensemble"
+      ],
+      "implPath": "src/model/custom/ensemble/ensemble.py",
       "source": "manual"
     },
     {
@@ -1734,9 +1810,13 @@
       "description": "Non-RL control: a logistic-regression classifier predicts next-bar direction from the same features and a fixed rule trades on it through the unchanged environment.",
       "category": "supervised",
       "status": "implemented",
-      "modelNames": ["supervised-logreg"],
+      "modelNames": [
+        "supervised-logreg"
+      ],
       "implPath": "src/model/supervised_model.py",
-      "paperIds": ["bysik-slepaczuk-btc-costs-2026"],
+      "paperIds": [
+        "bysik-slepaczuk-btc-costs-2026"
+      ],
       "source": "manual"
     },
     {
@@ -1746,54 +1826,30 @@
       "description": "Non-RL control: a gradient-boosted-tree classifier (the decisive 'is RL even the right tool?' baseline) forecasting next-bar direction.",
       "category": "supervised",
       "status": "implemented",
-      "modelNames": ["supervised-gbm"],
+      "modelNames": [
+        "supervised-gbm"
+      ],
       "implPath": "src/model/supervised_model.py",
-      "paperIds": ["bysik-slepaczuk-btc-costs-2026", "grinsztajn-trees-tabular-2022"],
+      "paperIds": [
+        "bysik-slepaczuk-btc-costs-2026",
+        "grinsztajn-trees-tabular-2022"
+      ],
       "source": "manual"
     },
     {
       "id": "hodl",
       "slug": "hodl",
       "name": "Buy-and-Hold",
-      "description": "Passive control — buys at the first bar and holds to the end; the benchmark every active model must beat out-of-sample net of fees.",
+      "description": "Passive control - buys at the first bar and holds to the end; the benchmark every active model must beat out-of-sample net of fees.",
       "category": "baseline",
       "status": "implemented",
-      "modelNames": ["hodl"],
+      "modelNames": [
+        "hodl"
+      ],
       "implPath": "src/model/hodl_model.py",
-      "paperIds": ["moskowitz-tsmom-2012"],
-      "source": "manual"
-    },
-    {
-      "id": "agent57",
-      "slug": "agent57",
-      "name": "Agent57",
-      "description": "DQN with an Agent57-style intrinsic-reward exploration buffer (count-based + prediction-error + episodic-memory novelty). Implemented in code but not in the active sweep set.",
-      "category": "rl",
-      "status": "implemented",
-      "modelNames": ["agent57"],
-      "implPath": "src/model/custom/agent57/agent57.py",
-      "source": "manual"
-    },
-    {
-      "id": "iqn",
-      "slug": "iqn",
-      "name": "Implicit Quantile Network (IQN)",
-      "description": "Distributional RL that samples implicit quantiles of the return distribution (quantile-Huber loss); a custom-head variant also exists. Implemented in code but not in the active sweep set.",
-      "category": "rl",
-      "status": "implemented",
-      "modelNames": ["iqn", "iqn-custom"],
-      "implPath": "src/model/iqn/iqn.py",
-      "source": "manual"
-    },
-    {
-      "id": "ensemble",
-      "slug": "ensemble",
-      "name": "Ensemble (4× Dueling DQN)",
-      "description": "A bagged ensemble of four custom dueling-DQN agents with averaged predictions. Implemented in code but not in the active sweep set.",
-      "category": "rl",
-      "status": "implemented",
-      "modelNames": ["ensemble"],
-      "implPath": "src/model/custom/ensemble/ensemble.py",
+      "paperIds": [
+        "moskowitz-tsmom-2012"
+      ],
       "source": "manual"
     },
     {
@@ -1805,7 +1861,10 @@
       "status": "proposed",
       "modelNames": [],
       "proposal": "Add an iTransformer-style inverted-attention encoder to src/model/custom/sequence_extractor.py and expose it as an `itransformer-ppo` model_name, then A/B it against attn-ppo/tcn-ppo under walk-forward + fees.",
-      "paperIds": ["dlinear-transformers-effective-2023", "hf-transformers-effective-tsf-2023"],
+      "paperIds": [
+        "dlinear-transformers-effective-2023",
+        "hf-transformers-effective-tsf-2023"
+      ],
       "source": "manual"
     }
   ],

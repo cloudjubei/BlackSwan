@@ -20,14 +20,11 @@ class EnvConfig:
     vol_target: float = 0.02
     vol_target_min: float = 0.1
     vol_window: int = 10
-    # Shorting: when enabled the action space gains short(3)/cover(4) and positions may go
-    # negative; long-only behaviour is unchanged when False.
+    # Shorting is an ENVIRONMENT property — what the action space ALLOWS, not a model knob. When enabled
+    # the action space gains short(3)/cover(4) and positions may go negative (long+short); long-only
+    # behaviour is unchanged when False. Managed via named environments in the hub (scope: environment).
     allow_shorting: bool = False
     max_short_size: float = 1.0
-    # Which directions the agent may TAKE: "long_only" (buy/close only), "short_only" (short/cover only —
-    # long entries are ignored), or "both". Supersedes allow_shorting (config_builder keeps the two in
-    # sync); the env enables shorts when this is short_only/both OR allow_shorting is True (back-compat).
-    position_mode: str = "long_only"
     batch_size: int = 32
     
 env_swap_all = EnvConfig(
