@@ -113,17 +113,7 @@ def _optional_float(cfg, key, default):
     return None if value in (None, "", "null", 0) else float(value)
 
 
-def _resolve_position_mode(cfg):
-    """position_mode is the authoritative 3-way lever; fall back to the legacy `allow_shorting` bool when
-    it is absent (old configs/runs). Returns (position_mode, allow_shorting) kept consistent."""
-    mode = str(cfg.get("position_mode", "")).strip().lower()
-    if mode not in ("long_only", "short_only", "both"):
-        mode = "both" if bool(cfg.get("allow_shorting", False)) else "long_only"
-    return mode, mode in ("short_only", "both")
-
-
 def build_env_config(cfg):
-    position_mode, allow_shorting = _resolve_position_mode(cfg)
     return OmegaConf.structured(
         EnvConfig(
             type="trade_all",
@@ -137,8 +127,7 @@ def build_env_config(cfg):
             vol_target=float(cfg.get("vol_target", 0.02)),
             vol_target_min=float(cfg.get("vol_target_min", 0.1)),
             vol_window=int(cfg.get("vol_window", 10)),
-            allow_shorting=allow_shorting,
-            position_mode=position_mode,
+            allow_shorting=bool(cfg.get("allow_shorting", False)),
             max_short_size=float(cfg.get("max_short_size", 1.0)),
             observations_contain=[
                 "networth_percent_this_trade",

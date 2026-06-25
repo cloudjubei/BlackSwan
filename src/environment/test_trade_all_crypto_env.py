@@ -200,41 +200,6 @@ def test_short_action_ignored_when_shorting_disabled():
     assert env.positions[-1] == 0
 
 
-# --- position_mode: long_only | short_only | both ---
-
-
-def test_short_only_ignores_long_entries():
-    # short_only: a Buy(1) is a no-op (longs disabled); a Short(3) opens a negative position.
-    env = make_env([100, 100, 90, 90], position_mode="short_only", transaction_fee=0.0)
-    env.setup("combo_all", dict(_MULTIPLIERS))
-    assert env.action_space.n == 5  # short_only still needs short(3)/cover(4)
-    _arm(env, 1, 100)
-    assert env.take_action(1) is False  # buy ignored
-    assert env.positions[-1] == 0
-    assert env.take_action(3) is True  # short opens
-    assert env.positions[-1] < 0
-
-
-def test_both_mode_allows_long_and_short():
-    env = make_env([100] * 6, position_mode="both", transaction_fee=0.0)
-    env.setup("combo_all", dict(_MULTIPLIERS))
-    assert env.action_space.n == 5
-    _arm(env, 1, 100)
-    assert env.take_action(1) is True  # long opens
-    assert env.positions[-1] > 0
-
-
-def test_long_only_is_default_and_ignores_shorts():
-    env = make_env([100] * 6, position_mode="long_only", transaction_fee=0.0)
-    env.setup("combo_all", dict(_MULTIPLIERS))
-    assert env.action_space.n == 3
-    _arm(env, 1, 100)
-    assert env.take_action(3) is False  # short ignored
-    assert env.positions[-1] == 0
-    assert env.take_action(1) is True  # long opens
-    assert env.positions[-1] > 0
-
-
 # --- long-only regression guards for the sign-aware refactor ---
 
 

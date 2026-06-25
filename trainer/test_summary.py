@@ -384,26 +384,17 @@ def test_dataset_fidelity_defaults_from_timeframe():
     assert out["config"]["fidelity_set"] == "1d"
 
 
-def test_trade_gate_modes():
+def test_trade_gate_is_quadratic():
     gate = summary_mod._trade_gate
     m = summary_mod.MIN_TRADES_FOR_FULL_CREDIT
-    assert gate(m, "quadratic", m) == 1.0
-    assert gate(m / 2, "quadratic", m) == pytest.approx(0.25)
-    assert gate(m / 2, "linear", m) == pytest.approx(0.5)
-    assert gate(m * 2, "linear", m) == 1.0
-    assert gate(m - 1, "threshold", m) == 0.0
-    assert gate(m, "threshold", m) == 1.0
-    assert gate(0, "none", m) == 1.0
-    assert gate(5, "quadratic", 0) == 1.0
+    assert gate(m, m) == 1.0  # full credit at the bar
+    assert gate(m * 2, m) == 1.0  # capped at 1.0 above the bar
+    assert gate(m / 2, m) == pytest.approx(0.25)  # quadratic falloff below
+    assert gate(0, m) == 0.0
+    assert gate(5, 0) == 1.0  # disabled gate
 
 
-def test_trade_gate_mode_none_ungates_a_low_trade_run():
-    out = _build({"timeframe": "1d", "trade_gate_mode": "none", "lookback_window_size": 0}, n_trades=3)
-    assert out["metrics"]["trade_gate"] == 1.0
-    assert out["objective"] == pytest.approx(out["metrics"]["total_return_pct"])
-
-
-def test_trade_gate_mode_defaults_to_quadratic():
+def test_trade_gate_quadratically_gates_a_low_trade_run():
     out = _build({"timeframe": "1d", "lookback_window_size": 0}, n_trades=10)
     assert out["metrics"]["trade_gate"] == pytest.approx((10 / summary_mod.MIN_TRADES_FOR_FULL_CREDIT) ** 2)
 

@@ -409,19 +409,12 @@ def _lookback(env, cfg):
     return int(cfg.get("lookback_window_size", 32))
 
 
-def _trade_gate(n_trades, mode, min_trades):
-    """Map a trade count to the [0,1] objective multiplier for the chosen gate mode. The gate is the
-    research-named "churn band-aid" — realistic fees already regulate frequency — so it is a sweepable
-    lever: none (ungated), linear, quadratic (the historical default, punishes under-trading steeply),
-    or threshold (full credit at/above the bar, none below)."""
-    if min_trades <= 0 or mode == "none":
+def _trade_gate(n_trades, min_trades):
+    """Map a trade count to the [0,1] objective multiplier: full credit at/above ``min_trades``, falling
+    off quadratically below it so under-trading is punished steeply."""
+    if min_trades <= 0:
         return 1.0
-    ratio = n_trades / min_trades
-    if mode == "linear":
-        return min(1.0, ratio)
-    if mode == "threshold":
-        return 1.0 if n_trades >= min_trades else 0.0
-    return min(1.0, ratio**2)
+    return min(1.0, (n_trades / min_trades) ** 2)
 
 
 def _health(env, state, is_rl, lookback):
@@ -457,9 +450,7 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         equity = [_finite(x) for x in _live(getattr(env, "net_worths", []), lookback)]
 
     n_trades = _finite(state[17]) if len(state) > 17 else 0.0
-    trade_gate = _trade_gate(
-        n_trades, str(cfg.get("trade_gate_mode", "quadratic")), MIN_TRADES_FOR_FULL_CREDIT
-    )
+    trade_gate = _trade_gate(n_trades, MIN_TRADES_FOR_FULL_CREDIT)
     traded_return = total_return * 100 * trade_gate
 
     # Realized transaction-cost drag: the env appends each trade's fee (in $) to `fees`, so the total
