@@ -60,9 +60,11 @@ def build_data_config(cfg):
     fset_id, fspec = resolve_fidelity(cfg)
     layers = list(fspec["layers"])
     lookback = int(fspec["lookback"])
-    # Intraday sets step on 1h bars (with higher layers resampled by the multi-layer provider) and
-    # need the derived-cache path; the single daily set runs the fast lookback-1 path off raw 1d files.
-    if fspec["fidelity_run"] != "1d":
+    fidelity_run = fspec["fidelity_run"]
+    # The 1h BASE path serves any step that observes a 1h layer — an hourly step AND a daily step over the
+    # 1h base (stepped day by day, the provider's divider_run handles the cadence). It needs the derived
+    # cache. The 1d base path runs off raw 1d files (single 1d, or 1d+1w resampled from 1d).
+    if fspec["fidelity_input"] == "1h":
         if asset != _SYMBOL:
             raise SystemExit(
                 f"{asset} has no intraday dataset on disk — intraday is {_SYMBOL}-only until "
@@ -81,10 +83,10 @@ def build_data_config(cfg):
                 timestamp="day_of_week",
                 obs_squash=str(cfg.get("obs_squash", "none")),
                 fidelity_input="1h",
-                fidelity_run="1h",
+                fidelity_run=fidelity_run,
                 layers=layers,
                 fidelity_input_test="1h",
-                fidelity_run_test="1h",
+                fidelity_run_test=fidelity_run,
                 layers_test=layers,
             )
         )

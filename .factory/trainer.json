@@ -8,8 +8,14 @@
     "name": "traded_return",
     "direction": "max"
   },
-  "pipelineVersion": "4.0",
+  "pipelineVersion": "5.0",
   "pipelineChangelog": [
+    {
+      "version": "5.0",
+      "date": "2026-06-25",
+      "breaking": true,
+      "summary": "Observation/reward ALIGNMENT fix in the multi-timeline (resolved-from-fidelity) data provider. MultiTimelineDataProvider.get_values omitted the warmup (start_index) from its observation offset, so the observation ended ~one lookback window BEHIND the bar get_price/the reward used (≈31 days for 1h+1d at lookback 32, scaling with the window). This is a STALE-observation desync, NOT a look-ahead leak — the agent saw OLD data, never the future, so returns were never inflated; but training credit-assignment was corrupted. Every MULTI-timeline run is affected and NOT comparable to v5: multi-layer (1h+1d / 1h+1d+1w / 1d+1w), a coarser single layer at a finer step (1d@1h), a finer base at a coarser step (1h@1d), or auto@1h (= 1h+1d). Those v<5 runs are marked status=invalid and excluded from all aggregation/xAI. SINGLE-timeline runs (1d@1d, 1h@1h, auto@1d) used the SingleDataProvider and are UNAFFECTED. Also lands daily-step multi-fidelity (a daily step can now observe finer/multi layers by stepping the 1h base day by day, divider 24) — additive, with end-to-end look-ahead regression guards; no impact on prior runs."
+    },
     {
       "version": "4.0",
       "date": "2026-06-19",
@@ -32,6 +38,15 @@
       "version": "1.0",
       "breaking": false,
       "summary": "Original pipeline — the historical results_hour.ods ledger import (Sharpe-era, pre-overhaul). Kept for reference; not comparable to v2."
+    }
+  ],
+  "runInvalidations": [
+    {
+      "id": "fidelity-desync-v5",
+      "kind": "fidelityDesync",
+      "beforePipelineMajor": 5,
+      "cancelPendingQueue": true,
+      "reason": "Trained on observations ~one warmup window behind the priced/rewarded bar (multi-timeline observation/reward desync, fixed in pipeline v5). Not comparable to v5 — re-run for a valid result."
     }
   ],
   "migrations": [
@@ -60,10 +75,6 @@
     {
       "match": { "reward_model": "profit_percentage_direct" },
       "set": { "reward_model": "combo_unified", "combo_direct": 1, "combo_sell": 0, "combo_buy": 0, "combo_positionprofitpercentage": 0, "combo_noaction": 0, "combo_wrongaction": 0, "combo_fee_penalty": 0, "combo_noop_penalty": 0 }
-    },
-    {
-      "match": { "reward_model": "combo_unified" },
-      "keepOrDefault": { "allow_shorting": false }
     },
     {
       "matchNot": { "reward_model": "combo_unified" },
@@ -344,7 +355,7 @@
       ],
       "default": "auto",
       "scope": "dataset",
-      "description": "Observation LAYERS — which timeframes the agent sees AT ONCE at each step (separate from the STEP frequency, which is the timeframe lever). Higher layers are resampled from the base, so wider = more context but a bigger input. auto = follow timeframe (1h->1h+1d, 1d->1d). At an HOURLY step (timeframe=1h): 1h (single), 1d (single coarser layer fed every hour, i.e. 1h+1d with the 1h dropped), 1h+1d, 1h+1d+1w, or 1d+1w. At a DAILY step (timeframe=1d): only 1d for now (daily-step + finer/multi layers is a planned data-provider enhancement). DATASET setting — define named datasets (e.g. '1h' vs '1h+1d') in the Datasets tab. An incompatible step×layers combo FAILS FAST at run start with a clear message."
+      "description": "Observation LAYERS — which timeframes the agent sees AT ONCE at each step (separate from the STEP frequency, which is the timeframe lever). Higher layers are resampled from the base, so wider = more context but a bigger input. auto = follow timeframe (1h->1h+1d, 1d->1d). The loaded BASE is the finest layer in the set, and every coarser layer is resampled from it. At an HOURLY step (timeframe=1h): 1h (single), 1d (single coarser layer fed every hour, i.e. 1h+1d with the 1h dropped), 1h+1d, 1h+1d+1w, or 1d+1w. At a DAILY step (timeframe=1d): 1d (single), 1d+1w, OR finer/multi sets (1h, 1h+1d, 1h+1d+1w) — the 1h base is stepped day by day (divider 24), the symmetric counterpart of an hourly step observing a resampled 1d. DATASET setting — define named datasets (e.g. '1h' vs '1h+1d') in the Datasets tab. The only sub-hourly layers (none exist) would fail fast; everything selectable resolves."
     },
     "walk_forward_window": {
       "type": "choice",
@@ -492,387 +503,6 @@
     }
   },
   "presets": [
-    {
-      "label": "▶ Exp L · Look-ahead leak regression (observed fidelity_set @ 1h: 1d MUST NOT beat hold)",
-      "sweep": {
-        "model_name": ["supervised-gbm", "supervised-logreg", "hodl"],
-        "fidelity_set": ["1d", "1h", "1h+1d"]
-      },
-      "fixed": {
-        "timeframe": "1h",
-        "walk_forward_window": "2024",
-        "forward_horizon": 1,
-        "prob_threshold": 0.5,
-        "stop_loss": 0.05,
-        "position_sizing": "vol_target",
-        "use_indicators": false,
-        "transaction_fee": 0.001,
-        "device": "cpu"
-      },
-      "seeds": 2,
-      "thesis": "RETURN_ENGINE_AUDIT regression. fidelity_set='1d' at a 1h step USED to feed the classifier resampled daily bars from up to ~32 days in the FUTURE (MultiTimelineDataProvider.get_values forward window), fabricating the audited +261.95% / +206%-vs-hold. After the get_values backward-window fix, the supervised 'fidelity_set=1d' cell MUST collapse to a loss (~ the '1h'/'1h+1d' cells) and MUST NOT beat hodl. Reproduction signature pre-fix: supervised-gbm fidelity_set=1d => +261.95% / 55.56% win / 396 trades / 58% acc; post-fix => ~ -64% / ~52% acc. hodl is the always-long control (~+37-55%).",
-      "thesisTarget": "fidelity_set"
-    },
-    {
-      "label": "▶ Exp 1 · 1d family triage (model × seed, fast)",
-      "sweep": { "model_name": ["reppo-custom", "trpo-custom", "duel-dqn-custom", "dqn"] },
-      "fixed": {
-        "timeframe": "1d",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "episodes": 1,
-        "device": "cpu"
-      },
-      "seeds": 2,
-      "thesis": "1d family triage (post-QW1/QW2)",
-      "thesisTarget": "model_name"
-    },
-    {
-      "label": "▶ Exp 2 · 1h winners re-baseline (post-features)",
-      "sweep": { "model_name": ["reppo-custom", "trpo-custom"] },
-      "fixed": {
-        "timeframe": "1h",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "device": "cpu"
-      },
-      "seeds": 4,
-      "thesis": "1h winners re-baseline (post-QW1/QW2)",
-      "thesisTarget": "model_name"
-    },
-    {
-      "label": "▶ Exp 3 · Trade-frequency frontier (stop_loss)",
-      "sweep": { "stop_loss": [0, 0.02, 0.05] },
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "device": "cpu"
-      },
-      "seeds": 2,
-      "thesis": "trade-frequency frontier",
-      "thesisTarget": "stop_loss"
-    },
-    {
-      "label": "▶ Exp 4 · Net capacity re-test (net_arch)",
-      "sweep": { "net_arch": ["512,64", "512,256,64,32", "8192,512"] },
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "device": "cpu"
-      },
-      "seeds": 2,
-      "thesis": "net capacity post-features",
-      "thesisTarget": "net_arch"
-    },
-    {
-      "label": "▶ Exp 5 · Indicators on/off — 1h (RB1)",
-      "sweep": { "use_indicators": [false, true] },
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "device": "cpu"
-      },
-      "seeds": 4,
-      "thesis": "indicators on/off (1h, RB1)",
-      "thesisTarget": "use_indicators"
-    },
-    {
-      "label": "▶ Exp 6 · Walk-forward robustness (2022·2023·2024)",
-      "datasets": [
-        { "walk_forward_window": "2022" },
-        { "walk_forward_window": "2023" },
-        { "walk_forward_window": "2024" }
-      ],
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "device": "cpu"
-      },
-      "seeds": 4,
-      "thesis": "is a 1h winner robust across regime-years out-of-sample, or tuned to 2024?",
-      "thesisTarget": "walk_forward_window"
-    },
-    {
-      "label": "▶ Exp 7 · Long-only vs long+short env (1h winner)",
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "device": "cpu"
-      },
-      "environments": [{ "allow_shorting": false }, { "allow_shorting": true }],
-      "seeds": 3,
-      "thesis": "does a long+short environment beat long-only OOS (esp. in down windows)?",
-      "thesisTarget": "allow_shorting"
-    },
-    {
-      "label": "▶ Exp 8 · Vol-targeted sizing (1h winner)",
-      "sweep": { "position_sizing": ["fixed", "vol_target"] },
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "device": "cpu"
-      },
-      "seeds": 3,
-      "thesis": "does vol-targeted sizing beat all-in (fewer trades, steadier Sharpe)?",
-      "thesisTarget": "position_sizing"
-    },
-    {
-      "label": "▶ Exp 9 · Direct vs shaped reward (1h winner)",
-      "sweep": { "combo_direct": [0, 1] },
-      "fixed": {
-        "reward_model": "combo_unified",
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "device": "cpu"
-      },
-      "seeds": 3,
-      "thesis": "do equity-path rewards beat the combo shaping family?",
-      "thesisTarget": "reward_model"
-    },
-    {
-      "label": "▶ Exp 10 · Fidelity stack (1h winner)",
-      "datasets": [
-        { "fidelity_set": "1h" },
-        { "fidelity_set": "1h+1d" },
-        { "fidelity_set": "1h+1d+1w" }
-      ],
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "device": "cpu"
-      },
-      "seeds": 3,
-      "thesis": "how much does stacking more timeframes help out-of-sample?",
-      "thesisTarget": "fidelity_set"
-    },
-    {
-      "label": "▶ Exp 11 · Obs squash (1h winner)",
-      "sweep": { "obs_squash": ["none", "clip", "tanh"] },
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "device": "cpu"
-      },
-      "seeds": 3,
-      "thesis": "does respecting the [-1,1] observation bound help?",
-      "thesisTarget": "obs_squash"
-    },
-    {
-      "label": "▶ Exp 12 · Exit-mechanic sweep (SL × TP × trailing)",
-      "environments": [
-        { "stop_loss": 0.02, "take_profit": 0, "trailing_take_profit": 0 },
-        { "stop_loss": 0.02, "take_profit": 0.02, "trailing_take_profit": 0 },
-        { "stop_loss": 0.01, "take_profit": 0.05, "trailing_take_profit": 0 },
-        { "stop_loss": 0.02, "take_profit": 0.05, "trailing_take_profit": 0.005 },
-        { "stop_loss": 0.02, "take_profit": 0.02, "trailing_take_profit": 0.001 }
-      ],
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "no_sell_action": true,
-        "device": "cpu"
-      },
-      "seeds": 3,
-      "thesis": "with exits driven only by TP/SL (no_sell_action), which stop-loss / take-profit / trailing profile trades best?",
-      "thesisTarget": "take_profit"
-    },
-    {
-      "label": "▶ Exp 13 · Supervised baseline (logreg vs gbm vs RL vs hold)",
-      "sweep": { "model_name": ["supervised-logreg", "supervised-gbm", "reppo-custom", "hodl"] },
-      "fixed": {
-        "timeframe": "1h",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "use_indicators": true,
-        "stop_loss": 0.02,
-        "device": "cpu"
-      },
-      "seeds": 3,
-      "thesis": "does a supervised classifier + rules beat end-to-end RL (and buy-and-hold) on the same 1h features?",
-      "thesisTarget": "model_name"
-    },
-    {
-      "label": "▶ Exp 14 · Architecture A/B (LSTM vs attention vs TCN)",
-      "sweep": {
-        "model_name": [
-          "reppo-custom",
-          "attn-ppo",
-          "tcn-ppo"
-        ]
-      },
-      "fixed": {
-        "timeframe": "1h",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "batch_size": 512,
-        "device": "cpu"
-      },
-      "seeds": 3,
-      "thesis": "do modern sequence encoders (self-attention / TCN) beat the recurrent-PPO LSTM on the same 1h data?",
-      "thesisTarget": "model_name"
-    },
-    {
-      "label": "▶ Exp 15 · No-op / wrong-action penalty × reward-scale sweep",
-      "sweep": {
-        "combo_noop_penalty": [
-          0,
-          0.02,
-          0.1,
-          0.5
-        ],
-        "combo_sell": [
-          1000,
-          100,
-          1
-        ],
-        "combo_wrongaction": [
-          0,
-          -1
-        ]
-      },
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "device": "cpu"
-      },
-      "seeds": 3,
-      "thesis": "Out-of-position and redundant signals are reward-INDIFFERENT under combo_unified: with combo_noop_penalty / combo_wrongaction / combo_noaction all 0, a hold, a blocked-buy (buy while long) and a blocked-sell (sell while flat) earn identical reward, so the deterministic eval policy emits junk there (blocked_signal_ratio ~0.95 even on great-return runs). Hypothesis: enabling combo_noop_penalty and/or combo_wrongaction drives blocked_signal_ratio toward 0 WITHOUT collapsing traded_return — and the effect is GATED BY REWARD SCALE (a penalty up to 0.5 is dwarfed by combo_sell=1000, so it should only bite as combo_sell shrinks toward 1). Falsified if suppressing the noise also kills returns everywhere, or if no in-range penalty moves blocked_signal_ratio at any combo_sell.",
-      "thesisTarget": "combo_noop_penalty"
-    },
-    {
-      "label": "▶ Exp 16 · Reward shaping — open-credit × fee-penalty (does outcome-only + fee-aware cut churn?)",
-      "sweep": {
-        "combo_buy": [
-          0.1,
-          0
-        ],
-        "combo_fee_penalty": [
-          0,
-          10
-        ]
-      },
-      "fixed": {
-        "timeframe": "1h",
-        "model_name": "reppo-custom",
-        "net_arch": "512,64",
-        "reward_model": "combo_unified",
-        "learning_rate": 0.0001,
-        "learning_starts": 20000,
-        "batch_size": 512,
-        "buffer_size": 1000000,
-        "gamma": 0.99,
-        "optimizer_class": "RMSprop",
-        "activation_fn": "CELU",
-        "device": "cpu"
-      },
-      "seeds": 3,
-      "thesis": "The open-action term rewards the ACT of opening by the next-bar move (combo_buy × (price[t+1]/price[t] − 1)) — immediate credit for entering, blind to cost — a churn engine (the 1h winner traded ~396 times, ~79.5% in fees, with combo_fee_penalty=0). Hypothesis: dropping the open-credit (combo_buy=0, so credit comes ONLY from the holding mark-to-market combo_positionprofitpercentage and the realised close P&L combo_sell — both fee-aware) and/or penalising fees (combo_fee_penalty>0) cuts n_trades and raises OOS net-of-fees traded_return vs the current combo_buy=0.1 / combo_fee_penalty=0 baseline (which is the (0.1,0) cell here). NOTE combo_fee_penalty competes with combo_sell=1000, so it may need to be large (10) to bite. Falsified if outcome-only / fee-aware shaping leaves churn + net return unchanged, or collapses traded_return.",
-      "thesisTarget": "combo_buy"
-    },
-    {
-      "label": "Buy & hold (control)",
-      "fixed": {
-        "model_name": "hodl",
-        "timeframe": "1h"
-      }
-    }
   ],
   "papers": [
     {

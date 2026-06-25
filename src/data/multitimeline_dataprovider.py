@@ -6,6 +6,17 @@ import pandas as pd
 from src.conf.data_config import DataConfig
 from src.data.abstract_dataprovider import AbstractDataProvider
 
+# Minutes per timeframe bar — the single source for BOTH the run step size (divider_run) and each
+# observed layer's resample multiplier, replacing the per-input if/elif ladders (which silently omitted
+# 1h->1d for the daily step and 1d->1w for a 1d base).
+_TF_MINUTES = {"1m": 1, "5m": 5, "10m": 10, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
+
+
+def _period_ratio(base: str, target: str) -> int:
+    """How many ``base`` bars make one ``target`` bar (e.g. base='1h', target='1d' -> 24). ``target`` is
+    never finer than ``base`` in a resolved config (the base is the finest layer), so the result is >= 1."""
+    return max(1, _TF_MINUTES[target] // _TF_MINUTES[base])
+
 # there needs to be three ways of handling this:
 # 1:
 # 1m [16:00 - 16:01 10.05]          ... [16:01 - 16:02 10.05]
@@ -68,51 +79,15 @@ class MultiTimelineDataProvider(AbstractDataProvider):
             self.raw_df = raw_df
             self.raw_df_for_plotting = raw_df
 
-            if fidelity_input == "1m":
-                if fidelity_run == "5m":
-                    self.divider_run = 5
-                elif fidelity_run == "10m":
-                    self.divider_run = 10
-                elif fidelity_run == "15m":
-                    self.divider_run = 15
-                elif fidelity_run == "30m":
-                    self.divider_run = 30
-                elif fidelity_run == "1h":
-                    self.divider_run = 60
-                # elif fidelity_run == "4h":
-                #     self.divider_run = 60*4
-                # elif fidelity_run == "1d":
-                #     self.divider_run = 60*24
-                # elif fidelity_run == "1w":
-                #     self.divider_run = 60*24*7
-            
+            # divider_run = how many INPUT (base) bars advance per RUN step. 1 when the step == the base
+            # (e.g. 1h base, 1h step); 24 for a DAILY step over a 1h base (step the hourly base day by day).
+            self.divider_run = _period_ratio(fidelity_input, fidelity_run)
+
             self.fidelity_offset = 0
             self.multipliers = []
             for i in range(len(layers)):
-                multiplier = 1
-                if fidelity_input == "1m":
-                    if layers[i] == "5m":
-                        multiplier = 5
-                    elif layers[i] == "10m":
-                        multiplier = 10
-                    elif layers[i] == "15m":
-                        multiplier = 15
-                    elif layers[i] == "30m":
-                        multiplier = 30
-                    elif layers[i] == "1h":
-                        multiplier = 60
-                    elif layers[i] == "4h":
-                        multiplier = 60*4
-                    elif layers[i] == "1d":
-                        multiplier = 60*24
-                    elif layers[i] == "1w":
-                        multiplier = 60*24*7
-                elif fidelity_input == "1h":
-                    if layers[i] == "1d":
-                        multiplier = 24
-                    elif layers[i] == "1w":
-                        multiplier = 24*7
-
+                # multiplier = how many INPUT (base) bars make one bar of this observed layer.
+                multiplier = _period_ratio(fidelity_input, layers[i])
                 self.fidelity_offset = multiplier * self.config.lookback_window_size
                 self.multipliers.append(multiplier)
 
@@ -124,6 +99,12 @@ class MultiTimelineDataProvider(AbstractDataProvider):
                 if layer == fidelity_input:
                     self.fidelity_dfs.append(self.dfs) # maybe should be self.fidelity_dfs.append(self.dfs)
                     if layer == fidelity_run:
+                        self.raw_df_for_plotting = self.raw_df.iloc[self.get_start_index()::self.divider_run]
+                        self.prices = self.prices[self.get_start_index()::self.divider_run]
+                    elif self.divider_run > 1 and fidelity_run not in layers:
+                        # DAILY step over a finer (1h) base with NO run-granularity layer to set the price
+                        # cadence (e.g. fidelity_set='1h' at timeframe=1d): slice the base prices/plot frame
+                        # to the run cadence so reward + price align with the once-per-day decision.
                         self.raw_df_for_plotting = self.raw_df.iloc[self.get_start_index()::self.divider_run]
                         self.prices = self.prices[self.get_start_index()::self.divider_run]
 
@@ -229,7 +210,13 @@ class MultiTimelineDataProvider(AbstractDataProvider):
 
         if self.is_resolved_from_fidelity:
             for i in range(len(self.fidelity_dfs)):
-                offset = step*self.divider_run
+                # The observation must end on the SAME base bar get_price(step) is sliced from: the
+                # warmup-anchored decision bar `starting_index + step*divider_run` (starting_index =
+                # fidelity_offset-1, an end-of-period row, so a daily step lands on the day's CLOSE). This
+                # mirrors the non-fidelity branch (`offset = step + get_start_index()`). Omitting
+                # starting_index left the observation a full warmup (~31 days) BEHIND the priced/rewarded
+                # bar — not a look-ahead leak (it was stale-past) but a real observation/reward desync.
+                offset = step*self.divider_run + self.get_start_index()
                 mapping = self.get_current_mapping(self.raw_df, offset, self.layers[i], self.fidelity_run)
                 df = self.fidelity_dfs[i][mapping]
 

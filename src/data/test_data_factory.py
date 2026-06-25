@@ -49,6 +49,13 @@ def test_multi_layer_uses_multi_provider(monkeypatch):
     assert _create(["1d", "1w"], "1h", "1h")[0] == "multi"
 
 
+def test_single_base_layer_at_coarser_step_uses_multi_provider(monkeypatch):
+    # 'fidelity_set=1h' at 'timeframe=1d' — even a lone layer that IS the base needs the MULTI provider
+    # when the STEP is coarser than the base (divider_run > 1): the single path can't step day by day.
+    _stub_providers(monkeypatch)
+    assert _create(["1h"], "1h", "1d")[0] == "multi"
+
+
 def test_no_layers_is_unsupported(monkeypatch):
     _stub_providers(monkeypatch)
     with pytest.raises(ValueError):

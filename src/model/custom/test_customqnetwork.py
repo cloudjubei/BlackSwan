@@ -37,24 +37,88 @@ def test_activation_fn_instances_inserted():
     assert any(isinstance(m, nn.Tanh) for m in mods)
 
 
-# --- validation guard -------------------------------------------------------
+# --- depth adaptation: one recipe builds at ANY net_arch depth --------------
+
+# 3 layer-producing blocks (weight_norm x3): the baked reppo-custom recipe, native to a 2-width net_arch.
+_RECIPE = [
+    "BatchNorm1d", "weight_norm", "activation_fn", "Dropout",
+    "weight_norm", "Dropout", "activation_fn", "weight_norm",
+]
 
 
-def test_wrong_layer_count_raises_valueerror():
-    # net_arch=[8,8] -> net_sizes has 3 hops, needs 3 layer-producing blocks; recipe has only 2.
-    with pytest.raises(ValueError, match="layer-producing block"):
-        build(6, 3, [8, 8], nn.ReLU, ["Linear", "Linear"])
+def test_recipe_too_few_blocks_tiles_up_to_match_net_arch():
+    # net_arch=[8,8] needs 3 layer blocks; a 2-block recipe tiles its hidden unit up to 3 and builds.
+    mods = build(6, 3, [8, 8], nn.ReLU, ["Linear", "Linear"])
+    assert sum(isinstance(m, nn.Linear) for m in mods) == 3
+    out = nn.Sequential(*mods)(th.zeros(4, 6))
+    assert tuple(out.shape) == (4, 3)
 
 
-def test_too_many_layers_raises_valueerror():
-    with pytest.raises(ValueError):
-        build(6, 3, [8], nn.ReLU, ["Linear", "Linear", "Linear"])
+def test_recipe_too_many_blocks_shrinks_to_match_net_arch():
+    # net_arch=[8] needs 2 layer blocks; a 3-block recipe shrinks down to 2 and builds.
+    mods = build(6, 3, [8], nn.ReLU, ["Linear", "Linear", "Linear"])
+    assert sum(isinstance(m, nn.Linear) for m in mods) == 2
+    out = nn.Sequential(*mods)(th.zeros(4, 6))
+    assert tuple(out.shape) == (4, 3)
 
 
-def test_valid_layer_count_does_not_raise():
-    # exactly len(net_arch)+1 = 2 layer-producing blocks.
+def test_valid_layer_count_builds_unchanged():
+    # exactly len(net_arch)+1 = 2 layer-producing blocks -> used as-is.
     mods = build(6, 3, [8], nn.ReLU, ["Linear", "NoisyLinear"])
     assert len(mods) == 2
+
+
+def test_matching_recipe_is_returned_byte_identical():
+    # the baked recipe at its native 2-width depth (3 blocks) is unchanged.
+    assert CustomQNetwork._fit_recipe_to_depth(_RECIPE, 3) == _RECIPE
+
+
+def test_recipe_tiles_up_to_a_4_width_net_arch_the_failing_case():
+    # The reported crash: net_arch=[4096,2048,256,128] (4 widths, needs 5 blocks) on the 3-block recipe.
+    mods = build(6, 3, [8, 8, 8, 8], nn.ReLU, list(_RECIPE))
+    assert sum(isinstance(m, nn.Linear) for m in mods) == 5  # weight_norm wraps nn.Linear
+    out = nn.Sequential(*mods)(th.zeros(4, 6))
+    assert tuple(out.shape) == (4, 3)
+
+
+def test_fit_recipe_cycles_hidden_units_and_keeps_the_output_segment():
+    fitted = CustomQNetwork._fit_recipe_to_depth(
+        ["A", "Linear", "B", "weight_norm", "C", "NoisyLinear"], 5
+    )
+    # segments [A,Linear] [B,weight_norm] [C,NoisyLinear]; hidden cycles to 4 then the output segment.
+    assert fitted == [
+        "A", "Linear", "B", "weight_norm",
+        "A", "Linear", "B", "weight_norm",
+        "C", "NoisyLinear",
+    ]
+
+
+def test_unadaptable_single_block_recipe_still_raises():
+    # one layer block has no hidden unit to repeat, so it cannot grow to a 3-layer net -> guard fires.
+    with pytest.raises(ValueError, match="layer-producing block"):
+        build(6, 3, [8, 8], nn.ReLU, ["Linear"])
+
+
+def test_fit_recipe_appends_trailing_decorations_to_the_output_segment():
+    # Non-layer blocks AFTER the last layer block decorate the output and tile with it.
+    fitted = CustomQNetwork._fit_recipe_to_depth(["Linear", "weight_norm", "LayerNorm"], 4)
+    assert fitted == ["Linear", "Linear", "Linear", "weight_norm", "LayerNorm"]
+
+
+def test_fit_recipe_with_no_layer_block_is_returned_unchanged():
+    # Nothing layer-producing -> nothing to tile; returned as-is for the guard to reject.
+    recipe = ["activation_fn", "Dropout"]
+    assert CustomQNetwork._fit_recipe_to_depth(recipe, 2) is recipe
+
+
+def test_fit_recipe_to_single_output_layer_when_no_widths():
+    # required=1 (net_arch=[]) -> hidden dropped, just the output segment remains.
+    assert CustomQNetwork._fit_recipe_to_depth(["Linear", "Linear"], 1) == ["Linear"]
+
+
+def test_fit_recipe_with_zero_required_is_returned_unchanged():
+    recipe = ["Linear", "Linear"]
+    assert CustomQNetwork._fit_recipe_to_depth(recipe, 0) is recipe
 
 
 # --- empty-recipe fallback --------------------------------------------------

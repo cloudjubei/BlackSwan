@@ -18,7 +18,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.data.multitimeline_dataprovider import MultiTimelineDataProvider
+from src.data.multitimeline_dataprovider import MultiTimelineDataProvider, _period_ratio
+
+
+def test_period_ratio_base_to_target_bars():
+    # How many BASE bars per one TARGET bar — drives both the run STEP size (divider_run) and each
+    # observed layer's resample multiplier. Same granularity -> 1; the daily-step gap 1h->1d -> 24.
+    assert _period_ratio("1h", "1h") == 1
+    assert _period_ratio("1h", "1d") == 24  # the previously-missing daily-step mapping
+    assert _period_ratio("1h", "1w") == 168
+    assert _period_ratio("1d", "1d") == 1
+    assert _period_ratio("1d", "1w") == 7  # the previously-missing 1d-base 1w multiplier
+    assert _period_ratio("1m", "1h") == 60
+    assert _period_ratio("1m", "5m") == 5
 
 
 # --------------------------------------------------------------------------------------------------
@@ -164,7 +176,7 @@ def test_nonfidelity_lookback_one_two_layers_does_not_sum():
 # get_values: fidelity branch (is_resolved_from_fidelity == True)
 # --------------------------------------------------------------------------------------------------
 
-def _fid(lookback, layers, fidelity_run, multipliers, fidelity_dfs, raw_df, divider_run=1):
+def _fid(lookback, layers, fidelity_run, multipliers, fidelity_dfs, raw_df, divider_run=1, starting_index=0):
     p = _bare()
     p.is_resolved_from_fidelity = True
     p.config = types.SimpleNamespace(lookback_window_size=lookback)
@@ -174,6 +186,10 @@ def _fid(lookback, layers, fidelity_run, multipliers, fidelity_dfs, raw_df, divi
     p.fidelity_dfs = fidelity_dfs
     p.raw_df = raw_df
     p.divider_run = divider_run
+    # The observation offset = starting_index + step*divider_run (the warmup-anchored decision bar that
+    # get_price(step) is also sliced from). Real providers set this = fidelity_offset-1; tests that don't
+    # care pass 0 (offset == step*divider_run).
+    p.starting_index = starting_index
     return p
 
 
@@ -229,14 +245,46 @@ def test_fidelity_two_layers_stack_on_layer_axis():
 
 
 def test_fidelity_divider_run_scales_offset():
-    # divider_run 5 -> offset = step * 5. step 26 -> offset 130 -> layer '1h' under fidelity '1m' ->
-    # mapping = minute 10; index = (130-10)/60 = 2; coarser -> top = 1 -> bucket10 rows [0,1].
+    # offset = starting_index + step*divider_run. With starting_index 0 and divider_run 5, step 26 ->
+    # offset 130 -> layer '1h' under fidelity '1m' -> mapping = minute 10; index = (130-10)/60 = 2; coarser
+    # -> top = 1 -> bucket10 rows [0,1]. (The end-of-period close anchoring lives in starting_index for the
+    # real provider, which is an end-of-period row — so it is NOT re-added here as a +(divider-1) term.)
     buckets = [pd.DataFrame({"f0": [float(b * 100 + j) for j in range(10)]}) for b in range(60)]
     raw = _ts_df([pd.Timestamp("2021-01-01 00:00:00") + pd.Timedelta(minutes=i) for i in range(200)])
     p = _fid(lookback=2, layers=["1h"], fidelity_run="1m", multipliers=[60],
              fidelity_dfs=[buckets], raw_df=raw, divider_run=5)
     v = p.get_values(26)
     assert v[0][:, 0].tolist() == [1000.0, 1001.0]
+
+
+def _daily_asof_layers(n_hours):
+    """fidelity_dfs for a DAILY step over a 1h base observing [1h, 1d], each bar's feature = its as-of
+    close (1h index): the 1h base bar j closes at index j; the single-phase 1d bar for day k closes at
+    k*24+23 (end of day k)."""
+    base = pd.DataFrame({"asof": [float(i) for i in range(n_hours)]})
+    daily = pd.DataFrame({"asof": [float(k * 24 + 23) for k in range(n_hours // 24)]})
+    return [[base], [daily]]
+
+
+def test_resolved_daily_step_offset_is_start_index_aligned_and_never_future():
+    # DAILY step (divider_run=24) over a 1h base observing [1h, 1d]. The decision bar = starting_index +
+    # step*24 (the SAME base bar get_price(step) is sliced from — start_index is an end-of-day row, so the
+    # decision is the day's CLOSE). The observation must end EXACTLY there: the 1h layer the end-of-day hour,
+    # the 1d layer the just-closed daily bar — never a future bar (leak), never behind it (the desync the
+    # offset-omits-start_index bug caused, which left the observation ~warmup days behind get_price).
+    n, start_index = 12 * 24, 47  # start_index 47 = end of day 1 (a 2-day warmup); offset lands end-of-day
+    p = _fid(lookback=2, layers=["1h", "1d"], fidelity_run="1d", multipliers=[1, 24],
+             fidelity_dfs=_daily_asof_layers(n), raw_df=_hourly_raw(n), divider_run=24,
+             starting_index=start_index)
+    for step in range(0, (n - start_index) // 24):
+        decision = start_index + step * 24  # == the base row get_price(step) is anchored to
+        observed = np.asarray(p.get_values(step))
+        assert observed.max() <= decision, (
+            f"LOOK-AHEAD LEAK: daily step {step} observes a bar closing at 1h-index {observed.max()} "
+            f"(future > decision {decision})")
+        assert observed.max() == decision, (
+            f"DESYNC/STALE: daily step {step} observation ends at {observed.max()}, not the priced "
+            f"decision bar {decision} (= start_index {start_index} + step*24)")
 
 
 def test_fidelity_lookback_one_single_layer_flattens():
@@ -361,9 +409,39 @@ def test_get_current_mapping_fidelity_1m(layer, expected):
     ],
 )
 def test_get_current_mapping_default_hourly_branch(layer, expected):
-    # Any fidelity not in {1m,30m,15m,10m,5m} falls through to the else (hourly) branch.
+    # Any fidelity not in {1m,30m,15m,10m,5m,1d} falls through to the else (hourly) branch.
     p = _bare()
     assert p.get_current_mapping(_WED, 0, layer, "1h") == expected
+
+
+@pytest.mark.parametrize(
+    "layer,expected",
+    [
+        ("1w", 2),  # daily step buckets by DAY -> weekday (Wed -> 2 of 0..6)
+        ("1d", 0),  # the 1d layer at a daily step is a single phase
+        ("1h", 0),  # the 1h base collapses to its single df
+    ],
+)
+def test_get_current_mapping_daily_step(layer, expected):
+    # A DAILY step (fidelity='1d') over the 1h base buckets by DAY, not hour — the hourly else-branch
+    # would return out-of-range hour phases (e.g. weekday*24+hour for 1w), indexing past the substreams.
+    p = _bare()
+    assert p.get_current_mapping(_WED, 0, layer, "1d") == expected
+
+
+def test_get_current_mapping_daily_step_weekday_full_cycle():
+    # The 1w layer at a daily step selects one of EXACTLY 7 weekday-phase substreams (multiplier_run =
+    # 168/24 or 7/1 = 7). Pin the full Mon..Sun cycle -> 0..6 (the existing test pins only Wed->2) and that
+    # the phase NEVER overruns 0..6 — the old hourly else-branch returned weekday*24+hour (up to 167),
+    # which would index far past the 7 substreams. '1d'/'1h' collapse to the single phase 0.
+    week = _ts_df([f"2021-01-{4 + i:02d} 09:30:00" for i in range(7)])  # 2021-01-04 is a Monday
+    p = _bare()
+    for i in range(7):
+        m = p.get_current_mapping(week, i, "1w", "1d")
+        assert m == i, f"weekday phase for day-offset {i} should be {i}, got {m}"
+        assert 0 <= m <= 6
+        assert p.get_current_mapping(week, i, "1d", "1d") == 0
+        assert p.get_current_mapping(week, i, "1h", "1d") == 0
 
 
 @pytest.mark.parametrize(

@@ -79,10 +79,19 @@ def test_build_data_config_coarser_only_stack_at_hourly_step(monkeypatch):
     assert cfg.lookback_window_size == 32
 
 
-def test_build_data_config_incoherent_timeframe_fidelity_fails_fast():
-    # Daily step + a finer/multi stack is not provider-supported — must fail fast, not silently run.
-    with pytest.raises(SystemExit):
-        config_builder.build_data_config({"timeframe": "1d", "fidelity_set": "1h+1d"})
+def test_build_data_config_daily_step_with_finer_layers_uses_1h_base(monkeypatch):
+    # A daily step observing finer (1h) layers loads the 1h derived base and steps it day by day
+    # (fidelity_run='1d' over fidelity_input='1h') instead of failing fast.
+    import trainer.derive_cache as dc
+
+    monkeypatch.setattr(dc, "ensure_derived", lambda symbol, pairs, fidelity, cache_dir=None: ["f"])
+    cfg = config_builder.build_data_config({"timeframe": "1d", "fidelity_set": "1h+1d"})
+    assert list(cfg.layers) == ["1h", "1d"]
+    assert cfg.fidelity_input == "1h"
+    assert cfg.fidelity_run == "1d"
+    assert cfg.fidelity_input_test == "1h"
+    assert cfg.fidelity_run_test == "1d"
+    assert cfg.lookback_window_size == 32
 
 
 def test_build_data_config_default_1h_is_the_1h_plus_1d_stack(monkeypatch):

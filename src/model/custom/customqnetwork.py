@@ -13,6 +13,22 @@ from src.model.custom.memorymodels import GRULocal, LSTMLocal
 from src.model.custom.noisylinear import NoisyLinear
 from src.model.custom.residualblock import ResidualBlock
 
+# Recipe block names that PRODUCE a Linear-like layer (each consumes one width from net_sizes). Everything
+# else (BatchNorm1d, Dropout, activation_fn, ResidualBlock, attention, ...) decorates the current width
+# without advancing it. A recipe needs exactly len(net_arch)+1 of these — one per width plus the output.
+_LAYER_BLOCKS = frozenset({
+    "Linear", "NoisyLinear",
+    "weight_norm", "weight_norm2",
+    "weight_norm_noisy", "weight_norm_noisy2", "weight_norm_noisy3",
+    "weight_norm2_noisy", "weight_norm2_noisy2", "weight_norm2_noisy3",
+    "spectral_norm", "spectral_norm2",
+    "spectral_norm_noisy", "spectral_norm_noisy2", "spectral_norm_noisy3",
+    "spectral_norm2_noisy", "spectral_norm2_noisy2", "spectral_norm2_noisy3",
+    "DropConnectLinear",
+    "LSTMLocal", "LSTMLocalN", "GRULocal", "GRULocal2", "GRULocal4",
+})
+
+
 class CustomQNetwork(QNetwork):
 
     def __init__(
@@ -50,6 +66,38 @@ class CustomQNetwork(QNetwork):
     # custom_net_arch= ["Linear", "activation_fn", "SelfAttention", "Linear"]
 
     @staticmethod
+    def _fit_recipe_to_depth(custom_net_arch: List[str], required: int) -> List[str]:
+        """Tile a -custom recipe's HIDDEN block-pattern so it has exactly ``required`` layer-producing
+        blocks (= len(net_arch)+1), letting ONE recipe build at any net_arch depth. The recipe is split
+        into segments, each a run of decorations terminated by a layer-producing block; the LAST segment
+        is the output, the rest are hidden units repeated (cycled) to reach the needed hidden count. A
+        recipe that already matches is returned UNCHANGED (byte-identical build); one that cannot be
+        tiled (no layer block, or no hidden unit to repeat) is returned as-is for the guard to reject."""
+        segments: List[List[str]] = []
+        current: List[str] = []
+        for name in custom_net_arch:
+            current.append(name)
+            if name in _LAYER_BLOCKS:
+                segments.append(current)
+                current = []
+        if current:
+            # Trailing decorations after the last layer block belong to the output segment.
+            if not segments:
+                return custom_net_arch  # no layer-producing block at all — nothing to tile
+            segments[-1] = segments[-1] + current
+        if len(segments) == required:
+            return custom_net_arch
+        needed_hidden = required - 1
+        hidden, output = segments[:-1], segments[-1]
+        if needed_hidden < 0 or (needed_hidden > 0 and not hidden):
+            return custom_net_arch  # un-adaptable — let the caller's guard raise a clear error
+        tiled = [hidden[i % len(hidden)] for i in range(needed_hidden)]
+        fitted: List[str] = []
+        for segment in tiled + [output]:
+            fitted.extend(segment)
+        return fitted
+
+    @staticmethod
     def create_mlp_custom(
         input_dim: int,
         output_dim: int,
@@ -76,22 +124,14 @@ class CustomQNetwork(QNetwork):
             return [GRULocal(input_dim, net_arch[0], len(net_arch), with_hidden=False), nn.Linear(net_arch[0], output_dim, bias=True)]
 
         # A -custom recipe consumes one width per layer-producing block; it MUST define exactly
-        # len(net_arch)+1 of them (one per width plus the output layer). When it doesn't, the built
-        # net's width silently diverges from the declared latent dim and training crashes deep in the
-        # forward pass (mat1×mat2 shape error). Fail fast here with an actionable message instead.
-        layer_blocks = {
-            "Linear", "NoisyLinear",
-            "weight_norm", "weight_norm2",
-            "weight_norm_noisy", "weight_norm_noisy2", "weight_norm_noisy3",
-            "weight_norm2_noisy", "weight_norm2_noisy2", "weight_norm2_noisy3",
-            "spectral_norm", "spectral_norm2",
-            "spectral_norm_noisy", "spectral_norm_noisy2", "spectral_norm_noisy3",
-            "spectral_norm2_noisy", "spectral_norm2_noisy2", "spectral_norm2_noisy3",
-            "DropConnectLinear",
-            "LSTMLocal", "LSTMLocalN", "GRULocal", "GRULocal2", "GRULocal4",
-        }
+        # len(net_arch)+1 of them (one per width plus the output layer). Rather than force every net_arch
+        # depth to ship its own hand-matched recipe, tile the recipe's hidden block-pattern to fit the
+        # requested depth (so one recipe builds at any net_arch — see _fit_recipe_to_depth). A matching
+        # recipe is unchanged. If it still can't be made to fit (e.g. a single-block recipe asked for
+        # several hidden layers), fail fast here instead of crashing deep in the forward pass.
         required = len(net_sizes) - 1
-        produced = sum(1 for m in custom_net_arch if m in layer_blocks)
+        custom_net_arch = CustomQNetwork._fit_recipe_to_depth(custom_net_arch, required)
+        produced = sum(1 for m in custom_net_arch if m in _LAYER_BLOCKS)
         if produced != required:
             raise ValueError(
                 f"custom_net_arch defines {produced} layer-producing block(s) but net_arch={net_arch} "

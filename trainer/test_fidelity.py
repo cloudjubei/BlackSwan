@@ -44,14 +44,28 @@ def test_coarser_only_stack_at_hourly_step():
     assert spec["fidelity_input"] == "1h"
 
 
-def test_daily_step_with_finer_layers_fails_fast():
-    with pytest.raises(SystemExit):
-        resolve_fidelity({"timeframe": "1d", "fidelity_set": "1h+1d"})
+def test_daily_step_with_finer_layers_uses_the_1h_base():
+    # A daily-stepping agent CAN observe finer (1h) layers now: load the 1h base and step it day by day
+    # (the symmetric counterpart of 1h-step observing a resampled 1d). The base is the finest layer.
+    _, spec = resolve_fidelity({"timeframe": "1d", "fidelity_set": "1h+1d"})
+    assert spec["layers"] == ["1h", "1d"]
+    assert spec["fidelity_run"] == "1d"
+    assert spec["fidelity_input"] == "1h"  # finest layer drives the base
 
 
-def test_daily_step_with_single_1h_fails_fast():
-    with pytest.raises(SystemExit):
-        resolve_fidelity({"timeframe": "1d", "fidelity_set": "1h"})
+def test_daily_step_with_single_1h_uses_the_1h_base():
+    _, spec = resolve_fidelity({"timeframe": "1d", "fidelity_set": "1h"})
+    assert spec["layers"] == ["1h"]
+    assert spec["fidelity_run"] == "1d"
+    assert spec["fidelity_input"] == "1h"
+
+
+def test_daily_step_coarser_only_stack_stays_on_1d_base():
+    # No 1h layer -> the 1d base is the finest; the 1w layer is resampled from it (step stays daily).
+    _, spec = resolve_fidelity({"timeframe": "1d", "fidelity_set": "1d+1w"})
+    assert spec["layers"] == ["1d", "1w"]
+    assert spec["fidelity_run"] == "1d"
+    assert spec["fidelity_input"] == "1d"
 
 
 def test_hourly_step_with_single_daily_resolves():

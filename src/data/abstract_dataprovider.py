@@ -575,6 +575,13 @@ class AbstractDataProvider(ABC):
             if layer == "10m":
                 return int((date_time.minute) / 5 % 2)
             return 0
+        if fidelity == "1d":
+            # DAILY step over a 1h base: bucket by DAY, not hour. A 1w layer has 7 day-phases (weekday);
+            # the 1d layer and the 1h base each collapse to a single phase (0). The hourly else-branch
+            # below would return hour-scaled phases that overrun the per-day substream count.
+            if layer == "1w":
+                return date_time.weekday()
+            return 0
         else:
             if layer == "1w":
                 return date_time.weekday() *24 + date_time.hour
