@@ -206,6 +206,22 @@ class MultiTimelineDataProvider(AbstractDataProvider):
         # return self.prices[step*self.divider_run + self.get_start_index()]
         return self.prices[step]
 
+    def _lookback_grid(self, df, top, lookback):
+        """The ``lookback`` feature rows ENDING (inclusive) at row ``top`` of ``df``, oldest-first. Front-
+        pads with the earliest available row when there isn't enough history (top < lookback-1), and
+        returns a neutral zero grid when no row has closed yet (top < 0) — so the window never reaches
+        FORWARD past ``top`` into the future (the RETURN_ENGINE_AUDIT.md look-ahead leak)."""
+        width = df.shape[1]
+        if top < 0:
+            return np.zeros((lookback, width))
+        top = min(top, len(df) - 1)
+        lo = max(0, top - (lookback - 1))
+        rows = df.iloc[lo:top + 1].values
+        if rows.shape[0] < lookback and rows.shape[0] > 0:
+            pad = np.repeat(rows[0:1], lookback - rows.shape[0], axis=0)
+            rows = np.concatenate([pad, rows], axis=0)
+        return rows
+
     def get_values(self, step: int):
 
         out = []
@@ -218,9 +234,14 @@ class MultiTimelineDataProvider(AbstractDataProvider):
                 df = self.fidelity_dfs[i][mapping]
 
                 index = int((offset - mapping)/self.multipliers[i])
-                v = df.loc[
-                    index : index + (self.config.lookback_window_size-1)
-                ].values
+                # Look-ahead guard (RETURN_ENGINE_AUDIT.md): the bar at `index` BEGINS at this step's
+                # bar. The run-fidelity layer's bar IS the decision bar — it closes now, so observing it
+                # is the standard decide-at-close assumption (top == index). A COARSER layer's current bar
+                # only closes `multiplier` steps later, so it (and any later bar) is the FUTURE; observe
+                # the lookback bars ENDING at the most-recent CLOSED bar instead (top == index - 1). The
+                # old `df.loc[index : index + lookback-1]` sliced FORWARD and leaked up to ~767h ahead.
+                top = index if self.multipliers[i] <= self.divider_run else index - 1
+                v = self._lookback_grid(df, top, self.config.lookback_window_size)
                 # raw_test = self.fidelity_raw_dfs[i][mapping].loc[
                 #     index : index + (self.config.lookback_window_size-1)
                 # ]

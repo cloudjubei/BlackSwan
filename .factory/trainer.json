@@ -493,6 +493,27 @@
   },
   "presets": [
     {
+      "label": "▶ Exp L · Look-ahead leak regression (observed fidelity_set @ 1h: 1d MUST NOT beat hold)",
+      "sweep": {
+        "model_name": ["supervised-gbm", "supervised-logreg", "hodl"],
+        "fidelity_set": ["1d", "1h", "1h+1d"]
+      },
+      "fixed": {
+        "timeframe": "1h",
+        "walk_forward_window": "2024",
+        "forward_horizon": 1,
+        "prob_threshold": 0.5,
+        "stop_loss": 0.05,
+        "position_sizing": "vol_target",
+        "use_indicators": false,
+        "transaction_fee": 0.001,
+        "device": "cpu"
+      },
+      "seeds": 2,
+      "thesis": "RETURN_ENGINE_AUDIT regression. fidelity_set='1d' at a 1h step USED to feed the classifier resampled daily bars from up to ~32 days in the FUTURE (MultiTimelineDataProvider.get_values forward window), fabricating the audited +261.95% / +206%-vs-hold. After the get_values backward-window fix, the supervised 'fidelity_set=1d' cell MUST collapse to a loss (~ the '1h'/'1h+1d' cells) and MUST NOT beat hodl. Reproduction signature pre-fix: supervised-gbm fidelity_set=1d => +261.95% / 55.56% win / 396 trades / 58% acc; post-fix => ~ -64% / ~52% acc. hodl is the always-long control (~+37-55%).",
+      "thesisTarget": "fidelity_set"
+    },
+    {
       "label": "▶ Exp 1 · 1d family triage (model × seed, fast)",
       "sweep": { "model_name": ["reppo-custom", "trpo-custom", "duel-dqn-custom", "dqn"] },
       "fixed": {

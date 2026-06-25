@@ -183,30 +183,34 @@ def test_fidelity_single_layer_grid_shape():
     raw = _ts_df(["2021-01-01 00:%02d:00" % i for i in range(6)])
     p = _fid(lookback=2, layers=["1h"], fidelity_run="1h", multipliers=[1],
              fidelity_dfs=[[layer_df]], raw_df=raw)
-    v = p.get_values(0)  # offset 0, mapping 0, index = (0-0)/1 = 0 -> rows [0,1]
+    # step 3: run-fidelity layer's bar IS the decision bar, so the window ENDS at it (backward) -> rows [2,3].
+    v = p.get_values(3)
     assert v.shape == (1, 2, 2)
-    assert np.array_equal(v[0], layer_df.loc[0:1].values)
+    assert np.array_equal(v[0], layer_df.loc[2:3].values)
 
 
 def test_fidelity_mapping_routes_to_minute_bucket():
-    # fidelity '1m', layer '1h' -> mapping == minute. Build 60 buckets; step 3 -> raw minute 3 -> bucket 3.
+    # fidelity '1m', layer '1h' (multiplier 60) -> mapping == minute, routing to that minute's bucket.
+    # The '1h' layer is COARSER than the '1m' step, so its current hour is still forming: the window
+    # ends at index-1 (the last CLOSED hour bar), never the future.
     buckets = [pd.DataFrame({"f0": [float(b * 100 + j) for j in range(10)]}) for b in range(60)]
-    raw = _ts_df(["2021-01-01 00:%02d:00" % i for i in range(8)])
+    raw = _ts_df([pd.Timestamp("2021-01-01 00:00:00") + pd.Timedelta(minutes=i) for i in range(200)])
     p = _fid(lookback=2, layers=["1h"], fidelity_run="1m", multipliers=[60],
              fidelity_dfs=[buckets], raw_df=raw)
-    v = p.get_values(3)  # offset 3, mapping = minute 3, index = (3-3)/60 = 0 -> bucket3 rows [0,1]
+    # step 123 -> minute 3 -> bucket 3; index = (123-3)/60 = 2; coarser -> top = 1 -> bucket3 rows [0,1].
+    v = p.get_values(123)
     assert v.shape == (1, 2, 1)
     assert v[0][:, 0].tolist() == [300.0, 301.0]
 
 
 def test_fidelity_index_advances_within_bucket():
-    # offset 60 (minute 0 of the next hour), layer '1h', multiplier 60: mapping = minute 0, index =
-    # (60-0)/60 = 1 -> the SECOND lookback window inside bucket 0.
+    # offset 180 (minute 0 of the 4th hour), layer '1h', multiplier 60: mapping = minute 0, index =
+    # (180-0)/60 = 3, coarser -> top = 2 -> the window ending at the 3rd CLOSED hour inside bucket 0.
     buckets = [pd.DataFrame({"f0": [float(b * 100 + j) for j in range(20)]}) for b in range(60)]
-    raw = _ts_df([pd.Timestamp("2021-01-01 00:00:00") + pd.Timedelta(minutes=i) for i in range(70)])
+    raw = _ts_df([pd.Timestamp("2021-01-01 00:00:00") + pd.Timedelta(minutes=i) for i in range(200)])
     p = _fid(lookback=2, layers=["1h"], fidelity_run="1m", multipliers=[60],
              fidelity_dfs=[buckets], raw_df=raw)
-    v = p.get_values(60)  # mapping = minute(of row60)=0, index=(60-0)/60=1 -> bucket0 rows [1,2]
+    v = p.get_values(180)  # mapping = minute(of row180)=0, index=3, top=2 -> bucket0 rows [1,2]
     assert v[0][:, 0].tolist() == [1.0, 2.0]
 
 
@@ -214,23 +218,24 @@ def test_fidelity_two_layers_stack_on_layer_axis():
     layer_a = _grid_df(6, 2, base=0.0)
     layer_b = _grid_df(6, 2, base=900.0)
     raw = _ts_df(["2021-01-01 00:%02d:00" % i for i in range(6)])
-    # Both layers under default-branch fidelity '1h' map to 0 (layers not handled there -> 0).
+    # Both layers under default-branch fidelity '1h' map to 0 (layers not handled there -> 0); both
+    # multiplier 1, so each window ENDS at the decision bar (step 3) -> rows [2,3], stacked on layer axis.
     p = _fid(lookback=2, layers=["1h", "1d"], fidelity_run="1h", multipliers=[1, 1],
              fidelity_dfs=[[layer_a], [layer_b]], raw_df=raw)
-    v = p.get_values(0)
+    v = p.get_values(3)
     assert v.shape == (2, 2, 2)
-    assert np.array_equal(v[0], layer_a.loc[0:1].values)
-    assert np.array_equal(v[1], layer_b.loc[0:1].values)
+    assert np.array_equal(v[0], layer_a.loc[2:3].values)
+    assert np.array_equal(v[1], layer_b.loc[2:3].values)
 
 
 def test_fidelity_divider_run_scales_offset():
-    # divider_run 5 -> offset = step * 5. step 2 -> offset 10 (minute 10 -> bucket0 for layer '1h'? no:
-    # layer '1h' under fidelity '1m' -> mapping = minute 10; index = (10-10)/60 = 0).
+    # divider_run 5 -> offset = step * 5. step 26 -> offset 130 -> layer '1h' under fidelity '1m' ->
+    # mapping = minute 10; index = (130-10)/60 = 2; coarser -> top = 1 -> bucket10 rows [0,1].
     buckets = [pd.DataFrame({"f0": [float(b * 100 + j) for j in range(10)]}) for b in range(60)]
-    raw = _ts_df([pd.Timestamp("2021-01-01 00:00:00") + pd.Timedelta(minutes=i) for i in range(60)])
+    raw = _ts_df([pd.Timestamp("2021-01-01 00:00:00") + pd.Timedelta(minutes=i) for i in range(200)])
     p = _fid(lookback=2, layers=["1h"], fidelity_run="1m", multipliers=[60],
              fidelity_dfs=[buckets], raw_df=raw, divider_run=5)
-    v = p.get_values(2)  # offset = 2*5 = 10 -> minute 10 -> bucket10, index 0
+    v = p.get_values(26)
     assert v[0][:, 0].tolist() == [1000.0, 1001.0]
 
 
@@ -267,6 +272,56 @@ def test_fidelity_lookback_one_two_layers_does_not_sum():
     # layer_a row0 [0,1000], layer_b row0 [900,1900] -> concatenated, not [900.0, 2900.0].
     assert v.tolist() != [900.0, 2900.0]
     assert len(v) == 4
+
+
+# --------------------------------------------------------------------------------------------------
+# get_values LOOK-AHEAD GUARD (regression: RETURN_ENGINE_AUDIT.md — fidelity_set='1d' @ timeframe='1h')
+#
+# At an hourly step s the observation must contain NO bar whose close is in the future. Encodes each
+# resampled bar's feature value as its OWN as-of 1h close index; asserts every observed value <= s.
+# Before the fix, the resolved-fidelity window sliced df.loc[index : index+lb-1] FORWARD, so a coarser
+# (e.g. daily) layer observed bars closing up to ~767h ahead — manufacturing the audited +261% return.
+# --------------------------------------------------------------------------------------------------
+
+def _hourly_raw(n_hours):
+    base = pd.Timestamp("2024-01-01 00:00:00")
+    return _ts_df([base + pd.Timedelta(hours=i) for i in range(n_hours)])
+
+
+def _daily_substreams_asof(n_hours):
+    """24 phase-shifted daily substreams resampled from an hourly base, exactly as process_fidelity
+    lays them out: substream h, bar k = 1h block [h+k*24 .. h+k*24+23], whose CLOSE is 1h index
+    h+k*24+23. Each bar's single feature carries that close index (its as-of time)."""
+    subs = []
+    for h in range(24):
+        closes, k = [], 0
+        while h + k * 24 + 23 < n_hours:
+            closes.append(float(h + k * 24 + 23))
+            k += 1
+        subs.append(pd.DataFrame({"asof": closes}))
+    return subs
+
+
+def test_resolved_fidelity_coarser_layer_never_observes_future():
+    lookback, n = 4, 24 * 12
+    p = _fid(lookback=lookback, layers=["1d"], fidelity_run="1h", multipliers=[24],
+             fidelity_dfs=[_daily_substreams_asof(n)], raw_df=_hourly_raw(n))
+    for step in range(0, n - 24):
+        observed = np.asarray(p.get_values(step))
+        assert observed.size == 0 or observed.max() <= step, (
+            f"LOOK-AHEAD LEAK: hourly step {step} observes a daily bar closing at 1h-index "
+            f"{observed.max()} (future > {step})")
+
+
+def test_resolved_fidelity_run_layer_never_observes_future():
+    lookback, n = 4, 50
+    base = pd.DataFrame({"asof": [float(i) for i in range(n)]})  # run-fidelity bar i closes at index i
+    p = _fid(lookback=lookback, layers=["1h"], fidelity_run="1h", multipliers=[1],
+             fidelity_dfs=[[base]], raw_df=_hourly_raw(n))
+    for step in range(0, n):
+        observed = np.asarray(p.get_values(step))
+        assert observed.max() <= step, (
+            f"LOOK-AHEAD LEAK: run-fidelity step {step} observes bar at index {observed.max()} (future)")
 
 
 # --------------------------------------------------------------------------------------------------
