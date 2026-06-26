@@ -4,6 +4,7 @@
   "description": "BlackSwan trains reinforcement-learning agents to trade a SINGLE crypto asset (BTCUSDT) on the spot market, long-only by default, under realistic 0.1% per-trade fees. Each run trains on historical klines and is tested OUT-OF-SAMPLE (walk-forward windows 2022/2023/2024, expanding train); the agent observes multi-timeframe OHLCV (e.g. stacked 1h+1d layers) plus optional technical indicators. The objective is traded_return = total post-fee return gated by trade frequency (trade often AND well — a near-hold run scores ~0). In the strong presets the agent has NO explicit sell action (no_sell_action): it only times entries and exits are forced by take-profit/stop-loss/trailing-stop — so 'many buys, few sells' is by design, not a bug. 'Good' = a setup that trades often and profitably AND beats buy-and-hold (positive return_vs_hold_pct) net of fees, stable across seeds and walk-forward windows.",
   "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
   "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
+  "maxThreadsPerRun": 2,
   "objective": {
     "name": "traded_return",
     "direction": "max"
@@ -98,6 +99,7 @@
         "a2c",
         "attn-ppo",
         "tcn-ppo",
+        "itransformer-ppo",
         "reppo",
         "ppo-sbx",
         "a2c-custom",
@@ -1331,6 +1333,45 @@
       ],
       "status": "untested",
       "source": "manual"
+    },
+    {
+      "id": "itransformer-inverted-2024",
+      "title": "iTransformer: Inverted Transformers Are Effective for Time Series Forecasting",
+      "url": "https://arxiv.org/abs/2310.06625",
+      "authors": "Liu, Hu, Zhang, Wu, Wang, Ma, Long",
+      "year": 2024,
+      "claim": "Inverting the Transformer — tokenising each VARIATE's whole series (not each timestep) so self-attention models cross-variate correlations and the FFN learns per-series representations — beats vanilla Transformers and specialised models on multivariate long-term forecasting, with better generalisation to unseen variates. No new components, only inverted dimensions.",
+      "approach": "Embed each variate's full lookback series as one token; self-attention ACROSS variate tokens (no temporal positional encoding — variates are unordered); a per-variate feed-forward network; LayerNorm over variates.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "multiAsset": false,
+        "retrainCadence": "N/A — a forecasting-architecture paper, not a trading strategy.",
+        "notes": "Forecasting benchmark (MSE/MAE on ETT/Traffic/Weather/etc.), not trading. The open question is whether inverted cross-variate attention helps a single-asset RL policy on a noisy OHLCV+portfolio observation under 0.1% fees."
+      },
+      "verdictNote": "The architecture we A/B as `itransformer-ppo` (src/model/custom/sequence_extractor.py, encoder='itransformer') against attn-ppo (attention over time) and tcn-ppo. Per no-champions-tsf-2025, expect a near-wash on a single noisy asset — the value is the rigorous A/B under walk-forward + fees, not a regime oracle.",
+      "tags": [
+        "architecture",
+        "transformer",
+        "sequence",
+        "time-series"
+      ],
+      "replicateConfig": {
+        "fixed": {
+          "reward_model": "combo_unified",
+          "combo_direct": 1,
+          "timeframe": "1h",
+          "use_indicators": true,
+          "lookback_window": 32
+        },
+        "sweep": {
+          "model_name": ["itransformer-ppo", "attn-ppo", "tcn-ppo"],
+          "walk_forward_window": [2022, 2023, 2024]
+        },
+        "seeds": 3
+      },
+      "status": "untested",
+      "source": "manual"
     }
   ],
   "models": [
@@ -1524,7 +1565,7 @@
       "id": "rainbow-dqn-custom",
       "slug": "rainbow-dqn-custom",
       "name": "Rainbow DQN",
-      "description": "DQN with prioritized experience replay, NoisyNet exploration, dueling streams and distributional quantiles. Consolidates the custom head, the SB3-subclass, and the legacy standalone Rainbow agent.",
+      "description": "DQN with prioritized experience replay, NoisyNet exploration, dueling streams and distributional quantiles. Consolidates the custom head and the SB3-subclass build.",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -1535,10 +1576,6 @@
         {
           "name": "SB3-subclass",
           "modelName": "rainbow-dqn"
-        },
-        {
-          "name": "legacy agent",
-          "modelName": "rainbow-dqn-old"
         }
       ],
       "implPath": "src/model/rainbow_dqn/rainbow_dqn.py",
@@ -1658,12 +1695,18 @@
       "id": "itransformer-ppo",
       "slug": "itransformer-ppo",
       "name": "iTransformer sequence encoder (PPO)",
-      "description": "PROPOSED: an inverted-attention (iTransformer-style) sequence encoder as a third SequenceFeaturesExtractor variant to A/B against attn-ppo and tcn-ppo.",
+      "description": "PPO over an inverted-attention (iTransformer, Liu et al. 2024) sequence encoder — each VARIATE (feature column) is a token embedding its full lookback series, with attention ACROSS variates (no positional embedding; variates are unordered). A third SequenceFeaturesExtractor variant to A/B against attn-ppo (attention over time) and tcn-ppo. Built 2026-06-26 (sequence_extractor.py `encoder='itransformer'`).",
       "category": "rl",
-      "status": "proposed",
-      "flavors": [],
-      "proposal": "Add an iTransformer-style inverted-attention encoder to src/model/custom/sequence_extractor.py and expose it as an `itransformer-ppo` model_name, then A/B it against attn-ppo/tcn-ppo under walk-forward + fees.",
+      "status": "implemented",
+      "flavors": [
+        {
+          "name": "default",
+          "modelName": "itransformer-ppo"
+        }
+      ],
+      "implPath": "src/model/custom/sequence_extractor.py",
       "paperIds": [
+        "itransformer-inverted-2024",
         "dlinear-transformers-effective-2023",
         "hf-transformers-effective-tsf-2023"
       ],

@@ -17,6 +17,9 @@ DEFAULT_FIDELITY_SET = "auto"
 # fidelity_set label -> the OBSERVED layer stack (the run/step is separate, from `timeframe`).
 # "auto" derives the stack from the run.
 _LAYER_SETS = {
+    "1m": ["1m"],
+    "1m+1h": ["1m", "1h"],
+    "1m+1h+1d": ["1m", "1h", "1d"],
     "1d": ["1d"],
     "1h": ["1h"],
     "1h+1d": ["1h", "1d"],
@@ -44,7 +47,13 @@ def resolve_fidelity(cfg=None):
     if fset == "auto":
         # Resolve "auto" to its CONCRETE layer-set id (e.g. 1h -> "1h+1d", 1d -> "1d") so stored runs
         # carry the actual value, not the synonym — "auto" is only a convenience INPUT in the launch form.
-        layers = ["1h", "1d"] if run == "1h" else ["1d"]
+        # A minute step mirrors the hourly default (finest base + one coarser context layer): 1m -> 1m+1h.
+        if run == "1m":
+            layers = ["1m", "1h"]
+        elif run == "1h":
+            layers = ["1h", "1d"]
+        else:
+            layers = ["1d"]
         set_id = "+".join(layers)
     else:
         if fset not in _LAYER_SETS:
@@ -56,26 +65,34 @@ def resolve_fidelity(cfg=None):
     # provider can both STEP at the run cadence and RESAMPLE every (coarser-or-equal) layer from it. An
     # hourly step always needs the 1h base; a DAILY step needs the 1h base too whenever it observes a 1h
     # layer (step it day by day, divider 24), else the 1d base. Lookback follows the base granularity.
-    fidelity_input = "1h" if (run == "1h" or "1h" in layers) else "1d"
+    # The BASE granularity is the FINEST of the step and the observed layers: 1m if any 1m is involved,
+    # else 1h if any 1h, else 1d. A coarser step over a finer base (e.g. an hourly step over a 1m base)
+    # is served by the provider's divider_run (decision cadence decoupled from the observed micro-data).
+    if run == "1m" or "1m" in layers:
+        fidelity_input = "1m"
+    elif run == "1h" or "1h" in layers:
+        fidelity_input = "1h"
+    else:
+        fidelity_input = "1d"
     return set_id, {
         "layers": layers,
         "fidelity_run": run,
         "fidelity_input": fidelity_input,
-        "lookback": 32 if fidelity_input == "1h" else 1,
+        "lookback": 32 if fidelity_input in ("1h", "1m") else 1,
     }
 
 
 def _validate(run, layers, set_id):
     # The step must be a provider-supported cadence, and every observed layer must be one the finest base
-    # (1h) can serve — nothing SUB-hourly exists, so {1h, 1d, 1w} is the whole allowed set at either step.
-    # Daily-step multi/finer fidelity is now served by stepping the 1h base day by day (divider 24), the
-    # symmetric counterpart of an hourly step observing a resampled 1d layer.
-    if run not in ("1h", "1d"):
-        raise SystemExit(f"unsupported timeframe {run!r} — use '1h' or '1d'.")
-    allowed = {"1h", "1d", "1w"}
+    # (now 1m, the canonical source) can serve — {1m, 1h, 1d, 1w}. A coarser step over a finer base
+    # (e.g. an hourly step over a 1m base) is served by the provider's divider_run, the same machinery
+    # that lets a daily step observe a resampled 1h layer.
+    if run not in ("1m", "1h", "1d"):
+        raise SystemExit(f"unsupported timeframe {run!r} — use '1m', '1h' or '1d'.")
+    allowed = {"1m", "1h", "1d", "1w"}
     bad = [layer for layer in layers if layer not in allowed]
     if bad:
         raise SystemExit(
             f"incompatible timeframe × fidelity_set: layers {bad} aren't supported (allowed "
-            f"{sorted(allowed)}) — the finest base is 1h, so nothing sub-hourly can be observed."
+            f"{sorted(allowed)}) — the finest base is 1m, so nothing sub-minute can be observed."
         )

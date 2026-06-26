@@ -34,6 +34,13 @@ def _daily_files(pairs, symbol=_SYMBOL):
     return [f for f in files if os.path.exists(f)]
 
 
+def _minute_files(pairs, symbol=_SYMBOL):
+    # The canonical 1m source klines (NOT derived — 1m IS the source of truth; coarser layers resample
+    # from it at runtime in the provider). Used by the 1m-base path.
+    files = [f"binance/{symbol}-1m-{y}-{m}.json" for (y, m) in pairs]
+    return [f for f in files if os.path.exists(f)]
+
+
 def require_data_present(cfg=None):
     """Fail fast with a clear message when the chosen asset's klines aren't on disk."""
     cfg = cfg or {}
@@ -62,6 +69,41 @@ def build_data_config(cfg):
     layers = list(fspec["layers"])
     lookback = int(fspec["lookback"])
     fidelity_run = fspec["fidelity_run"]
+    # The 1m BASE path serves any run whose finest involved granularity is 1m — a minute step, OR a
+    # coarser step (1h/1d) over the 1m base where the provider's divider_run advances the right number of
+    # 1m bars per decision (observe 1m micro-structure, decide coarsely). It reads the RAW 1m source
+    # directly (no derive: 1m is the source of truth; coarser layers resample at runtime).
+    if fspec["fidelity_input"] == "1m":
+        if asset != _SYMBOL:
+            raise SystemExit(
+                f"{asset} has no 1-minute dataset on disk — minute data is {_SYMBOL}-only until "
+                f"altcoin klines are added (deferred to the data mine)."
+            )
+        train_files = _minute_files(train_pairs, asset)
+        test_files = _minute_files(test_pairs, asset)
+        if not train_files or not test_files:
+            raise SystemExit(
+                f"binance/ 1m klines for {asset} missing for window {wf} — a 1m run needs the raw "
+                f"minute source on disk."
+            )
+        return OmegaConf.structured(
+            DataConfig(
+                id=f"{asset}-{fset_id}-wf{wf}",
+                train_data_paths=[train_files],
+                test_data_paths=[test_files],
+                lookback_window_size=int(cfg.get("lookback_window") or lookback),
+                type=str(cfg.get("data_type", "only_price_percent")),
+                use_indicators=bool(cfg.get("use_indicators", False)),
+                timestamp="day_of_week",
+                obs_squash=str(cfg.get("obs_squash", "none")),
+                fidelity_input="1m",
+                fidelity_run=fidelity_run,
+                layers=layers,
+                fidelity_input_test="1m",
+                fidelity_run_test=fidelity_run,
+                layers_test=layers,
+            )
+        )
     # The 1h BASE path serves any step that observes a 1h layer — an hourly step AND a daily step over the
     # 1h base (stepped day by day, the provider's divider_run handles the cadence). It needs the derived
     # cache. The 1d base path runs off raw 1d files (single 1d, or 1d+1w resampled from 1d).

@@ -94,6 +94,45 @@ def test_build_data_config_daily_step_with_finer_layers_uses_1h_base(monkeypatch
     assert cfg.lookback_window_size == 32
 
 
+def test_build_data_config_1m_uses_raw_minute_source(monkeypatch):
+    # B0: a minute-base run reads the RAW 1m files directly (no derive cache); coarser layers resample
+    # from them at runtime.
+    monkeypatch.setattr(
+        config_builder,
+        "_minute_files",
+        lambda pairs, symbol=config_builder._SYMBOL: [f"1m-{y}-{m}" for (y, m) in pairs],
+    )
+    cfg = config_builder.build_data_config({"timeframe": "1m", "walk_forward_window": "2024"})
+    assert cfg.fidelity_input == "1m"
+    assert cfg.fidelity_run == "1m"
+    assert list(cfg.layers) == ["1m", "1h"]
+    assert list(cfg.train_data_paths[0])[0] == "1m-2020-1"
+    assert "1m+1h" in cfg.id
+    assert cfg.lookback_window_size == 32
+
+
+def test_build_data_config_1m_base_with_hourly_decision_cadence(monkeypatch):
+    # B2: observe 1m micro-structure, DECIDE hourly -> 1m base (fidelity_input), 1h step (fidelity_run).
+    monkeypatch.setattr(
+        config_builder, "_minute_files", lambda pairs, symbol=config_builder._SYMBOL: ["f"]
+    )
+    cfg = config_builder.build_data_config({"timeframe": "1h", "fidelity_set": "1m+1h"})
+    assert cfg.fidelity_input == "1m"
+    assert cfg.fidelity_run == "1h"
+    assert list(cfg.layers) == ["1m", "1h"]
+
+
+def test_build_data_config_1m_non_btc_fails_fast():
+    with pytest.raises(SystemExit):
+        config_builder.build_data_config({"asset": "ETHUSDT", "timeframe": "1m"})
+
+
+def test_build_data_config_1m_missing_source_fails_fast(monkeypatch):
+    monkeypatch.setattr(config_builder, "_minute_files", lambda pairs, symbol=config_builder._SYMBOL: [])
+    with pytest.raises(SystemExit, match="1m klines"):
+        config_builder.build_data_config({"timeframe": "1m"})
+
+
 def test_build_data_config_default_1h_is_the_1h_plus_1d_stack(monkeypatch):
     import trainer.derive_cache as dc
 

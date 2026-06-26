@@ -7,9 +7,12 @@ reshapes the flat obs back to [B, lookback, per_bar] and applies a genuine tempo
 bars, then pools to a fixed feature vector the policy MLP consumes — wired via SB3's
 `features_extractor_class` on a plain MlpPolicy (no custom policy needed).
 
-Encoders: 'attn' (single-block self-attention with a learned positional embedding) and 'tcn' (dilated
-causal residual convolutions). Both are deliberately small — on a single noisy asset under 0.1% fees,
-architecture is a variance-reduction / diagnostic lever, not a regime oracle; keep depth at 1.
+Encoders: 'attn' (single-block self-attention over BARS with a learned positional embedding), 'tcn'
+(dilated causal residual convolutions over bars), and 'itransformer' (Liu et al. 2024 — INVERTED
+attention: each VARIATE/feature column is a token embedding its whole lookback series, attention mixes
+across variates, no positional embedding since variates are unordered). All are deliberately small — on a
+single noisy asset under 0.1% fees, architecture is a variance-reduction / diagnostic lever, not a regime
+oracle; keep depth at 1.
 """
 
 from typing import List
@@ -86,8 +89,10 @@ class SequenceFeaturesExtractor(BaseFeaturesExtractor):
                 f"SequenceFeaturesExtractor: obs_dim {obs_dim} is not divisible by lookback {lookback} "
                 f"— the flattened observation is not a clean [lookback, per_bar] grid."
             )
-        if encoder not in ("attn", "tcn"):
-            raise ValueError(f"SequenceFeaturesExtractor: unknown encoder '{encoder}' (use 'attn' or 'tcn').")
+        if encoder not in ("attn", "tcn", "itransformer"):
+            raise ValueError(
+                f"SequenceFeaturesExtractor: unknown encoder '{encoder}' (use 'attn', 'tcn', or 'itransformer')."
+            )
         if pool not in ("mean", "last"):
             raise ValueError(f"SequenceFeaturesExtractor: unknown pool '{pool}' (use 'mean' or 'last').")
 
@@ -99,6 +104,15 @@ class SequenceFeaturesExtractor(BaseFeaturesExtractor):
         if encoder == "attn":
             self.in_proj = nn.Linear(self.per_bar, d_model)
             self.pos = nn.Parameter(th.zeros(1, lookback, d_model))
+            self.attn = nn.MultiheadAttention(d_model, num_heads=heads, batch_first=True, dropout=dropout)
+            self.norm1 = nn.LayerNorm(d_model)
+            self.ffn = nn.Sequential(nn.Linear(d_model, d_model * 2), nn.GELU(), nn.Linear(d_model * 2, d_model))
+            self.norm2 = nn.LayerNorm(d_model)
+            self.head = nn.Linear(d_model, features_dim)
+        elif encoder == "itransformer":
+            # Inverted: each VARIATE (feature column) is a token whose embedding is its full lookback-length
+            # series; attention then mixes ACROSS variates. No positional embedding — variates are unordered.
+            self.in_proj = nn.Linear(lookback, d_model)
             self.attn = nn.MultiheadAttention(d_model, num_heads=heads, batch_first=True, dropout=dropout)
             self.norm1 = nn.LayerNorm(d_model)
             self.ffn = nn.Sequential(nn.Linear(d_model, d_model * 2), nn.GELU(), nn.Linear(d_model * 2, d_model))
@@ -127,6 +141,14 @@ class SequenceFeaturesExtractor(BaseFeaturesExtractor):
             h = self.in_proj(x) + self.pos
             attended, _ = self.attn(h, h, h)
             h = self.norm1(h + attended)
+            h = self.norm2(h + self.ffn(h))
+            return self.head(self._pool(h))
+        if self.encoder == "itransformer":
+            # Invert to [B, per_bar, lookback] (variates as tokens), embed each variate's series, attend
+            # ACROSS variates, then pool over the variate axis.
+            v = self.in_proj(x.transpose(1, 2))  # [B, per_bar, d_model]
+            attended, _ = self.attn(v, v, v)
+            h = self.norm1(v + attended)
             h = self.norm2(h + self.ffn(h))
             return self.head(self._pool(h))
         # tcn: encode over the bar (time) axis -> channels-major [B, per_bar, lookback]

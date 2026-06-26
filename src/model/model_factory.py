@@ -23,7 +23,6 @@ from src.model.hodl_model import HodlModel
 from src.model.supervised_model import SupervisedModel
 from src.model.iqn.iqn import IQN
 from src.model.munchhausen_dqn.munchhausen_dqn import MunchausenDQN
-from src.model.rainbow.rainbow_dqn_agent import RainbowDQNAgent
 from src.model.rainbow_dqn.prioritized_replay_buffer import PrioritizedReplayBuffer
 from src.model.rainbow_dqn.rainbow_dqn import RainbowDQN
 from src.model.regression_model import RegressionModel
@@ -277,12 +276,15 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                            "enable_critic_lstm": config.model_rl.enable_critic_lstm
                        })
     
-    elif config.model_rl.model_name in ("attn-ppo", "tcn-ppo"):
-        # PPO over a true SEQUENCE features-extractor (self-attention / TCN) that reshapes the flat
-        # obs back to its [lookback, per_bar] bar grid and encodes over the bars — the principled way
-        # to add modern sequence architectures (the custom_net_arch attention tokens run on the flat
-        # vector, not a real sequence). The extractor takes lookback from the env's data provider.
-        encoder = "attn" if config.model_rl.model_name == "attn-ppo" else "tcn"
+    elif config.model_rl.model_name in ("attn-ppo", "tcn-ppo", "itransformer-ppo"):
+        # PPO over a true SEQUENCE features-extractor (self-attention over bars / TCN / iTransformer
+        # inverted-attention over variates) that reshapes the flat obs back to its [lookback, per_bar] bar
+        # grid and encodes it — the principled way to add modern sequence architectures (the
+        # custom_net_arch attention tokens run on the flat vector, not a real sequence). The extractor
+        # takes lookback from the env's data provider.
+        encoder = {"attn-ppo": "attn", "tcn-ppo": "tcn", "itransformer-ppo": "itransformer"}[
+            config.model_rl.model_name
+        ]
         print(f"Loading {config.model_rl.model_name} - PPO with a {encoder} sequence features-extractor")
         rl_model = PPO(env=env, policy='MlpPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=config.model_rl.target_update_interval, batch_size= config.model_rl.batch_size,
                        n_epochs=1,
@@ -406,9 +408,6 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                 "net_arch": config.model_rl.net_arch,
                 "custom_net_arch": config.model_rl.custom_net_arch
         })
-    elif config.model_rl.model_name == "rainbow-dqn-old":
-        seed = config.model_rl.seed if config.model_rl.seed is not None else 777
-        rl_model = RainbowDQNAgent(env, memory_size= config.model_rl.buffer_size, batch_size= config.model_rl.batch_size, target_update=config.model_rl.target_update_interval, seed= seed)
     elif config.model_rl.model_name == "iqn":
         rl_model = IQN(env=env, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
                        buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 

@@ -384,7 +384,7 @@ model_rl = ModelConfigSearch(
 
         # model_name= ["munchausen-dqn"],
         # model_name= ["rainbow-dqn"],
-        # model_name= ["rainbow-dqn-old", "iqn"], # very slow (12it/s, 10it/s), but can work very well
+        # model_name= ["iqn"], # very slow (~10it/s), but can work very well
         # model_name= ["duel-dqn-lstm"], # can have some very good results with hidden size 2,4
 
         reward_model= ["combo_all2"],
@@ -849,68 +849,6 @@ model_technical_bollinger_test = ModelConfigSearch(
         sell_is_price_check= True,
     )
 )
-
-@dataclass
-class ModelRLConfig:
-    model_name: str
-    reward_model: str
-    learning_rate: float = 0.0001
-    batch_size: int = 32
-    buffer_size: int = 1_000_000
-    gamma: float = 0.99
-    tau: float = 1.0
-    exploration_fraction: float = 0.1
-    exploration_final_eps: float = 0.05
-    learning_starts: int = 50000
-    train_freq: int = 4
-    gradient_steps: int = 1
-    target_update_interval: int = 10000
-    max_grad_norm: float = 10
-    optimizer_class: str = 'Adam'
-    optimizer_eps: float = 0.00000001
-    optimizer_weight_decay: float = 0
-    optimizer_centered: bool = False
-    optimizer_alpha: float = 0.99
-    optimizer_momentum: float = 0
-    activation_fn: str = 'ReLU'
-    net_arch: List[int] = field(default_factory=list)
-    custom_net_arch: List[str] = field(default_factory=list)
-
-    # LSTM topology for the recurrent (reppo / reppo-custom) models. Defaults reproduce SB3's
-    # RecurrentActorCriticPolicy exactly (separate actor+critic LSTMs, hidden size 256). shared_lstm
-    # collapses them to ONE LSTM (cheaper) and REQUIRES enable_critic_lstm=False (SB3 asserts the XOR).
-    lstm_hidden_size: int = 256
-    shared_lstm: bool = False
-    enable_critic_lstm: bool = True
-
-    episodes: int = 1
-
-    reward_multiplier_combo_noaction: float = 0
-    reward_multiplier_combo_wrongaction: float = 0
-    reward_multiplier_combo_positionprofitpercentage: float = 0
-    reward_multiplier_combo_buy: float = 0
-    reward_multiplier_combo_sell: float = 0
-    # combo_unified: the DIRECT per-step portfolio-return component (folds in profit_percentage_direct).
-    reward_multiplier_combo_direct: float = 0
-
-    reward_multiplier_combo_sell_profit: float = 0
-    reward_multiplier_combo_sell_profit_prev: float = 0
-    reward_multiplier_combo_sell_perfect: float = 0
-    reward_multiplier_combo_sell_drawdown: float = 0
-    reward_multiplier_combo_buy_profit: float = 0
-    reward_multiplier_combo_buy_perfect: float = 0
-    reward_multiplier_combo_buy_profitable_offset: int = 0
-    reward_multiplier_combo_buy_profitable: float = 0
-    reward_multiplier_combo_buy_drawdown: float = 0
-    reward_multiplier_combo_hold_profit: float = 0
-    reward_multiplier_combo_hold_drawdown: float = 0
-    reward_multiplier_combo_fee_penalty: float = 1.0
-    reward_multiplier_combo_noop_penalty: float = 0.001
-
-    progress_bar: bool = True
-    checkpoints_folder: str = 'checkpoints'
-    checkpoint_to_load: str | None = None
-    seed: int | None = None
 
 def get_models_simple():
     return [model_hodl, model_time_test, model_technical_kallmanfilter_test, model_technical_bollinger_test]

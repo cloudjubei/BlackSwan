@@ -449,51 +449,6 @@ def test_create_rl_model_loads_checkpoint_when_configured(monkeypatch):
     assert loaded["path"] == os.path.join("ck", "best.zip")
 
 
-def test_create_rl_model_rainbow_old_defaults_seed_to_777(monkeypatch):
-    captured = {}
-
-    class FakeRainbowOld:
-        def __init__(self, env, memory_size, batch_size, target_update, seed):
-            captured.update(
-                env=env, memory_size=memory_size, batch_size=batch_size, target_update=target_update, seed=seed
-            )
-
-        def set_logger(self, logger):
-            pass
-
-        def set_random_seed(self, seed):
-            captured["seed_set"] = seed
-
-    monkeypatch.setattr(model_factory, "RainbowDQNAgent", FakeRainbowOld)
-    cfg = ModelConfig(
-        model_type="rl",
-        model_rl=_rl_config("rainbow-dqn-old", buffer_size=400, batch_size=8, target_update_interval=99, seed=None),
-    )
-    create_rl_model(cfg, env="ENV", device="cpu")
-    assert captured["seed"] == 777
-    assert captured["memory_size"] == 400
-    assert captured["target_update"] == 99
-
-
-def test_create_rl_model_rainbow_old_honours_explicit_seed(monkeypatch):
-    captured = {}
-
-    class FakeRainbowOld:
-        def __init__(self, env, memory_size, batch_size, target_update, seed):
-            captured["seed"] = seed
-
-        def set_logger(self, logger):
-            pass
-
-        def set_random_seed(self, seed):
-            pass
-
-    monkeypatch.setattr(model_factory, "RainbowDQNAgent", FakeRainbowOld)
-    cfg = ModelConfig(model_type="rl", model_rl=_rl_config("rainbow-dqn-old", seed=42))
-    create_rl_model(cfg, env="ENV", device="cpu")
-    assert captured["seed"] == 42
-
-
 def test_create_rl_model_ensemble_builds_four_members(monkeypatch):
     built = []
 

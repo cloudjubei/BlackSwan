@@ -55,6 +55,16 @@ class MultiTimelineDataProvider(AbstractDataProvider):
         self.buyreward_maxwait = buyreward_maxwait
         self.buyreward_percent = buyreward_percent
         self.steps = 0
+        # Set by _precompute_values() once the fidelity build is complete. The fast path hoists the
+        # per-step pandas (pd.to_datetime + DataFrame->numpy) out of get_values: it caches each fidelity
+        # substream as a numpy matrix and precomputes the per-(layer, step) substream + window-top INDICES,
+        # so get_values is a numpy slice with NO pandas. Memory stays ~data-sized (index arrays + base
+        # matrices), NOT step×lookback — what makes minute-bar feasible. While None, get_values uses the
+        # per-step compute path (identical output, pinned by a hash regression test).
+        self._fidelity_mats = None
+        self._step_mapping = None
+        self._step_top = None
+        self._raw_dt = None
 
         self.dfs = []
         self.timestamps = []
@@ -128,7 +138,9 @@ class MultiTimelineDataProvider(AbstractDataProvider):
             self.steps = int((df.shape[0] - self.fidelity_offset)/self.divider_run)
             # self.steps = self.raw_df_for_plotting.shape[0] - 1
 
-        else:         
+            self._precompute_values()
+
+        else:
             for i in range(len(self.paths)):
                 path = self.paths[i]
                 df, prices, timestamps, buy_sells, rewards_buy_profitable, rewards_buy_drawdown = self.get_data(path, config.type, config.timestamp, config.indicator, buyreward_percent, buyreward_maxwait)
@@ -187,6 +199,15 @@ class MultiTimelineDataProvider(AbstractDataProvider):
         # return self.prices[step*self.divider_run + self.get_start_index()]
         return self.prices[step]
 
+    def get_timestamp_datetime(self, df, i):
+        # Reuse the once-converted decision-bar datetimes (set in _precompute_values) instead of
+        # re-running pd.to_datetime(df.iloc[i]) on every mapping lookup — the per-step hot cost. getattr
+        # guards the white-box unit fixtures that build the provider via __new__ (no __init__ attrs).
+        cache = getattr(self, "_raw_dt", None)
+        if cache is not None and df is getattr(self, "raw_df", None):
+            return cache[i]
+        return super().get_timestamp_datetime(df, i)
+
     def _lookback_grid(self, df, top, lookback):
         """The ``lookback`` feature rows ENDING (inclusive) at row ``top`` of ``df``, oldest-first. Front-
         pads with the earliest available row when there isn't enough history (top < lookback-1), and
@@ -197,13 +218,56 @@ class MultiTimelineDataProvider(AbstractDataProvider):
             return np.zeros((lookback, width))
         top = min(top, len(df) - 1)
         lo = max(0, top - (lookback - 1))
-        rows = df.iloc[lo:top + 1].values
+        rows = df.iloc[lo:top + 1].values if hasattr(df, "iloc") else df[lo:top + 1]
         if rows.shape[0] < lookback and rows.shape[0] > 0:
             pad = np.repeat(rows[0:1], lookback - rows.shape[0], axis=0)
             rows = np.concatenate([pad, rows], axis=0)
         return rows
 
+    def _precompute_values(self):
+        """Hoist the per-step pandas out of the observation path. Convert the decision-bar timestamps and
+        every fidelity substream to numpy ONCE, then precompute the per-(layer, step) substream mapping +
+        window-top indices. get_values then builds the observation with a pure-numpy slice — no
+        pd.to_datetime, no DataFrame.iloc — so the data axis stops scaling with the step count. Output is
+        byte-identical to the per-step path (same mapping/top/_lookback_grid math); a hash regression test
+        pins it. Memory is index-array + base-matrix sized, NOT step×lookback."""
+        self._raw_dt = list(pd.to_datetime(self.raw_df["timestamp"]))
+        self._fidelity_mats = [[np.asarray(d.values) for d in subs] for subs in self.fidelity_dfs]
+        start = self.get_start_index()
+        self._step_mapping = []
+        self._step_top = []
+        for i in range(len(self.fidelity_dfs)):
+            maps = []
+            tops = []
+            for step in range(self.steps):
+                offset = step * self.divider_run + start
+                mapping = self.get_current_mapping(self.raw_df, offset, self.layers[i], self.fidelity_run)
+                index = int((offset - mapping) / self.multipliers[i])
+                top = index if self.multipliers[i] <= self.divider_run else index - 1
+                maps.append(mapping)
+                tops.append(top)
+            self._step_mapping.append(maps)
+            self._step_top.append(tops)
+
     def get_values(self, step: int):
+        # Fast O(1)-pandas path for in-range steps once precomputed; the per-step compute path otherwise
+        # (the out-of-range edge step the env reads at `done`, the non-fidelity branch, and the white-box
+        # unit fixtures that bypass __init__). getattr guards the latter (no _step_mapping attribute).
+        if getattr(self, "_step_mapping", None) is not None and 0 <= step < self.steps:
+            out = []
+            lookback = self.config.lookback_window_size
+            for i in range(len(self.fidelity_dfs)):
+                mat = self._fidelity_mats[i][self._step_mapping[i][step]]
+                v = self._lookback_grid(mat, self._step_top[i][step], lookback)
+                if lookback <= 1:
+                    v = v.flatten()
+                    out = v if len(out) == 0 else np.concatenate([out, v])
+                else:
+                    out.append(v)
+            return np.array(out)
+        return self._compute_values(step)
+
+    def _compute_values(self, step: int):
 
         out = []
         v = None

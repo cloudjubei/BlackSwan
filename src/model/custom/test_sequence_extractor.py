@@ -10,7 +10,7 @@ def _space(obs_dim):
     return spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
 
 
-@pytest.mark.parametrize("encoder", ["attn", "tcn"])
+@pytest.mark.parametrize("encoder", ["attn", "tcn", "itransformer"])
 @pytest.mark.parametrize("lookback", [1, 32])
 def test_forward_shape_is_features_dim(encoder, lookback):
     per_bar = 5
@@ -73,7 +73,7 @@ class _Provider:
         return 0
 
 
-@pytest.mark.parametrize("model_name", ["attn-ppo", "tcn-ppo"])
+@pytest.mark.parametrize("model_name", ["attn-ppo", "tcn-ppo", "itransformer-ppo"])
 def test_create_model_builds_ppo_with_sequence_extractor(model_name):
     from src.conf.env_config import EnvConfig
     from src.environment.trade_all_crypto_env import TradeAllCryptoEnv
@@ -96,4 +96,4 @@ def test_create_model_builds_ppo_with_sequence_extractor(model_name):
     model = create_model(config, env, "cpu")
     extractor = model.rl_model.policy.features_extractor
     assert isinstance(extractor, SequenceFeaturesExtractor)
-    assert extractor.encoder == ("attn" if model_name == "attn-ppo" else "tcn")
+    assert extractor.encoder == {"attn-ppo": "attn", "tcn-ppo": "tcn", "itransformer-ppo": "itransformer"}[model_name]

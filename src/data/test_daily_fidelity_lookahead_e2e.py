@@ -31,9 +31,56 @@ from src.data.data_factory import create_provider
 _HAVE_DATA = os.path.exists("binance/BTCUSDT-1h-2020-1.json") and os.path.exists(
     "binance/BTCUSDT-1d-2020-1.json"
 )
+_HAVE_1M = os.path.exists("binance/BTCUSDT-1m-2020-1.json")
 pytestmark = pytest.mark.skipif(
     not _HAVE_DATA, reason="needs binance/ BTCUSDT 1h+1d klines for the real-resampling e2e guard"
 )
+
+
+def _one_month_pairs(cfg=None):
+    # A single month of 1m base (~44k bars) is enough to exercise the resample + lookback + look-ahead
+    # arithmetic without loading multi-year minute data.
+    return [(2020, 1)], [(2020, 2)], {"walk_forward_window": "tiny"}
+
+
+@pytest.mark.skipif(not _HAVE_1M, reason="needs binance/ BTCUSDT 1m klines for the minute-base e2e guard")
+def test_minute_base_hourly_decision_decouples_cadence_byte_identical(monkeypatch):
+    # B0 + B2 end-to-end on the REAL 1m source: observing 1m micro-structure while DECIDING hourly loads
+    # the 1m base and advances 60 bars per decision (divider_run=60), so the decision count stays ~hourly
+    # (NOT 60x) — the minute-data unlock. The O(1) fast path must remain byte-identical to the per-step
+    # compute path (no look-ahead/observation drift), and the standard look-ahead invariant must hold.
+    monkeypatch.setattr(wf, "resolve_walk_forward_window", _one_month_pairs)
+    monkeypatch.setattr(cb, "resolve_walk_forward_window", _one_month_pairs)
+    dc = cb.build_data_config({"timeframe": "1h", "fidelity_set": "1m+1h", "use_indicators": True})
+    assert dc.fidelity_input == "1m" and dc.fidelity_run == "1h"
+    p = create_provider(
+        dc, dc.train_data_paths, dc.fidelity_input, dc.fidelity_run, list(dc.layers),
+        dc.buyreward_maxwait, dc.buyreward_percent,
+    )
+    assert p.divider_run == 60  # 60 one-minute base bars advance per hourly decision
+    n = p.get_timesteps()
+    assert 600 < n < 800, f"a month of hourly decisions over a 1m base should be ~720 steps, got {n}"
+    # byte-identity fast (precomputed) vs slow (per-step) across a sample of steps + the edge step
+    for step in list(range(0, n, max(1, n // 120))) + [n]:
+        fast = np.asarray(p.get_values(step))
+        slow = np.asarray(p._compute_values(step))
+        assert np.array_equal(fast, slow), f"1m base step {step}: fast != slow"
+    # look-ahead: no observed bar closes after the decision bar (re-derives get_values' own arithmetic)
+    raw = p.raw_df
+    raw_ts = _ts_col(raw)
+    checks = 0
+    for step in range(0, n, max(1, n // 200)):
+        offset = step * p.divider_run + p.get_start_index()
+        decision = pd.to_datetime(raw[raw_ts].iloc[offset])
+        for i, layer in enumerate(p.layers):
+            observed = _observed_close(p, raw, raw_ts, offset, i, layer)
+            if observed is None:
+                continue
+            checks += 1
+            assert observed <= decision, (
+                f"LOOK-AHEAD LEAK [1m base] step {step} layer '{layer}': {observed} > {decision}"
+            )
+    assert checks > 0
 
 
 def _tiny_pairs(cfg=None):
@@ -124,6 +171,9 @@ def test_daily_step_observation_offset_matches_price_anchor_real_provider(fideli
             ln = len(p.fidelity_dfs[i][m])
             vals = [float(r) for r in range(ln)] if i == base_idx else [0.0] * ln
             p.fidelity_dfs[i][m] = pd.DataFrame({"asof": vals})
+    # Rebuild the precompute caches from the as-of-encoded frames so the O(1) get_values path reflects
+    # this white-box override (it materialised numpy matrices from the ORIGINAL fidelity_dfs at build).
+    p._precompute_values()
     si = p.get_start_index()
     for step in range(p.get_timesteps()):
         anchor = si + step * p.divider_run
@@ -133,6 +183,47 @@ def test_daily_step_observation_offset_matches_price_anchor_real_provider(fideli
             f"but get_price(step) is anchored at {anchor} (start_index {si} + step*{p.divider_run})"
         )
         assert result.max() <= anchor
+
+
+@pytest.mark.parametrize("timeframe,fidelity_set", [("1h", "1h+1d"), ("1d", "1h+1d"), ("1d", "1d+1w")])
+def test_precompute_fast_path_is_byte_identical_to_per_step_compute(timeframe, fidelity_set, monkeypatch):
+    # B1: the precomputed O(1)-pandas fast path (get_values) must return EXACTLY what the original per-step
+    # compute path (_compute_values) returns, for EVERY step and the out-of-range edge step the env reads
+    # at `done`. This is the byte-identity gate that makes the speedup safe (no observation/look-ahead drift).
+    p = _build(timeframe, fidelity_set, monkeypatch)
+    assert p._step_mapping is not None, "precompute did not run"
+    n = p.get_timesteps()
+    assert n > 5
+    for step in range(n):
+        fast = np.asarray(p.get_values(step))
+        slow = np.asarray(p._compute_values(step))
+        assert np.array_equal(fast, slow), f"[{timeframe}/{fidelity_set}] step {step}: fast != slow"
+    np.asarray(p.get_values(n))  # edge step falls back to _compute_values without raising
+
+
+def test_precompute_fast_path_does_no_per_step_mapping(monkeypatch):
+    # SPEEDUP PROOF (B1): the fast path must NOT call get_current_mapping (which runs pd.to_datetime) per
+    # step — eliminating that per-step pandas IS the speedup. The slow path calls it once per layer per
+    # step; the fast path calls it ZERO times (the mapping/top indices were precomputed once).
+    p = _build("1h", "1h+1d", monkeypatch)
+    sample = min(40, p.get_timesteps())
+    calls = {"n": 0}
+    real = p.get_current_mapping
+
+    def counting(*args, **kwargs):
+        calls["n"] += 1
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(p, "get_current_mapping", counting)
+    for step in range(sample):
+        p.get_values(step)
+    fast_calls = calls["n"]
+    calls["n"] = 0
+    for step in range(sample):
+        p._compute_values(step)
+    slow_calls = calls["n"]
+    assert fast_calls == 0, f"fast path made {fast_calls} per-step mapping calls (should be 0)"
+    assert slow_calls >= sample, "slow path should call get_current_mapping per layer per step"
 
 
 @pytest.mark.parametrize("fidelity_set", ["1h+1d", "1h", "1d+1w"])

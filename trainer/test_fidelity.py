@@ -77,6 +77,42 @@ def test_hourly_step_with_single_daily_resolves():
     assert spec["fidelity_input"] == "1h"
 
 
+def test_minute_step_auto_resolves_to_1m_plus_1h():
+    # B0: a minute-stepping agent on the 1m base, observing 1m micro-structure + an hourly context layer.
+    _, spec = resolve_fidelity({"timeframe": "1m"})
+    assert spec["fidelity_run"] == "1m"
+    assert spec["fidelity_input"] == "1m"
+    assert spec["layers"] == ["1m", "1h"]
+    assert spec["lookback"] == 32
+
+
+def test_minute_base_observed_at_hourly_step_decouples_cadence():
+    # B2: observe 1m micro-structure but DECIDE hourly — fidelity_input=1m (base, stepped 60 bars/decision
+    # via divider_run), fidelity_run=1h (the decision cadence). This is the cadence/data decoupling.
+    _, spec = resolve_fidelity({"timeframe": "1h", "fidelity_set": "1m+1h"})
+    assert spec["fidelity_run"] == "1h"
+    assert spec["fidelity_input"] == "1m"
+    assert spec["layers"] == ["1m", "1h"]
+    assert spec["lookback"] == 32
+
+
+def test_minute_step_with_coarse_layers_uses_1m_base():
+    _, spec = resolve_fidelity({"timeframe": "1m", "fidelity_set": "1m+1h+1d"})
+    assert spec["fidelity_input"] == "1m"
+    assert spec["fidelity_run"] == "1m"
+    assert spec["layers"] == ["1m", "1h", "1d"]
+
+
+def test_validate_accepts_a_minute_run_and_minute_base_layers():
+    assert fidelity_mod._validate("1m", ["1m", "1h"], "1m+1h") is None
+    assert fidelity_mod._validate("1h", ["1m", "1h"], "1m+1h") is None
+
+
+def test_minute_set_ids_are_offered():
+    ids = fidelity_set_ids()
+    assert "1m" in ids and "1m+1h" in ids and "1m+1h+1d" in ids
+
+
 def test_unknown_fidelity_set_fails_fast():
     with pytest.raises(SystemExit):
         resolve_fidelity({"timeframe": "1h", "fidelity_set": "5m+1h"})
