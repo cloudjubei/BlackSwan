@@ -236,21 +236,24 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
     elif config.model_rl.model_name == "reppo":
         print(f"Loading RecurrentPPO - LSTM based PPO model")
 
-        rl_model = RecurrentPPO(env=env, policy= 'MlpLstmPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=config.model_rl.target_update_interval, batch_size= config.model_rl.batch_size, 
+        rl_model = RecurrentPPO(env=env, policy= 'MlpLstmPolicy', device= device, learning_rate= config.model_rl.learning_rate, n_steps=config.model_rl.target_update_interval, batch_size= config.model_rl.batch_size,
                        n_epochs=1,
-                       gamma= config.model_rl.gamma, 
+                       gamma= config.model_rl.gamma,
                        policy_kwargs= {
                            "normalize_images": False,
                            "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
-                           "net_arch": config.model_rl.net_arch
+                           "net_arch": config.model_rl.net_arch,
+                           "lstm_hidden_size": config.model_rl.lstm_hidden_size,
+                           "shared_lstm": config.model_rl.shared_lstm,
+                           "enable_critic_lstm": config.model_rl.enable_critic_lstm
                        })
     elif config.model_rl.model_name == "reppo-custom":
         print(f"Loading RecurrentPPO Custom- LSTM based PPO model")
 
-        rl_model = RecurrentPPO(env=env, policy= CustomRecurrentActorCriticPolicy, device= device, learning_rate= config.model_rl.learning_rate, n_steps=config.model_rl.target_update_interval, batch_size= config.model_rl.batch_size, 
+        rl_model = RecurrentPPO(env=env, policy= CustomRecurrentActorCriticPolicy, device= device, learning_rate= config.model_rl.learning_rate, n_steps=config.model_rl.target_update_interval, batch_size= config.model_rl.batch_size,
                        n_epochs=1,
-                       gamma= config.model_rl.gamma, 
+                       gamma= config.model_rl.gamma,
                        policy_kwargs= {
                            "normalize_images": False,
                            "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
@@ -258,7 +261,10 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                            },
                            "activation_fn": activation_fns[config.model_rl.activation_fn],
                            "net_arch": config.model_rl.net_arch,
-                           "custom_net_arch": config.model_rl.custom_net_arch
+                           "custom_net_arch": config.model_rl.custom_net_arch,
+                           "lstm_hidden_size": config.model_rl.lstm_hidden_size,
+                           "shared_lstm": config.model_rl.shared_lstm,
+                           "enable_critic_lstm": config.model_rl.enable_critic_lstm
                        })
     
     elif config.model_rl.model_name in ("attn-ppo", "tcn-ppo"):

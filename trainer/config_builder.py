@@ -18,6 +18,7 @@ from src.conf.data_config import DataConfig
 from src.conf.env_config import EnvConfig
 from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervisedConfig, model_rl
 from src.model.model_factory import get_model_combinations
+from src.model.rl_model import is_recurrent_model_name
 from trainer.fidelity import resolve_fidelity
 from trainer.walk_forward import resolve_walk_forward_window
 
@@ -195,6 +196,12 @@ def build_model_config(cfg):
     rl.seed = int(cfg["seed"]) if cfg.get("seed") is not None else None
     if cfg.get("checkpoint_to_load"):
         rl.checkpoint_to_load = str(cfg["checkpoint_to_load"])
+    if "lstm_hidden_size" in cfg:
+        rl.lstm_hidden_size = [int(cfg["lstm_hidden_size"])]
+    if "shared_lstm" in cfg:
+        rl.shared_lstm = [bool(cfg["shared_lstm"])]
+    if "enable_critic_lstm" in cfg:
+        rl.enable_critic_lstm = [bool(cfg["enable_critic_lstm"])]
     if "net_arch" in cfg:
         rl.net_arch = [_parse_net_arch(cfg["net_arch"])]
     if "optimizer_class" in cfg:
@@ -207,4 +214,9 @@ def build_model_config(cfg):
         rl.exploration_final_eps = [float(cfg["exploration_final_eps"])]
     config = get_model_combinations(OmegaConf.structured(search))[0]
     config.iterations_to_pick_best = 1
+    if is_recurrent_model_name(model_name) and config.model_rl.shared_lstm and config.model_rl.enable_critic_lstm:
+        raise SystemExit(
+            "shared_lstm=True requires enable_critic_lstm=False — SB3's RecurrentActorCriticPolicy "
+            "shares ONE LSTM across actor+critic only when the separate critic LSTM is disabled."
+        )
     return config

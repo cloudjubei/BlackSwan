@@ -194,6 +194,30 @@ def test_main_config_json_no_calibration_block(tmp_path, monkeypatch):
     assert "evaluation" not in out
 
 
+def test_main_emit_decision_trace_false_skips_trace(tmp_path, monkeypatch):
+    # A sweep run can opt OUT of the (expensive) second deterministic test replay that builds the
+    # decision trace by setting emit_decision_trace=false — the scored summary is unaffected.
+    captured = {}
+    _patch_pipeline(monkeypatch, captured=captured)
+    cfg_path = tmp_path / "cfg.json"
+    cfg_path.write_text(json.dumps({"model_name": "dqn", "emit_decision_trace": False}))
+    out_path = str(tmp_path / "s.json")
+    rc = run_mod.main(["--config-json", str(cfg_path), "--summary-out", out_path])
+    assert rc == 0
+    assert captured["trace_called"] == 0
+
+
+def test_main_emit_decision_trace_defaults_on(tmp_path, monkeypatch):
+    # Omitting the flag preserves the historical behaviour: the trace IS attached.
+    captured = {}
+    _patch_pipeline(monkeypatch, captured=captured)
+    cfg_path = tmp_path / "cfg.json"
+    cfg_path.write_text(json.dumps({"model_name": "dqn"}))
+    out_path = str(tmp_path / "s.json")
+    run_mod.main(["--config-json", str(cfg_path), "--summary-out", out_path])
+    assert captured["trace_called"] == 1
+
+
 def test_main_resume_from_sets_checkpoint_to_load(tmp_path, monkeypatch):
     captured = {}
     _patch_pipeline(monkeypatch, captured=captured)

@@ -179,11 +179,12 @@ def main(argv=None):
     env_test, state, model, is_rl, train_seconds = _run_one(cfg)
     out = summary_mod.build_summary(env_test, state, cfg, model, ran_at, is_rl)
 
-    if not args.calibrate:
+    if not args.calibrate and cfg.get("emit_decision_trace", True):
         # Explain WHY the model acted: replay the deterministic test once more to capture per-step
         # confidence/Q-values + attribution onto out['artifacts']['decisionTrace']. Best-effort — a
         # failure here must not fail an otherwise-good run, and it resets env_test (read AFTER the
-        # summary is built).
+        # summary is built). A sweep can set emit_decision_trace=false to skip this whole second test
+        # replay (the scored summary above is already complete); leave it on for inspected/final runs.
         try:
             decision_trace.attach_decision_trace(out, env_test, model, cfg, args.summary_out, is_rl)
         except Exception as exc:

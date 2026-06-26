@@ -9,9 +9,12 @@ control flow and the action remapping are exercised with no real training, GPU, 
 import os
 
 import numpy as np
+import torch
+from torch import nn
+from torch.nn.utils import parametrize
 
 from src.conf.model_config import ModelConfig, ModelRLConfig
-from src.model.rl_model import RLModel, is_recurrent_model_name
+from src.model.rl_model import RLModel, is_recurrent_model_name, fold_eval_parametrizations
 
 
 # --- fakes -----------------------------------------------------------------
@@ -146,6 +149,43 @@ def test_is_recurrent_model_name_covers_both_reppo_variants():
     assert is_recurrent_model_name("reppo-custom")
     assert not is_recurrent_model_name("dqn")
     assert not is_recurrent_model_name(None)
+
+
+# --- A7: eval weight-norm fold ---------------------------------------------
+
+def test_fold_eval_parametrizations_is_numerically_identical():
+    torch.manual_seed(0)
+    net = nn.Sequential(
+        nn.utils.parametrizations.weight_norm(nn.Linear(8, 4)), nn.ReLU(), nn.Linear(4, 2)
+    )
+    net.eval()
+    x = torch.randn(3, 8)
+    before = net(x).detach().clone()
+    assert parametrize.is_parametrized(net[0], "weight")
+    folded = fold_eval_parametrizations(net)
+    assert folded == 1
+    assert not parametrize.is_parametrized(net[0], "weight")
+    assert torch.allclose(before, net(x).detach(), atol=1e-6)
+
+
+def test_fold_eval_parametrizations_is_noop_without_reparam():
+    assert fold_eval_parametrizations(nn.Linear(4, 2)) == 0
+
+
+def test_fold_eval_parametrizations_is_idempotent():
+    net = nn.Sequential(nn.utils.parametrizations.weight_norm(nn.Linear(4, 2)))
+    assert fold_eval_parametrizations(net) == 1
+    assert fold_eval_parametrizations(net) == 0
+
+
+def test_test_folds_policy_parametrizations():
+    # test() bakes weight_norm into plain weights for the eval passes; best-effort, so a policy that
+    # isn't a torch module (sbx/JAX) or missing entirely just no-ops (covered by the other test() tests).
+    sb3 = _FakeSB3(action=1)
+    sb3.policy = nn.Sequential(nn.utils.parametrizations.weight_norm(nn.Linear(3, 2)))
+    m = _rl_model(sb3, model_name="dqn")
+    m.test(_FakeEnv(2), deterministic=True, progress_bar=False)
+    assert not parametrize.is_parametrized(sb3.policy[0], "weight")
 
 
 # --- predict / predictOnline action remapping ------------------------------

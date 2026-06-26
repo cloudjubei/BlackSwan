@@ -27,6 +27,10 @@ class ModelRLConfigSearch:
     net_arch: List[List[int]] = field(default_factory=list)
     custom_net_arch: List[List[str]] = field(default_factory=list)
 
+    lstm_hidden_size: List[int] = field(default_factory=list)
+    shared_lstm: List[bool] = field(default_factory=list)
+    enable_critic_lstm: List[bool] = field(default_factory=list)
+
     episodes: List[int] = field(default_factory=list)
 
     reward_multiplier_combo_noaction: List[float] = field(default_factory=list)
@@ -79,6 +83,13 @@ class ModelRLConfig:
     activation_fn: str = 'ReLU'
     net_arch: List[int] = field(default_factory=list)
     custom_net_arch: List[str] = field(default_factory=list)
+
+    # LSTM topology for the recurrent (reppo / reppo-custom) models. Defaults reproduce SB3's
+    # RecurrentActorCriticPolicy exactly (separate actor+critic LSTMs, hidden size 256). shared_lstm
+    # collapses them to ONE LSTM (cheaper) and REQUIRES enable_critic_lstm=False (SB3 asserts the XOR).
+    lstm_hidden_size: int = 256
+    shared_lstm: bool = False
+    enable_critic_lstm: bool = True
 
     episodes: int = 1
 
@@ -212,16 +223,23 @@ class ModelTechnicalConfig:
     sell_is_price_check: bool = False
     sell_is_up_check: bool = True
 @dataclass
+class ModelMomentumConfigSearch:
+    lookback_periods: List[int] = field(default_factory=lambda: [30])
+@dataclass
+class ModelMomentumConfig:
+    lookback_periods: int
+@dataclass
 class ModelConfigSearch:
-    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time"]
+    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time", "momentum"]
     model_rl: ModelRLConfigSearch | None = None
     model_regression: ModelRegressionConfigSearch | None = None
     model_supervised: ModelSupervisedConfigSearch | None = None
     model_technical: ModelTechnicalConfigSearch | None = None
     model_time: ModelTimeConfigSearch | None = None
+    model_momentum: ModelMomentumConfigSearch | None = None
 @dataclass
 class ModelConfig:
-    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time"]
+    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time", "momentum"]
     iterations_to_pick_best: int = 10
     # iterations_to_pick_best: int = 1
     model_rl: ModelRLConfig | None = None
@@ -229,6 +247,7 @@ class ModelConfig:
     model_supervised: ModelSupervisedConfig | None = None
     model_technical: ModelTechnicalConfig | None = None
     model_time: ModelTimeConfig | None = None
+    model_momentum: ModelMomentumConfig | None = None
 
     def is_deep(self) -> bool:
         return self.model_type == "rl" or self.model_type == "regression"
@@ -554,6 +573,10 @@ model_rl = ModelConfigSearch(
         #     ["Linear", "LayerNorm", "activation_fn", "Dropout", "Linear", "activation_fn", "Linear", "activation_fn", "Linear", "activation_fn", "Linear"],
         # ],
 
+        lstm_hidden_size= [256],
+        shared_lstm= [False],
+        enable_critic_lstm= [True],
+
         episodes= [1],
 
         reward_multiplier_combo_noaction= [0],
@@ -852,6 +875,13 @@ class ModelRLConfig:
     activation_fn: str = 'ReLU'
     net_arch: List[int] = field(default_factory=list)
     custom_net_arch: List[str] = field(default_factory=list)
+
+    # LSTM topology for the recurrent (reppo / reppo-custom) models. Defaults reproduce SB3's
+    # RecurrentActorCriticPolicy exactly (separate actor+critic LSTMs, hidden size 256). shared_lstm
+    # collapses them to ONE LSTM (cheaper) and REQUIRES enable_critic_lstm=False (SB3 asserts the XOR).
+    lstm_hidden_size: int = 256
+    shared_lstm: bool = False
+    enable_critic_lstm: bool = True
 
     episodes: int = 1
 

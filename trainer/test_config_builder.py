@@ -134,6 +134,40 @@ def test_build_model_config_supervised_maps_levers():
     assert config.model_supervised.seed == 7
 
 
+def test_build_model_config_lstm_levers_default_to_separate_256():
+    # Byte-compat default: a reppo-custom run without the new levers keeps SB3's separate-LSTM,
+    # hidden-size-256 topology (what the policy used before these levers existed).
+    config = config_builder.build_model_config({"model_name": "reppo-custom"})
+    assert config.model_rl.lstm_hidden_size == 256
+    assert config.model_rl.shared_lstm is False
+    assert config.model_rl.enable_critic_lstm is True
+
+
+def test_build_model_config_lstm_hidden_size_override():
+    config = config_builder.build_model_config({"model_name": "reppo-custom", "lstm_hidden_size": 64})
+    assert config.model_rl.lstm_hidden_size == 64
+
+
+def test_build_model_config_shared_lstm_topology():
+    config = config_builder.build_model_config(
+        {"model_name": "reppo-custom", "shared_lstm": True, "enable_critic_lstm": False}
+    )
+    assert config.model_rl.shared_lstm is True
+    assert config.model_rl.enable_critic_lstm is False
+
+
+def test_build_model_config_shared_lstm_without_disabling_critic_fails_fast():
+    # SB3 asserts shared_lstm XOR critic_lstm; surface that as a clear fail-fast, not a deep assert.
+    with pytest.raises(SystemExit):
+        config_builder.build_model_config({"model_name": "reppo-custom", "shared_lstm": True})
+
+
+def test_build_model_config_shared_lstm_ignored_for_non_recurrent_model():
+    # A stray shared_lstm on a non-LSTM model is a meaningless lever, not an error.
+    config = config_builder.build_model_config({"model_name": "dqn", "shared_lstm": True})
+    assert config.model_rl.shared_lstm is True
+
+
 def test_build_model_config_maps_penalty_multipliers():
     config = config_builder.build_model_config({"combo_noop_penalty": 0.02, "combo_fee_penalty": 2.5})
     assert config.model_rl.reward_multiplier_combo_noop_penalty == 0.02

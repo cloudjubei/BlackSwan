@@ -19,6 +19,24 @@ def is_recurrent_model_name(model_name) -> bool:
     return model_name in RECURRENT_MODEL_NAMES
 
 
+def fold_eval_parametrizations(policy) -> int:
+    """Bake every weight reparametrization (weight_norm / spectral_norm) into a plain weight for EVAL.
+
+    weight_norm recomputes the effective weight from its (g, v) factors on EVERY forward; at eval those
+    factors are frozen, so removing the parametrization while KEEPING the current weight
+    (``leave_parametrized=True``) is numerically identical and drops the per-forward recompute. The
+    default reppo-custom net carries three weight_norm layers, so this trims each test/replay forward.
+    Idempotent; returns the number of modules folded."""
+    from torch.nn.utils import parametrize
+
+    folded = 0
+    for module in policy.modules():
+        if parametrize.is_parametrized(module, "weight"):
+            parametrize.remove_parametrizations(module, "weight", leave_parametrized=True)
+            folded += 1
+    return folded
+
+
 class RLModel(BaseRLModel):
     def __init__(self, config: ModelConfig, rl_model: BaseAlgorithm):
         super(RLModel, self).__init__(config)
@@ -40,6 +58,14 @@ class RLModel(BaseRLModel):
 
     def test(self, env: AbstractEnv, deterministic: bool = True, progress_bar: bool = True):
         obs, _ = env.reset()
+
+        # Fold weight_norm/spectral_norm into plain weights for the eval passes (this test + the
+        # decision-trace replay that reuses this policy): numerically identical, skips the per-forward
+        # weight recompute. Best-effort — JAX/sbx policies aren't torch modules, so guard and move on.
+        try:
+            fold_eval_parametrizations(self.rl_model.policy)
+        except Exception:
+            pass
 
         if progress_bar:
             fake_model = stable_baselines3.dqn.DQN(env=env, policy='MlpPolicy')
