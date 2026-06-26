@@ -50,23 +50,7 @@ def compute_key(paths, params):
     return hashlib.sha256(payload.encode()).hexdigest()[:32]
 
 
-def load_or_build(paths, params, build, cache_dir=_CACHE_DIR):
-    """Return the cached build for (source files, params), computing + persisting it on a miss.
-
-    ``build`` is a zero-arg callable that produces the (picklable) artifacts. The cache is transparent:
-    with BS_FEATURE_CACHE=0 it just calls build() and writes nothing. A corrupt/old-format entry is
-    treated as a miss and rebuilt over."""
-    if not _enabled():
-        return build()
-    key = compute_key(paths, params)
-    path = os.path.join(cache_dir, key + ".pkl")
-    if os.path.exists(path):
-        try:
-            with open(path, "rb") as f:
-                return pickle.load(f)
-        except Exception:
-            pass
-    result = build()
+def _write_atomic(path, result, cache_dir):
     os.makedirs(cache_dir, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=cache_dir, suffix=".tmp")
     try:
@@ -78,4 +62,33 @@ def load_or_build(paths, params, build, cache_dir=_CACHE_DIR):
             os.unlink(tmp)
         except OSError:
             pass
+
+
+def load_or_build_key(key, build, cache_dir=None):
+    """Like load_or_build but with a CALLER-COMPUTED key — for inputs that aren't source files (e.g. an
+    in-memory frame keyed by its content hash). ``build`` is a zero-arg callable producing picklable
+    artifacts; a corrupt/old-format entry is treated as a miss and rebuilt over. BS_FEATURE_CACHE=0
+    bypasses entirely (no disk touched). cache_dir defaults to _CACHE_DIR resolved at call time."""
+    if not _enabled():
+        return build()
+    cache_dir = cache_dir or _CACHE_DIR
+    path = os.path.join(cache_dir, key + ".pkl")
+    if os.path.exists(path):
+        try:
+            with open(path, "rb") as f:
+                return pickle.load(f)
+        except Exception:
+            pass
+    result = build()
+    _write_atomic(path, result, cache_dir)
     return result
+
+
+def load_or_build(paths, params, build, cache_dir=None):
+    """Return the cached build for (source files, params), computing + persisting it on a miss.
+
+    ``build`` is a zero-arg callable that produces the (picklable) artifacts. The cache is transparent:
+    with BS_FEATURE_CACHE=0 it just calls build() and writes nothing."""
+    if not _enabled():
+        return build()
+    return load_or_build_key(compute_key(paths, params), build, cache_dir)

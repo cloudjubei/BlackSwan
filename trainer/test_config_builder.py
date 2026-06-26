@@ -134,6 +134,25 @@ def test_build_model_config_supervised_maps_levers():
     assert config.model_supervised.seed == 7
 
 
+def test_is_momentum_detects_momentum_model():
+    assert config_builder.is_momentum({"model_name": "momentum"})
+    assert config_builder.is_momentum({"model_type": "momentum"})
+    assert not config_builder.is_momentum({"model_name": "hodl"})
+    assert not config_builder.is_momentum({"model_name": "supervised-gbm"})
+
+
+def test_build_model_config_momentum_maps_lookback():
+    config = config_builder.build_model_config({"model_name": "momentum", "momentum_lookback": 252})
+    assert config.model_type == "momentum"
+    assert config.model_momentum.lookback_periods == 252
+
+
+def test_build_model_config_momentum_defaults_lookback():
+    config = config_builder.build_model_config({"model_name": "momentum"})
+    assert config.model_type == "momentum"
+    assert config.model_momentum.lookback_periods == 30
+
+
 def test_build_model_config_lstm_levers_default_to_separate_256():
     # Byte-compat default: a reppo-custom run without the new levers keeps SB3's separate-LSTM,
     # hidden-size-256 topology (what the policy used before these levers existed).

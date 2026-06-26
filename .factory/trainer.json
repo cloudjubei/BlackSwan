@@ -117,12 +117,15 @@
         "qrdqn",
         "ars",
         "ars-mlp",
+        "ensemble",
+        "agent57",
         "supervised-logreg",
         "supervised-gbm",
+        "momentum",
         "hodl"
       ],
       "default": "reppo-custom",
-      "description": "The algorithm / policy. Naming conventions: a bare name is the vanilla SB3 build, '-custom' uses tuned network internals, '-lstm' adds a recurrent features-extractor, '-sbx' is the JAX/SBX build. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'reppo'/'reppo-custom' = RecurrentPPO; 'trpo'/'trpo-custom' = TRPO; 'a2c'/'a2c-custom' = A2C. DQN line: 'dqn'/'dqn-custom'/'dqn-lstm'/'dqn-sbx'; dueling 'duel-dqn*'; 'munchausen-*' add the Munchausen log-policy bonus; 'rainbow-dqn'/'rainbow-dqn-custom' add prioritized experience replay (importance-weighted sampling by TD-error). Distributional: 'iqn'/'iqn-custom' (implicit quantile) and 'qrdqn'/'qrdqn-custom' (quantile-regression). 'ars'/'ars-mlp' are Augmented Random Search (gradient-free) baselines. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'hodl' is the buy-and-hold control."
+      "description": "The algorithm / policy. Naming conventions: a bare name is the vanilla SB3 build, '-custom' uses tuned network internals, '-lstm' adds a recurrent features-extractor, '-sbx' is the JAX/SBX build. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'reppo'/'reppo-custom' = RecurrentPPO; 'trpo'/'trpo-custom' = TRPO; 'a2c'/'a2c-custom' = A2C. DQN line: 'dqn'/'dqn-custom'/'dqn-lstm'/'dqn-sbx'; dueling 'duel-dqn*'; 'munchausen-*' add the Munchausen log-policy bonus; 'rainbow-dqn'/'rainbow-dqn-custom' add prioritized experience replay (importance-weighted sampling by TD-error). Distributional: 'iqn'/'iqn-custom' (implicit quantile) and 'qrdqn'/'qrdqn-custom' (quantile-regression). 'ars'/'ars-mlp' are Augmented Random Search (gradient-free) baselines. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'momentum' is a deterministic time-series-momentum baseline (long when the trailing `momentum_lookback`-bar return is positive, flat otherwise — Moskowitz-style), a non-RL control to beat. 'hodl' is the buy-and-hold control."
     },
     "reward_model": {
       "type": "choice",
@@ -411,6 +414,16 @@
       ],
       "appliesWhen": { "model_name": ["supervised-logreg", "supervised-gbm"] },
       "description": "SUPERVISED baseline only: go long only when the classifier's P(up) exceeds this (0.5 = act on any edge; higher = trade only high-confidence signals, fewer trades). Ignored by RL/hodl models."
+    },
+    "momentum_lookback": {
+      "type": "number",
+      "default": 30,
+      "range": [
+        1,
+        365
+      ],
+      "appliesWhen": { "model_name": ["momentum"] },
+      "description": "MOMENTUM baseline only: the trailing window (in bars) whose return SIGN sets the position — long when the price now exceeds the price this many bars ago, flat otherwise. Re-evaluated every bar. E.g. at 1d cadence 30 ≈ monthly, 252 ≈ Moskowitz's ~12-month time-series-momentum rule. Ignored by RL/supervised/hodl models."
     },
     "obs_squash": {
       "type": "choice",
@@ -1147,24 +1160,27 @@
       },
       "replicateConfig": {
         "fixed": {
-          "model_name": "hodl",
-          "reward_model": "combo_unified", "combo_direct": 1,
+          "model_name": "momentum",
           "timeframe": "1d",
           "use_indicators": true,
-          "position_sizing": "vol_target",
-          "vol_target": 0.15,
-          "allow_shorting": true
+          "position_sizing": "fixed",
+          "allow_shorting": false
         },
         "sweep": {
+          "momentum_lookback": [
+            30,
+            90,
+            252
+          ],
           "walk_forward_window": [
-            2022,
-            2023,
-            2024
+            "2022",
+            "2023",
+            "2024"
           ]
         },
         "seeds": 1
       },
-      "verdictNote": "Seminal, but transplanting the ~1.2 Sharpe to single-asset spot BTC under 0.1% fees + walk-forward is unjustified for three compounding reasons. (1) Diversification: the strong Sharpe is a 58-instrument cross-asset portfolio; a single asset loses nearly all the variance reduction — expect single-asset TSM Sharpe far lower (often <0.5). (2) Costs: results are essentially GROSS; 0.1%/trade spot fees plus a vol-scaled frequently-resized rule bleed materially, and crypto's high vol forces more turnover. (3) The registry is long-biased spot, so the short leg (TSM's crisis-alpha) is constrained, cutting return. Net: TSM is the RIGHT honest, parameter-light non-ML CONTROL to beat — a deep model that cannot beat this adapted, net-of-fee, walk-forward control is fluff.",
+      "verdictNote": "Replicated via the deterministic `momentum` model (long when the trailing momentum_lookback-bar return is positive, flat otherwise; long/flat single-asset BTC spot, fixed sizing — vol-target sizing deferred as a multi-asset precursor, shorting a future extension), swept over 30/90/252-bar lookbacks. Seminal, but transplanting the ~1.2 Sharpe to single-asset spot BTC under 0.1% fees + walk-forward is unjustified for three compounding reasons. (1) Diversification: the strong Sharpe is a 58-instrument cross-asset portfolio; a single asset loses nearly all the variance reduction — expect single-asset TSM Sharpe far lower (often <0.5). (2) Costs: results are essentially GROSS; 0.1%/trade spot fees plus a vol-scaled frequently-resized rule bleed materially, and crypto's high vol forces more turnover. (3) The registry is long-biased spot, so the short leg (TSM's crisis-alpha) is constrained, cutting return. Net: TSM is the RIGHT honest, parameter-light non-ML CONTROL to beat — a deep model that cannot beat this adapted, net-of-fee, walk-forward control is fluff.",
       "tags": [
         "non-ML-control",
         "momentum",
@@ -1552,7 +1568,7 @@
       "id": "agent57",
       "slug": "agent57",
       "name": "Agent57",
-      "description": "DQN with an Agent57-style intrinsic-reward exploration buffer (count-based + prediction-error + episodic-memory novelty). Implemented in code, not in the active sweep set.",
+      "description": "DQN with an Agent57-style intrinsic-reward exploration buffer (count-based + prediction-error + episodic-memory novelty). Fixed 2026-06-26: CustomAgent57ReplayBuffer now records the sampled buffer positions (last_sampled_indices) so compute_intrinsic_rewards can look the per-sample bonus up — SB3's ReplayBufferSamples carries no indices.",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -1568,7 +1584,7 @@
       "id": "ensemble",
       "slug": "ensemble",
       "name": "Ensemble (4x Dueling DQN)",
-      "description": "A bagged ensemble of four custom dueling-DQN agents with averaged predictions. Implemented in code, not in the active sweep set.",
+      "description": "A bagged ensemble of four custom dueling-DQN agents. Trains each member independently and predicts by AVERAGING their Q-values then argmax (the discrete-action ensemble vote). Fixed 2026-06-26: reimplemented as a plain duck-typed model (learn/predict/save/policy/device) instead of an unfinished OffPolicyAlgorithm subclass.",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -1650,6 +1666,45 @@
       "paperIds": [
         "dlinear-transformers-effective-2023",
         "hf-transformers-effective-tsf-2023"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "a2c",
+      "slug": "a2c",
+      "name": "A2C",
+      "description": "Advantage Actor-Critic — a synchronous on-policy actor-critic. Covers the stock SB3 MLP build and the tuned custom-net-arch head.",
+      "category": "rl",
+      "status": "implemented",
+      "flavors": [
+        { "name": "vanilla", "modelName": "a2c" },
+        { "name": "custom head", "modelName": "a2c-custom" }
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "qrdqn",
+      "slug": "qrdqn",
+      "name": "QR-DQN",
+      "description": "Quantile-Regression DQN — distributional RL that learns a set of return quantiles (via quantile-Huber regression) instead of a single Q-value. Covers the SB3-contrib build and the custom quantile net.",
+      "category": "rl",
+      "status": "implemented",
+      "flavors": [
+        { "name": "vanilla", "modelName": "qrdqn" },
+        { "name": "custom net", "modelName": "qrdqn-custom" }
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "ars",
+      "slug": "ars",
+      "name": "ARS",
+      "description": "Augmented Random Search — a gradient-free baseline that perturbs policy weights along random directions and keeps the best. A decisive control: if random search rivals the gradient learners, the learned gradient isn't earning its keep.",
+      "category": "baseline",
+      "status": "implemented",
+      "flavors": [
+        { "name": "linear", "modelName": "ars" },
+        { "name": "MLP", "modelName": "ars-mlp" }
       ],
       "source": "manual"
     }

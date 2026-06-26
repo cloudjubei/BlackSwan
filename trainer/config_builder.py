@@ -16,7 +16,7 @@ from omegaconf import OmegaConf
 
 from src.conf.data_config import DataConfig
 from src.conf.env_config import EnvConfig
-from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervisedConfig, model_rl
+from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervisedConfig, ModelMomentumConfig, model_rl
 from src.model.model_factory import get_model_combinations
 from src.model.rl_model import is_recurrent_model_name
 from trainer.fidelity import resolve_fidelity
@@ -149,11 +149,21 @@ def is_supervised(cfg):
     return str(cfg.get("model_name", "")).lower().startswith("supervised") or cfg.get("model_type") == "supervised"
 
 
+def is_momentum(cfg):
+    return str(cfg.get("model_name", "")).lower() == "momentum" or cfg.get("model_type") == "momentum"
+
+
 def build_model_config(cfg):
     """Return one concrete ModelConfig for the lever values in ``cfg``."""
     if is_hodl(cfg):
         hodl = OmegaConf.structured(ModelConfigSearch(model_type="hodl"))
         config = get_model_combinations(hodl)[0]
+        config.iterations_to_pick_best = 1
+        return config
+
+    if is_momentum(cfg):
+        momentum = ModelMomentumConfig(lookback_periods=int(cfg.get("momentum_lookback", 30)))
+        config = ModelConfig(model_type="momentum", model_momentum=momentum)
         config.iterations_to_pick_best = 1
         return config
 

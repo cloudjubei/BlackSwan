@@ -5,10 +5,12 @@ import pandas as pd
 import numpy as np
 import calendar
 import datetime
+import hashlib
 
 from src.data.data_utils import plot_indicator
 from src.util.plot import plot_timeseries
 from src.data import indicators as _indicators
+from src.data import feature_cache
 
 class AbstractDataProvider(ABC):
     def __init__(self, config: DataConfig):
@@ -149,14 +151,19 @@ class AbstractDataProvider(ABC):
         return result_df
 
     def get_data(self, paths, type, timestamp, indicator, buyreward_percent, buyreward_maxwait):
-        dfs = []
-        
-        for path in paths:
-            df = pd.read_json(path)
-            dfs.append(df)
+        params = {
+            "fn": "get_data", "type": type, "timestamp": timestamp, "indicator": indicator,
+            "buyreward_percent": buyreward_percent, "buyreward_maxwait": buyreward_maxwait,
+            "use_indicators": getattr(self.config, "use_indicators", False),
+            "obs_squash": getattr(self.config, "obs_squash", "none"),
+        }
 
-        result_df = pd.concat(dfs, ignore_index=True)
-        return self.process_df(result_df, type, timestamp, indicator, buyreward_percent, buyreward_maxwait)
+        def _build():
+            dfs = [pd.read_json(path) for path in paths]
+            result_df = pd.concat(dfs, ignore_index=True)
+            return self.process_df(result_df, type, timestamp, indicator, buyreward_percent, buyreward_maxwait)
+
+        return feature_cache.load_or_build(paths, params, _build)
     
     def process_df(self, result_df, type, timestamp, indicator, buyreward_percent, buyreward_maxwait):
 
@@ -324,20 +331,23 @@ class AbstractDataProvider(ABC):
         return result_df, prices, timestamps, rewards_buysell, rewards_buy_profitable, rewards_buy_drawdown
     
     def get_raw_data(self, paths, timestamp = "none", columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number","asset_volume_taker_base"]):
-        dfs = []
-
         # asset_volume_taker_base carried through for the QW2 taker_buy_ratio feature. Indicators are
         # COMPUTED from this OHLCV at runtime (process_df_simple -> _add_curated_indicators), not read.
 
-        for path in paths:
-            df = pd.read_json(path)
-            dfs.append(df)
+        params = {
+            "fn": "get_raw_data", "timestamp": timestamp, "columns": list(columns),
+            "use_indicators": getattr(self.config, "use_indicators", False),
+            "obs_squash": getattr(self.config, "obs_squash", "none"),
+        }
 
-        result_df = pd.concat(dfs, ignore_index=True)
+        def _build():
+            frames = [pd.read_json(path) for path in paths]
+            result_df = pd.concat(frames, ignore_index=True)
+            raw_df = result_df[columns]
+            processed, prices, timestamps = self.process_df_simple(raw_df.copy(), timestamp, columns)
+            return raw_df, processed, prices, timestamps
 
-        raw_df = result_df[columns]
-        result_df, prices, timestamps = self.process_df_simple(raw_df.copy(), timestamp, columns)
-        return raw_df, result_df, prices, timestamps
+        return feature_cache.load_or_build(paths, params, _build)
     
     def process_df_simple(self, result_df, timestamp, columns):
 
@@ -459,6 +469,26 @@ class AbstractDataProvider(ABC):
         return result_df
 
     def process_fidelity(self, df, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run, multiplier_input_to_run, timestamp, columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number","asset_volume_taker_base"]):
+        # Coarse-layer resampling is the dominant provider-build cost (~97% of a multi-year train build:
+        # a per-bar pandas-slice loop). It is a pure function of the input frame's CONTENT + the resample
+        # params + the feature config, so cache it keyed on a hash of those — every other seed/algo run on
+        # the same window reuses it. The frame hash makes the key independent of the source-file path.
+        frame_fp = hashlib.sha256(pd.util.hash_pandas_object(df, index=True).values.tobytes()).hexdigest()
+        key_src = repr((
+            frame_fp, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run,
+            multiplier_input_to_run, timestamp, list(columns),
+            getattr(self.config, "use_indicators", False), getattr(self.config, "obs_squash", "none"),
+        ))
+        key = "fid_" + hashlib.sha256(key_src.encode()).hexdigest()[:28]
+        return feature_cache.load_or_build_key(
+            key,
+            lambda: self._process_fidelity_uncached(
+                df, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run,
+                multiplier_input_to_run, timestamp, columns,
+            ),
+        )
+
+    def _process_fidelity_uncached(self, df, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run, multiplier_input_to_run, timestamp, columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number","asset_volume_taker_base"]):
         steps = df.shape[0]
 
         dfs = []

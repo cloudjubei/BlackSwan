@@ -52,6 +52,9 @@ class CustomAgent57ReplayBuffer(ReplayBuffer):
             handle_timeout_termination=handle_timeout_termination
         )
         self.intrinsic_rewards = np.zeros((self.buffer_size,))
+        # The buffer positions returned by the most recent sample() — Agent57.compute_intrinsic_rewards
+        # looks the per-sample intrinsic reward up by these (SB3's ReplayBufferSamples carries no indices).
+        self.last_sampled_indices = None
         self.visit_counts = {}
         self.prediction_model = PredictionModel(observation_space.shape[0])
         self.memory_module = EpisodicMemory()
@@ -86,6 +89,13 @@ class CustomAgent57ReplayBuffer(ReplayBuffer):
         loss.backward()
         self.prediction_optimizer.step()
         return loss.item()
+
+    def _get_samples(self, batch_inds, env=None):
+        # Record the sampled buffer positions so the per-sample intrinsic reward can be looked up; SB3's
+        # ReplayBufferSamples doesn't expose them. optimize_memory_usage is off, so batch_inds ARE the
+        # positions `intrinsic_rewards` is indexed by (set in add() at self.pos-1).
+        self.last_sampled_indices = batch_inds
+        return super()._get_samples(batch_inds, env=env)
 
 class Agent57(DQN):
     def __init__(
@@ -154,7 +164,9 @@ class Agent57(DQN):
         self.logger.record("train/loss", np.mean(losses))
 
     def compute_intrinsic_rewards(self, replay_data):
-        intrinsic_rewards = torch.tensor(
-            self.replay_buffer.intrinsic_rewards[replay_data.indices], dtype=torch.float32
-        )
-        return intrinsic_rewards
+        # Look up the per-sample intrinsic reward by the positions the buffer just sampled, shaped to match
+        # replay_data.rewards (batch, 1) and on the model device.
+        indices = self.replay_buffer.last_sampled_indices
+        return torch.tensor(
+            self.replay_buffer.intrinsic_rewards[indices], dtype=torch.float32, device=self.device
+        ).reshape(-1, 1)

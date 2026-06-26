@@ -82,6 +82,33 @@ def test_nested_path_lists_hash_like_flattened(tmp_path):
     assert feature_cache.compute_key([[str(a), str(b)]], {}) == feature_cache.compute_key([str(a), str(b)], {})
 
 
+def test_load_or_build_key_caches_on_explicit_key(tmp_path):
+    cdir = str(tmp_path / "cache")
+    calls = []
+
+    def build():
+        calls.append(1)
+        return [1, 2, 3]
+
+    r1 = feature_cache.load_or_build_key("fid_abc", build, cache_dir=cdir)
+    r2 = feature_cache.load_or_build_key("fid_abc", build, cache_dir=cdir)
+    assert r1 == r2 == [1, 2, 3]
+    assert len(calls) == 1
+    # a different key is a separate entry
+    feature_cache.load_or_build_key("fid_def", build, cache_dir=cdir)
+    assert len(calls) == 2
+
+
+def test_load_or_build_key_disabled_bypasses(tmp_path, monkeypatch):
+    monkeypatch.setenv("BS_FEATURE_CACHE", "0")
+    cdir = str(tmp_path / "cache")
+    calls = []
+    feature_cache.load_or_build_key("k", lambda: calls.append(1), cache_dir=cdir)
+    feature_cache.load_or_build_key("k", lambda: calls.append(1), cache_dir=cdir)
+    assert len(calls) == 2
+    assert not os.path.isdir(cdir)
+
+
 def test_missing_source_does_not_alias_present(tmp_path):
     present = tmp_path / "a.json"
     _touch(str(present))

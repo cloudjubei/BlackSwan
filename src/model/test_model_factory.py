@@ -23,6 +23,8 @@ from src.conf.model_config import (
     ModelTechnicalConfigSearch,
     ModelTimeConfig,
     ModelTimeConfigSearch,
+    ModelMomentumConfig,
+    ModelMomentumConfigSearch,
     ModelSupervisedConfig,
 )
 from src.model import model_factory
@@ -48,6 +50,7 @@ from src.model.regression_model import RegressionModel
 from src.model.supervised_model import SupervisedModel
 from src.model.technical_strategy_model import TechnicalStrategyModel
 from src.model.time_strategy_model import TimeStrategyModel
+from src.model.momentum_strategy_model import MomentumStrategyModel
 
 
 # --------------------------------------------------------------------------------------
@@ -135,6 +138,18 @@ def test_get_model_combinations_non_list_values_stay_scalar():
     assert combos[0].model_technical.buy_amount_is_multiplier is True
 
 
+def test_get_model_combinations_momentum_cartesian_product():
+    search = OmegaConf.structured(
+        ModelConfigSearch(
+            model_type="momentum",
+            model_momentum=ModelMomentumConfigSearch(lookback_periods=[30, 90, 252]),
+        )
+    )
+    combos = get_model_combinations(search)
+    assert [c.model_type for c in combos] == ["momentum", "momentum", "momentum"]
+    assert {c.model_momentum.lookback_periods for c in combos} == {30, 90, 252}
+
+
 def test_get_model_combinations_unsupported_type_raises():
     with pytest.raises(ValueError):
         get_model_combinations(OmegaConf.structured(ModelConfigSearch(model_type="nope")))
@@ -170,6 +185,13 @@ def test_create_model_supervised_returns_supervised_model():
     cfg = ModelConfig(model_type="supervised", model_supervised=ModelSupervisedConfig())
     m = create_model(cfg, env=None, device="cpu")
     assert isinstance(m, SupervisedModel)
+
+
+def test_create_model_momentum_returns_momentum_strategy():
+    cfg = ModelConfig(model_type="momentum", model_momentum=ModelMomentumConfig(lookback_periods=30))
+    m = create_model(cfg, env=None, device="cpu")
+    assert isinstance(m, MomentumStrategyModel)
+    assert m.momentum_config.lookback_periods == 30
 
 
 def test_create_model_rl_delegates_to_create_rl_model(monkeypatch):

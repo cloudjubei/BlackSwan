@@ -21,6 +21,50 @@ import pytest
 from src.data.multitimeline_dataprovider import MultiTimelineDataProvider, _period_ratio
 
 
+def test_process_fidelity_cache_skips_the_expensive_resample_on_warm(tmp_path, monkeypatch):
+    # SPEEDUP PROOF (A6): process_fidelity is ~97% of a multi-year provider build. The cache must make the
+    # SECOND build (same window) skip the resample entirely — proven here by counting _process_fidelity_
+    # uncached invocations: it runs once (cold) and zero times (warm), so the dominant cost is genuinely
+    # eliminated, not merely re-paid faster.
+    import types as _types
+
+    from src.data import feature_cache
+
+    monkeypatch.setattr(feature_cache, "_CACHE_DIR", str(tmp_path / "fc"))
+    monkeypatch.setenv("BS_FEATURE_CACHE", "1")
+    prov = _bare()
+    prov.config = _types.SimpleNamespace(use_indicators=False, obs_squash="none")
+    df = _grid_df(64, 4)
+    calls = []
+
+    def fake_uncached(*args, **kwargs):
+        calls.append(1)
+        return (["DFS"], ["RAW"], ["PRICES"])
+
+    monkeypatch.setattr(prov, "_process_fidelity_uncached", fake_uncached)
+    r_cold = prov.process_fidelity(df, "1d", 0, 24, "1h", 1, 24, "day_of_week")
+    r_warm = prov.process_fidelity(df, "1d", 0, 24, "1h", 1, 24, "day_of_week")
+    assert r_cold == r_warm == (["DFS"], ["RAW"], ["PRICES"])
+    assert len(calls) == 1  # warm build did NOT recompute the resample
+
+
+def test_process_fidelity_cache_misses_when_input_frame_changes(tmp_path, monkeypatch):
+    # The cache key is the input frame's CONTENT hash, so a different frame must rebuild (no stale reuse).
+    import types as _types
+
+    from src.data import feature_cache
+
+    monkeypatch.setattr(feature_cache, "_CACHE_DIR", str(tmp_path / "fc"))
+    monkeypatch.setenv("BS_FEATURE_CACHE", "1")
+    prov = _bare()
+    prov.config = _types.SimpleNamespace(use_indicators=False, obs_squash="none")
+    calls = []
+    monkeypatch.setattr(prov, "_process_fidelity_uncached", lambda *a, **k: (calls.append(1), ([], [], []))[1])
+    prov.process_fidelity(_grid_df(64, 4, base=0.0), "1d", 0, 24, "1h", 1, 24, "day_of_week")
+    prov.process_fidelity(_grid_df(64, 4, base=99.0), "1d", 0, 24, "1h", 1, 24, "day_of_week")
+    assert len(calls) == 2  # different frame content -> distinct key -> rebuilt
+
+
 def test_period_ratio_base_to_target_bars():
     # How many BASE bars per one TARGET bar — drives both the run STEP size (divider_run) and each
     # observed layer's resample multiplier. Same granularity -> 1; the daily-step gap 1h->1d -> 24.

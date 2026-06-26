@@ -178,6 +178,33 @@ def test_fold_eval_parametrizations_is_idempotent():
     assert fold_eval_parametrizations(net) == 0
 
 
+def test_fold_eliminates_the_weight_norm_recompute(monkeypatch):
+    # SPEEDUP PROOF (A7): pre-fold, EVERY forward recomputes the weight from (g, v) via torch._weight_norm
+    # (the op cProfile flagged at ~8% of the reppo-custom forward). Folding must make that op stop running
+    # — proven by counting calls to torch._weight_norm before vs after the fold.
+    net = nn.Sequential(
+        nn.utils.parametrizations.weight_norm(nn.Linear(16, 16)),
+        nn.ReLU(),
+        nn.utils.parametrizations.weight_norm(nn.Linear(16, 4)),
+    )
+    net.eval()
+    x = torch.randn(2, 16)
+    count = {"n": 0}
+    real = torch._weight_norm
+
+    def counting(*args, **kwargs):
+        count["n"] += 1
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(torch, "_weight_norm", counting)
+    net(x)
+    assert count["n"] >= 2  # both weight_norm layers recompute on a pre-fold forward
+    fold_eval_parametrizations(net)
+    count["n"] = 0
+    net(x)
+    assert count["n"] == 0  # post-fold: the per-forward weight_norm recompute is gone
+
+
 def test_test_folds_policy_parametrizations():
     # test() bakes weight_norm into plain weights for the eval passes; best-effort, so a policy that
     # isn't a torch module (sbx/JAX) or missing entirely just no-ops (covered by the other test() tests).
