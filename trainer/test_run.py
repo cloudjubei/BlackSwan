@@ -194,6 +194,29 @@ def test_main_config_json_no_calibration_block(tmp_path, monkeypatch):
     assert "evaluation" not in out
 
 
+def test_resolve_device_explicit_value_wins_over_auto_logic():
+    assert run_mod._resolve_device({"device": "cpu"}) == "cpu"
+    assert run_mod._resolve_device({"device": "mps", "model_name": "ppo"}) == "mps"
+    assert run_mod._resolve_device({}) == "cpu"  # default
+
+
+def test_resolve_device_auto_picks_mps_for_measured_winners(monkeypatch):
+    monkeypatch.setattr(run_mod, "_mps_available", lambda: True)
+    for name in ("reppo", "reppo-custom", "dqn"):
+        assert run_mod._resolve_device({"device": "auto", "model_name": name}) == "mps"
+
+
+def test_resolve_device_auto_keeps_cpu_for_mlp_models(monkeypatch):
+    monkeypatch.setattr(run_mod, "_mps_available", lambda: True)
+    for name in ("ppo", "a2c", "ars", ""):
+        assert run_mod._resolve_device({"device": "auto", "model_name": name}) == "cpu"
+
+
+def test_resolve_device_auto_falls_back_to_cpu_without_mps(monkeypatch):
+    monkeypatch.setattr(run_mod, "_mps_available", lambda: False)
+    assert run_mod._resolve_device({"device": "auto", "model_name": "reppo-custom"}) == "cpu"
+
+
 def test_main_emit_decision_trace_false_skips_trace(tmp_path, monkeypatch):
     # A sweep run can opt OUT of the (expensive) second deterministic test replay that builds the
     # decision trace by setting emit_decision_trace=false — the scored summary is unaffected.

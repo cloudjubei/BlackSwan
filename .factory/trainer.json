@@ -4,6 +4,7 @@
   "description": "BlackSwan trains reinforcement-learning agents to trade a SINGLE crypto asset (BTCUSDT) on the spot market, long-only by default, under realistic 0.1% per-trade fees. Each run trains on historical klines and is tested OUT-OF-SAMPLE (walk-forward windows 2022/2023/2024, expanding train); the agent observes multi-timeframe OHLCV (e.g. stacked 1h+1d layers) plus optional technical indicators. The objective is traded_return = total post-fee return gated by trade frequency (trade often AND well — a near-hold run scores ~0). In the strong presets the agent has NO explicit sell action (no_sell_action): it only times entries and exits are forced by take-profit/stop-loss/trailing-stop — so 'many buys, few sells' is by design, not a bug. 'Good' = a setup that trades often and profitably AND beats buy-and-hold (positive return_vs_hold_pct) net of fees, stable across seeds and walk-forward windows.",
   "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
   "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
+  "benchmarkDevice": ".venv/bin/python -m trainer.bench_device --summary-out {summaryOut}",
   "maxThreadsPerRun": 2,
   "objective": {
     "name": "traded_return",
@@ -101,10 +102,13 @@
         "tcn-ppo",
         "itransformer-ppo",
         "reppo",
+        "rrl",
+        "esn-rrl",
         "ppo-sbx",
         "a2c-custom",
         "trpo",
         "dqn-custom",
+        "tdqn",
         "dqn-lstm",
         "dqn-sbx",
         "duel-dqn",
@@ -795,13 +799,15 @@
       },
       "replicateConfig": {
         "fixed": {
-          "model_name": "dqn",
+          "model_name": "tdqn",
           "reward_model": "combo_unified", "combo_direct": 1,
           "timeframe": "1d",
           "use_indicators": true,
           "position_sizing": "fixed",
           "allow_shorting": true,
-          "net_arch": "512,128,32",
+          "gamma": 0.4,
+          "net_arch": "512,256,128",
+          "custom_net_arch": ["BatchNorm1d", "Linear"],
           "lookback_window": 32
         },
         "sweep": {
@@ -916,8 +922,7 @@
       },
       "replicateConfig": {
         "fixed": {
-          "model_name": "reppo-custom",
-          "reward_model": "combo_unified", "combo_direct": 1,
+          "model_name": "rrl",
           "timeframe": "1d",
           "use_indicators": true,
           "position_sizing": "fixed",
@@ -974,8 +979,7 @@
       },
       "replicateConfig": {
         "fixed": {
-          "model_name": "reppo-custom",
-          "reward_model": "combo_unified", "combo_direct": 1,
+          "model_name": "esn-rrl",
           "timeframe": "1h",
           "fidelity_set": "1h+1d",
           "use_indicators": true,
@@ -1748,6 +1752,71 @@
       "flavors": [
         { "name": "linear", "modelName": "ars" },
         { "name": "MLP", "modelName": "ars-mlp" }
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "momentum",
+      "slug": "momentum",
+      "name": "Time-Series Momentum",
+      "description": "A non-RL time-series-momentum baseline (Moskowitz/Ooi/Pedersen 2012): take a long/short position on the sign of the trailing return over a lookback. The rule-based trend-following control — 'does a learned policy actually beat simple momentum net of fees?'.",
+      "category": "baseline",
+      "status": "implemented",
+      "flavors": [
+        { "name": "default", "modelName": "momentum" }
+      ],
+      "implPath": "src/model/momentum_strategy_model.py",
+      "paperIds": [
+        "moskowitz-tsmom-2012"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "rrl",
+      "slug": "rrl",
+      "name": "Recurrent Reinforcement Learning (RRL)",
+      "description": "Moody & Saffell (2001) DIRECT recurrent RL — no Q-values, no SB3. A recurrent linear policy F_t = tanh(w·x_t + u·F_{t-1} + b) outputs a CONTINUOUS position in [-1,1] (the previous position feeds back, so it holds through noise), trained by gradient ASCENT on the Sharpe ratio of the realised strategy return R_t = F_{t-1}·r_t − δ·|ΔF| (the objective the online DIFFERENTIAL Sharpe estimates), via truncated BPTT. Single-asset; the continuous position is discretised to the env's discrete long/flat/short actions at eval.",
+      "category": "rl",
+      "status": "implemented",
+      "flavors": [
+        { "name": "default", "modelName": "rrl" }
+      ],
+      "implPath": "src/model/custom/rrl/rrl_model.py",
+      "paperIds": [
+        "moody-saffell-rrl-2001",
+        "borrageiro-rrl-crypto-2022"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "esn-rrl",
+      "slug": "esn-rrl",
+      "name": "ESN-RRL (Echo State Network + RRL)",
+      "description": "Borrageiro (2022) — RRL on top of a fixed ECHO STATE NETWORK reservoir. A random recurrent net, scaled to a sub-unit spectral radius (the echo-state property), is run over the inputs WITHOUT training; its high-dimensional leaky-integrator state is the feature the trained RRL position layer reads (only the readout learns). Inherits RRL's direct Sharpe-ascent training + discretised-action eval; only the feature map differs.",
+      "category": "rl",
+      "status": "implemented",
+      "flavors": [
+        { "name": "default", "modelName": "esn-rrl" }
+      ],
+      "implPath": "src/model/custom/rrl/esn_rrl_model.py",
+      "paperIds": [
+        "borrageiro-rrl-crypto-2022"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "tdqn",
+      "slug": "tdqn",
+      "name": "TDQN (Trading Deep Q-Network)",
+      "description": "Théate & Ernst (2021) Trading DQN — a deep double-DQN for single-asset trading. Mechanically the custom-head DQN (CustomDQNPolicy); its faithful identity is the LAUNCH CONFIG: a deep feedforward Q-net (e.g. 256-128-64 + BatchNorm), a low discount (gamma≈0.4), long/short positioning, and indicator inputs — carried by the paper's replicate spec. Selectable as model_name 'tdqn'.",
+      "category": "rl",
+      "status": "implemented",
+      "flavors": [
+        { "name": "default", "modelName": "tdqn" }
+      ],
+      "implPath": "src/model/model_factory.py",
+      "paperIds": [
+        "theate-ernst-tdqn-2021"
       ],
       "source": "manual"
     }

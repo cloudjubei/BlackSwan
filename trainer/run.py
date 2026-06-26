@@ -85,10 +85,37 @@ def _seed_everything(seed):
         pass
 
 
+def _mps_available():
+    try:
+        import torch
+
+        return bool(torch.backends.mps.is_available())
+    except Exception:
+        return False
+
+
+# Models measured ~1.45-1.6x faster on Apple MPS than on a 2-thread CPU (LSTM/heavy-matmul); the MLP
+# models (ppo/a2c/ars) are SLOWER on MPS, so `auto` leaves them on CPU.
+_MPS_FASTER_MODELS = ("reppo", "reppo-custom", "dqn")
+
+
+def _resolve_device(cfg):
+    """Resolve cfg['device'], expanding 'auto'. 'auto' picks MPS for the models measured faster on it
+    (recurrent + dqn), else CPU. Use 'auto'/'mps' for a SINGLE latency-bound run (e.g. a final
+    confirmation run); keep 'cpu' (the default) for parallel SWEEPS — one GPU can't be shared across the
+    runs A1 packs onto the host, and MPS breaks bit-reproducibility."""
+    requested = str(cfg.get("device", "cpu"))
+    if requested != "auto":
+        return requested
+    if str(cfg.get("model_name", "")) in _MPS_FASTER_MODELS and _mps_available():
+        return "mps"
+    return "cpu"
+
+
 def _run_one(cfg):
     """Build → train → deterministic test; return (env_test, run_state, model, is_rl, train_seconds)."""
     config_builder.require_data_present(cfg)
-    device = str(cfg.get("device", "cpu"))
+    device = _resolve_device(cfg)
     if "seed" in cfg:
         _seed_everything(int(cfg["seed"]))
 

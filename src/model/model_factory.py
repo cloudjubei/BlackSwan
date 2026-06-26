@@ -191,6 +191,15 @@ def create_model(config: ModelConfig, env: AbstractEnv, device: str):
 def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
     rl_model = None
 
+    # Direct-RL agents (Moody-Saffell RRL family) aren't SB3 BaseAlgorithms — they train their own way and
+    # ARE the AbstractModel, so they're returned directly (not wrapped in RLModel).
+    if config.model_rl.model_name == "rrl":
+        from src.model.custom.rrl.rrl_model import RRLModel
+        return RRLModel(config, env, device)
+    if config.model_rl.model_name == "esn-rrl":
+        from src.model.custom.rrl.esn_rrl_model import ESNRRLModel
+        return ESNRRLModel(config, env, device)
+
     if config.model_rl.model_name == "ppo":
         print(f"Loading PPO - Proximal Policy Optimization model")
         
@@ -725,8 +734,11 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
         # maximize: bool = False,
         # differentiable: bool = False,
 
-    elif config.model_rl.model_name == "dqn-custom":
-        rl_model = DQN(env=env, policy= CustomDQNPolicy, device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size, 
+    elif config.model_rl.model_name in ("dqn-custom", "tdqn"):
+        # 'tdqn' = the Théate & Ernst (2021) Trading-DQN: mechanically the custom-head double-DQN; its
+        # faithful identity (a deep net, low gamma, long/short) is carried by the launch config / the
+        # paper's replicateConfig, per the "TDQN as a faithful dqn-custom config" decision.
+        rl_model = DQN(env=env, policy= CustomDQNPolicy, device= device, learning_rate= config.model_rl.learning_rate, batch_size= config.model_rl.batch_size,
                        buffer_size= config.model_rl.buffer_size, gamma= config.model_rl.gamma, 
                        tau= config.model_rl.tau, 
                        exploration_final_eps=config.model_rl.exploration_final_eps, exploration_fraction=config.model_rl.exploration_fraction,
