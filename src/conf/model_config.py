@@ -199,6 +199,14 @@ class ModelTimeConfig:
     time_buy: int
     time_sell: int
 @dataclass
+class ModelDayConfigSearch:
+    day_buy: List[int] = field(default_factory=lambda: [0])
+    day_sell: List[int] = field(default_factory=lambda: [4])
+@dataclass
+class ModelDayConfig:
+    day_buy: int
+    day_sell: int
+@dataclass
 class ModelTechnicalConfigSearch:
     buy_indicator: List[str] = field(default_factory=list)
     buy_amount_threshold: List[float] = field(default_factory=list)
@@ -237,9 +245,10 @@ class ModelConfigSearch:
     model_technical: ModelTechnicalConfigSearch | None = None
     model_time: ModelTimeConfigSearch | None = None
     model_momentum: ModelMomentumConfigSearch | None = None
+    model_day: ModelDayConfigSearch | None = None
 @dataclass
 class ModelConfig:
-    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time", "momentum"]
+    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time", "momentum", "weekday"]
     iterations_to_pick_best: int = 10
     # iterations_to_pick_best: int = 1
     model_rl: ModelRLConfig | None = None
@@ -248,6 +257,7 @@ class ModelConfig:
     model_technical: ModelTechnicalConfig | None = None
     model_time: ModelTimeConfig | None = None
     model_momentum: ModelMomentumConfig | None = None
+    model_day: ModelDayConfig | None = None
 
     def is_deep(self) -> bool:
         return self.model_type == "rl" or self.model_type == "regression"

@@ -128,10 +128,12 @@
         "supervised-logreg",
         "supervised-gbm",
         "momentum",
+        "time",
+        "weekday",
         "hodl"
       ],
       "default": "reppo-custom",
-      "description": "The algorithm / policy. Naming conventions: a bare name is the vanilla SB3 build, '-custom' uses tuned network internals, '-lstm' adds a recurrent features-extractor, '-sbx' is the JAX/SBX build. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'reppo'/'reppo-custom' = RecurrentPPO; 'trpo'/'trpo-custom' = TRPO; 'a2c'/'a2c-custom' = A2C. DQN line: 'dqn'/'dqn-custom'/'dqn-lstm'/'dqn-sbx'; dueling 'duel-dqn*'; 'munchausen-*' add the Munchausen log-policy bonus; 'rainbow-dqn'/'rainbow-dqn-custom' add prioritized experience replay (importance-weighted sampling by TD-error). Distributional: 'iqn'/'iqn-custom' (implicit quantile) and 'qrdqn'/'qrdqn-custom' (quantile-regression). 'ars'/'ars-mlp' are Augmented Random Search (gradient-free) baselines. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'momentum' is a deterministic time-series-momentum baseline (long when the trailing `momentum_lookback`-bar return is positive, flat otherwise — Moskowitz-style), a non-RL control to beat. 'hodl' is the buy-and-hold control."
+      "description": "The algorithm / policy. Naming conventions: a bare name is the vanilla SB3 build, '-custom' uses tuned network internals, '-lstm' adds a recurrent features-extractor, '-sbx' is the JAX/SBX build. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'reppo'/'reppo-custom' = RecurrentPPO; 'trpo'/'trpo-custom' = TRPO; 'a2c'/'a2c-custom' = A2C. DQN line: 'dqn'/'dqn-custom'/'dqn-lstm'/'dqn-sbx'; dueling 'duel-dqn*'; 'munchausen-*' add the Munchausen log-policy bonus; 'rainbow-dqn'/'rainbow-dqn-custom' add prioritized experience replay (importance-weighted sampling by TD-error). Distributional: 'iqn'/'iqn-custom' (implicit quantile) and 'qrdqn'/'qrdqn-custom' (quantile-regression). 'ars'/'ars-mlp' are Augmented Random Search (gradient-free) baselines. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'momentum' is a deterministic time-series-momentum baseline (long when the trailing `momentum_lookback`-bar return is positive, flat otherwise — Moskowitz-style), a non-RL control to beat. 'time' is a deterministic time-of-day baseline — long from UTC hour `time_buy` to hour `time_sell` every day (intraday round-trip, or overnight when buy>sell); needs intraday data (timeframe=1h) and is a control + a probe for time-of-day/overnight seasonality. 'weekday' is a deterministic day-of-week baseline — long from weekday `day_buy` (0=Mon..6=Sun) to `day_sell` every week (intra-week, or across the weekend when buy>sell); runs at a daily step (timeframe=1d) and probes weekly seasonality (the Monday/day-of-week effect). 'hodl' is the buy-and-hold control."
     },
     "reward_model": {
       "type": "choice",
@@ -431,6 +433,46 @@
       "appliesWhen": { "model_name": ["momentum"] },
       "description": "MOMENTUM baseline only: the trailing window (in bars) whose return SIGN sets the position — long when the price now exceeds the price this many bars ago, flat otherwise. Re-evaluated every bar. E.g. at 1d cadence 30 ≈ monthly, 252 ≈ Moskowitz's ~12-month time-series-momentum rule. Ignored by RL/supervised/hodl models."
     },
+    "time_buy": {
+      "type": "number",
+      "default": 14,
+      "range": [
+        0,
+        23
+      ],
+      "appliesWhen": { "model_name": ["time"] },
+      "description": "TIME baseline only: the UTC hour-of-day (0-23) to OPEN a long. Needs intraday data (timeframe=1h). E.g. 14 ≈ US equity open (~14:30 UTC), 0 ≈ UTC midnight / Asia. Sweep time_buy × time_sell to probe time-of-day / overnight seasonality. Ignored by other models."
+    },
+    "time_sell": {
+      "type": "number",
+      "default": 21,
+      "range": [
+        0,
+        23
+      ],
+      "appliesWhen": { "model_name": ["time"] },
+      "description": "TIME baseline only: the UTC hour-of-day (0-23) to CLOSE the long. With time_sell > time_buy it's an intraday round-trip (e.g. long 14->21 = US session); with time_sell < time_buy it holds OVERNIGHT (e.g. buy 21, sell 14 next day = the off-US-session / overnight-return probe). Ignored by other models."
+    },
+    "day_buy": {
+      "type": "number",
+      "default": 0,
+      "range": [
+        0,
+        6
+      ],
+      "appliesWhen": { "model_name": ["weekday"] },
+      "description": "WEEKDAY baseline only: the day-of-week (0=Mon, 1=Tue, ... 6=Sun) to OPEN a long. Runs at a daily step (timeframe=1d). E.g. day_buy 0 = open Monday (the Monday-effect probe). Sweep day_buy x day_sell to probe weekly seasonality. Ignored by other models."
+    },
+    "day_sell": {
+      "type": "number",
+      "default": 4,
+      "range": [
+        0,
+        6
+      ],
+      "appliesWhen": { "model_name": ["weekday"] },
+      "description": "WEEKDAY baseline only: the day-of-week (0=Mon..6=Sun) to CLOSE the long. With day_sell > day_buy it's an intra-week hold (e.g. long Mon 0 -> Fri 4); with day_sell < day_buy it holds across the WEEKEND (e.g. buy Fri 4, sell Mon 0 = the weekend-return probe, crypto trades the weekend). Ignored by other models."
+    },
     "obs_squash": {
       "type": "choice",
       "choices": [
@@ -590,7 +632,7 @@
         "overfitting",
         "supports-simpler-wins"
       ],
-      "replicateConfig": {},
+      "replicateConfig": {"fixed": {"timeframe": "1h", "fidelity_set": "1h+1d", "use_indicators": true}, "sweep": {"model_name": ["supervised-logreg", "attn-ppo", "tcn-ppo", "itransformer-ppo"], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 2},
       "status": "untested",
       "source": "manual"
     },
@@ -615,7 +657,7 @@
         "gbm",
         "supports-simpler-wins"
       ],
-      "replicateConfig": {},
+      "replicateConfig": {"fixed": {"timeframe": "1d", "use_indicators": true}, "sweep": {"model_name": ["supervised-gbm", "supervised-logreg", "ppo-custom"], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 2},
       "status": "untested",
       "source": "manual"
     },
@@ -640,7 +682,7 @@
         "window-features",
         "supports-simpler-wins"
       ],
-      "replicateConfig": {},
+      "replicateConfig": {"fixed": {"timeframe": "1d", "use_indicators": true}, "sweep": {"model_name": ["supervised-gbm", "supervised-logreg", "attn-ppo"], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 2},
       "status": "untested",
       "source": "manual"
     },
@@ -667,7 +709,7 @@
         "walk-forward",
         "refutes-simpler-wins"
       ],
-      "replicateConfig": {},
+      "replicateConfig": {"fixed": {"timeframe": "1h", "fidelity_set": "1h+1d", "use_indicators": true}, "sweep": {"model_name": ["reppo-custom", "attn-ppo", "dqn-custom", "supervised-gbm"], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 2},
       "status": "untested",
       "source": "manual"
     },
@@ -693,7 +735,7 @@
         "attention-free",
         "supports-simpler-wins"
       ],
-      "replicateConfig": {},
+      "replicateConfig": {"fixed": {"timeframe": "1h", "fidelity_set": "1h+1d", "use_indicators": true}, "sweep": {"model_name": ["supervised-logreg", "attn-ppo", "tcn-ppo"], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 2},
       "status": "untested",
       "source": "manual"
     },
@@ -719,7 +761,7 @@
         "refutes-simpler-wins",
         "blog"
       ],
-      "replicateConfig": {},
+      "replicateConfig": {"fixed": {"timeframe": "1h", "fidelity_set": "1h+1d", "use_indicators": true}, "sweep": {"model_name": ["attn-ppo", "tcn-ppo", "itransformer-ppo"], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 2},
       "status": "untested",
       "source": "manual"
     },
@@ -745,7 +787,7 @@
         "competition",
         "pooling-caveat"
       ],
-      "replicateConfig": {},
+      "replicateConfig": {"fixed": {"timeframe": "1d", "use_indicators": true}, "sweep": {"model_name": ["supervised-gbm", "supervised-logreg"], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 2},
       "status": "untested",
       "source": "manual"
     },
@@ -1376,6 +1418,112 @@
       },
       "status": "untested",
       "source": "manual"
+    },
+    {
+      "id": "gao-han-li-zhou-market-intraday-momentum-2018",
+      "title": "Market Intraday Momentum",
+      "url": "https://ideas.repec.org/a/eee/jfinec/v129y2018i2p394-414.html",
+      "authors": "Lei Gao, Yufeng Han, Sophia Zhengzi Li, Guofu Zhou",
+      "year": 2018,
+      "claim": "In the S&P 500 ETF (1993-2013) the FIRST half-hour return (from the prior close) significantly predicts the LAST half-hour return, strongest on high-volatility/volume, recession and macro-news days; the intraday timing strategy survives a single-digit-bps one-way cost.",
+      "approach": "Predictive regression of the last-half-hour return on the first-half-hour return; a once-a-day intraday market-timing strategy.",
+      "assumptions": {
+        "fees": true,
+        "netOfCosts": true,
+        "notes": "Equity-ETF microstructure anchored to a REAL open/close auction; reported breakeven is single-digit bps ONE-WAY, at/below BlackSwan's 10bps round-trip. A 24/7 crypto asset has no such close, so neither the signal definition nor the cost result transfers cleanly."
+      },
+      "verdictNote": "The seminal intraday-momentum paper and the theoretical backbone for the `time` baseline. It DOES test costs (rare), but the effect is an equity open/close phenomenon; on a single 24/7 crypto asset net of 0.1% it is not expected to survive — the literature anchor + a falsification target.",
+      "tags": ["intraday-momentum", "seasonality", "time-of-day", "skeptical"],
+      "replicateConfig": {
+        "fixed": { "model_name": "time", "timeframe": "1h", "fidelity_set": "1h" },
+        "sweep": { "time_buy": [13, 14, 15], "time_sell": [20, 21, 22], "walk_forward_window": [2022, 2023, 2024] },
+        "seeds": 1
+      },
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "shen-urquhart-wang-bitcoin-intraday-momentum-2022",
+      "title": "Bitcoin intraday time-series momentum",
+      "url": "https://centaur.reading.ac.uk/100181/",
+      "authors": "Dehua Shen, Andrew Urquhart, Pengfei Wang",
+      "year": 2022,
+      "claim": "Bitcoin shows intraday time-series momentum (first half-hour predicts last half-hour), strongest in the highest-volume/volatility sessions, attributed to liquidity provision.",
+      "approach": "Crypto replication of Gao et al. — predictive regressions + a market-timing strategy keyed to fixed UTC session windows.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "The accessible abstract/repository reports 'economic gains' but NO foregrounded net-of-0.1%-round-trip backtest beating buy-and-hold OOS on a single asset; the signal is conditional on an observed early return, not a static clock."
+      },
+      "verdictNote": "The on-point CRYPTO analogue backing a time-of-day round-trip — but UNPROVEN net of BlackSwan's fees and signal-conditional (not a pure buy-at-X/sell-at-Y rule). Backs the `time` baseline as a probe; the deterministic clock is the cost-robust skeleton to beat.",
+      "tags": ["intraday-momentum", "crypto", "time-of-day"],
+      "replicateConfig": {
+        "fixed": { "model_name": "time", "timeframe": "1h", "fidelity_set": "1h" },
+        "sweep": { "time_buy": [0, 6, 12, 14, 18], "time_sell": [6, 12, 18, 21, 23], "walk_forward_window": [2022, 2023, 2024] },
+        "seeds": 1
+      },
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "eross-intraday-dynamics-bitcoin-2019",
+      "title": "The intraday dynamics of bitcoin",
+      "url": "https://centaur.reading.ac.uk/81745/",
+      "authors": "Andrea Eross, Frank McGroarty, Andrew Urquhart, Simon Wolfe",
+      "year": 2019,
+      "claim": "Bitcoin volume rises through the day and falls ~4pm-midnight; realised volatility peaks at the openings of the three major global stock markets; liquidity peaks at major-exchange opening hours while early morning is illiquid.",
+      "approach": "Descriptive analysis of 4 years of GMT-stamped tick data aggregated to 5-minute bars.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "Descriptive only — documents WHEN volume/volatility/liquidity concentrate (UTC hours tied to equity-market opens); no trading strategy or cost test."
+      },
+      "verdictNote": "Motivates WHICH UTC hours to probe with the `time` baseline (volatility peaks at EU/US opens; off-hours are quiet) — where any hour-of-day edge would plausibly live. Not itself a strategy.",
+      "tags": ["time-of-day", "crypto", "microstructure"],
+      "replicateConfig": {
+        "fixed": { "model_name": "time", "timeframe": "1h", "fidelity_set": "1h", "allow_shorting": true },
+        "sweep": { "time_buy": [13, 14, 15], "time_sell": [21, 22, 23], "walk_forward_window": [2022, 2023, 2024] },
+        "seeds": 1
+      },
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "wen-bouri-xu-zhao-crypto-intraday-predictability-2022",
+      "title": "Intraday return predictability in the cryptocurrency markets: Momentum, reversal, or both",
+      "url": "https://ideas.repec.org/a/eee/ecofin/v62y2022ics1062940822000833.html",
+      "authors": "Zhuzhu Wen, Elie Bouri, Yahua Xu, Yang Zhao",
+      "year": 2022,
+      "claim": "Bitcoin (and ETH/LTC/XRP) intraday predictability is BOTH momentum and reversal depending on regime (price jumps, FOMC days, liquidity, COVID); a timing strategy beats buy-and-hold IN-SAMPLE.",
+      "approach": "State-dependent intraday predictive regressions across cryptos.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "No clean net-of-cost survival claim; the headline (sign flips momentum<->reversal by regime) is itself a warning that a static rule is unstable OOS."
+      },
+      "verdictNote": "SKEPTICAL CONTROL for the time / intraday family: the predictability sign FLIPS by regime, so a fixed deterministic time-of-day rule is unlikely to be stable OOS net of fees — the falsification frame for the `time` baseline.",
+      "tags": ["intraday-momentum", "reversal", "crypto", "skeptical"],
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "aharon-qadan-day-of-week-bitcoin-2019",
+      "title": "Bitcoin and the day-of-the-week effect",
+      "url": "https://ideas.repec.org/a/eee/finlet/v31y2019ics1544612317307894.html",
+      "authors": "David Yechiam Aharon, Mahmoud Qadan",
+      "year": 2019,
+      "claim": "A day-of-the-week calendar anomaly in Bitcoin returns AND volatility (2010-2017 daily, OLS+GARCH), concentrated around Monday.",
+      "approach": "In-sample calendar regressions (OLS) + GARCH on daily Bitcoin returns.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "No net-of-cost trading test; 2010-2017 is early/illiquid/trending BTC — high data-mining + OOS-decay risk."
+      },
+      "verdictNote": "The day-of-week backbone for the 'maybe weekly patterns emerge' extension of the time baseline. Treat as a WEAK prior to re-validate OOS, not a backed strategy — a day-of-week long/flat rule trades infrequently (low fee drag), so a cheap control to test once a calendar lever exists.",
+      "tags": ["calendar", "day-of-week", "crypto", "skeptical"],
+      "replicateConfig": {"fixed": {"model_name": "weekday", "timeframe": "1d"}, "sweep": {"day_buy": [0, 1, 4, 6], "day_sell": [0, 2, 5], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 1},
+      "status": "untested",
+      "source": "manual"
     }
   ],
   "models": [
@@ -1817,6 +1965,79 @@
       "implPath": "src/model/model_factory.py",
       "paperIds": [
         "theate-ernst-tdqn-2021"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "policy-gradient",
+      "slug": "policy-gradient",
+      "name": "Policy Gradient",
+      "description": "Temporarily mapped to A2C. Vanilla policy-gradient (REINFORCE) is covered by the exposed actor-critic policy-gradient methods (A2C / PPO), which add a learned baseline and are strictly stronger; Zhang/Zohren/Roberts (2020) compare DQN / Policy-Gradient / A2C, and A2C is the policy-gradient representative here. Repoint to a dedicated REINFORCE only if a falsification arm is wanted.",
+      "category": "rl",
+      "status": "implemented",
+      "flavors": [
+        { "name": "via A2C", "modelName": "a2c" }
+      ],
+      "paperIds": [
+        "zhang-zohren-roberts-drl-2020"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "eiie",
+      "slug": "eiie",
+      "name": "EIIE (Ensemble of Identical Independent Evaluators)",
+      "description": "DEFERRED — a multi-asset PORTFOLIO architecture (Jiang et al 2017): one weight-shared network is applied INDEPENDENTLY to each asset's price tensor, producing a softmax allocation over N assets + cash. It cannot be built faithfully in BlackSwan's SINGLE-asset, discrete-action env (it degenerates to a position sizer). Revisit once the multi-asset / portfolio env lands (Wave-3).",
+      "category": "rl",
+      "status": "deferred",
+      "flavors": [],
+      "proposal": "Needs a multi-asset portfolio env first (continuous weight-vector action over N assets + cash); then the EIIE extractor (weight-shared per-asset CNN/RNN -> softmax weights). Blocked until that env exists.",
+      "paperIds": [
+        "jiang-portfolio-drl-2017"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "time",
+      "slug": "time",
+      "name": "Time-of-Day Baseline",
+      "description": "A deterministic clock strategy: open a long at a fixed UTC hour and close at another, every day — an intraday round-trip (buy<sell) or an OVERNIGHT hold (buy>sell). A control to BEAT and a probe for time-of-day / overnight seasonality; needs intraday data (timeframe=1h). Sweep time_buy x time_sell to surface any hour-of-day pattern. Per the literature (intraday momentum is an equity open/close-auction effect; crypto calendar effects are regime-dependent and cost-fragile) these rarely survive 0.1% fees on a 24/7 asset — so the value is the baseline + the falsification.",
+      "category": "baseline",
+      "status": "implemented",
+      "flavors": [
+        { "name": "US session (long 14->21)", "modelName": "time", "config": { "time_buy": 14, "time_sell": 21 } },
+        { "name": "overnight (buy 21, sell 14)", "modelName": "time", "config": { "time_buy": 21, "time_sell": 14 } },
+        { "name": "US morning (14->17)", "modelName": "time", "config": { "time_buy": 14, "time_sell": 17 } },
+        { "name": "US afternoon (17->21)", "modelName": "time", "config": { "time_buy": 17, "time_sell": 21 } },
+        { "name": "Asia session (0->8)", "modelName": "time", "config": { "time_buy": 0, "time_sell": 8 } },
+        { "name": "other hours", "modelName": "time" }
+      ],
+      "implPath": "src/model/time_strategy_model.py",
+      "paperIds": [
+        "shen-urquhart-wang-bitcoin-intraday-momentum-2022",
+        "eross-intraday-dynamics-bitcoin-2019",
+        "gao-han-li-zhou-market-intraday-momentum-2018",
+        "wen-bouri-xu-zhao-crypto-intraday-predictability-2022",
+        "aharon-qadan-day-of-week-bitcoin-2019"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "weekday",
+      "slug": "weekday",
+      "name": "Day-of-Week Baseline",
+      "description": "A deterministic weekly clock: open a long at the start of weekday `day_buy` (0=Mon..6=Sun) and close at `day_sell`, every week — an intra-week hold (buy<sell, e.g. Mon->Fri) or a WEEKEND hold (buy>sell, e.g. Fri->Mon; crypto trades the weekend). A control to BEAT and a probe for weekly seasonality (the Monday / day-of-week effect; Aharon-Qadan). Runs at a daily step (timeframe=1d). Per the literature these calendar effects are in-sample, data-mining-prone and unlikely to survive OOS net of 0.1% fees — so the value is the baseline + falsification.",
+      "category": "baseline",
+      "status": "implemented",
+      "flavors": [
+        { "name": "Mon->Fri (weekdays)", "modelName": "weekday", "config": { "day_buy": 0, "day_sell": 4 } },
+        { "name": "Fri->Mon (weekend hold)", "modelName": "weekday", "config": { "day_buy": 4, "day_sell": 0 } },
+        { "name": "Monday effect (Mon->Tue)", "modelName": "weekday", "config": { "day_buy": 0, "day_sell": 1 } },
+        { "name": "other days", "modelName": "weekday" }
+      ],
+      "implPath": "src/model/day_of_week_strategy_model.py",
+      "paperIds": [
+        "aharon-qadan-day-of-week-bitcoin-2019"
       ],
       "source": "manual"
     }

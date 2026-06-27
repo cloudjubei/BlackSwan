@@ -8,7 +8,7 @@ import sbx.common.type_aliases
 import sbx.core
 import sbx.dqn
 import sbx.ppo
-from src.conf.model_config import ModelConfigSearch, ModelConfig, ModelTechnicalConfig, ModelTimeConfig, ModelMomentumConfig, ModelRLConfig, ModelRegressionConfig, ModelSupervisedConfig
+from src.conf.model_config import ModelConfigSearch, ModelConfig, ModelTechnicalConfig, ModelTimeConfig, ModelMomentumConfig, ModelDayConfig, ModelRLConfig, ModelRegressionConfig, ModelSupervisedConfig
 from src.model.custom.agent57.agent57 import Agent57
 from src.model.custom.customqnetwork import CustomQNetwork
 from src.model.custom.dgwo import DGWO
@@ -30,6 +30,7 @@ from src.model.rl_model import RLModel
 from src.model.time_strategy_model import TimeStrategyModel
 from src.model.technical_strategy_model import TechnicalStrategyModel
 from src.model.momentum_strategy_model import MomentumStrategyModel
+from src.model.day_of_week_strategy_model import DayOfWeekStrategyModel
 from src.environment.abstract_env import AbstractEnv
 
 from stable_baselines3.common.logger import HumanOutputFormat, KVWriter, Logger
@@ -167,6 +168,13 @@ def get_model_combinations(config: ModelConfigSearch) -> List[ModelConfig]:
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="momentum", model_momentum=ModelMomentumConfig(**get_combo(c, list_keys, non_lists))), combinations))
+    elif config.model_type == "weekday":
+        data = config.model_day
+        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
+        list_values = [value for value in data.values() if type(value) == ListConfig]
+        non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
+        combinations = itertools.product(*list_values)
+        return list(map(lambda c: ModelConfig(model_type="weekday", model_day=ModelDayConfig(**get_combo(c, list_keys, non_lists))), combinations))
 
     raise ValueError(f'{config.model_type} - model not supported')
 
@@ -185,6 +193,8 @@ def create_model(config: ModelConfig, env: AbstractEnv, device: str):
         return TechnicalStrategyModel(config)
     elif config.model_type == "momentum":
         return MomentumStrategyModel(config)
+    elif config.model_type == "weekday":
+        return DayOfWeekStrategyModel(config)
 
     raise ValueError(f'{config.model_type} - model not supported')
 

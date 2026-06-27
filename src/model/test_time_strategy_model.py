@@ -1,114 +1,51 @@
 """Direct unit tests for the deterministic TimeStrategyModel baseline.
 
-get_action reads the most-recent bar's ``timestamp_close``, converts it to a UTC wall-clock, and
-buys/sells when that clock (or its +1s offset) matches the configured ``time_buy`` / ``time_sell``
-(stored as HHMM, scaled to HHMM00). We craft exact UTC epoch seconds and assert the emitted action.
+get_action reads the current bar's UTC hour from ``env.data_provider.get_timestamp(env.current_step)`` and
+opens a long at ``time_buy`` (hour 0-23), closes at ``time_sell``, else holds. We feed a fake provider whose
+get_timestamp returns a bar at a chosen UTC hour and assert the emitted action (1 buy / 2 sell / 0 hold).
 """
-
-import calendar
-import types
-from datetime import datetime
+from types import SimpleNamespace
 
 import pandas as pd
 
+from src.conf.model_config import ModelConfig, ModelTimeConfig
 from src.model.time_strategy_model import TimeStrategyModel
 
 
-COLUMNS = ["timestamp_close", "price"]
-
-
-def _epoch(hour, minute, second, day=1):
-    # Build a UTC epoch matching datetime.utcfromtimestamp's interpretation (timegm = UTC tuple).
-    return calendar.timegm(datetime(2021, 1, day, hour, minute, second).utctimetuple())
-
-
-def _env(ts_close, *, lookback=1):
-    item_size = len(COLUMNS)
-    last_bar = [float(ts_close), 0.0]
-    obs = [0.0] * (item_size * (lookback - 1)) + last_bar + [99999.0]
-    env = types.SimpleNamespace(
-        env_config=types.SimpleNamespace(lookback_window_size=lookback),
-        df=types.SimpleNamespace(columns=pd.Index(COLUMNS)),
+def _model(time_buy, time_sell):
+    return TimeStrategyModel(
+        ModelConfig(model_type="time", model_time=ModelTimeConfig(time_buy=time_buy, time_sell=time_sell))
     )
-    return env, obs
 
 
-def _model(time_buy=1200, time_sell=1400):
-    m = TimeStrategyModel.__new__(TimeStrategyModel)
-    m.time_config = types.SimpleNamespace(time_buy=time_buy, time_sell=time_sell)
-    return m
+def _env(hour):
+    """A fake env whose CURRENT bar sits at the given UTC hour."""
+    dt = pd.Timestamp(2021, 1, 1, hour, 0, 0, tz="UTC")
+    return SimpleNamespace(current_step=0, data_provider=SimpleNamespace(get_timestamp=lambda _s: dt))
 
 
-# --- get_id ---------------------------------------------------------------
-
-def test_get_id_formats_type_and_times():
-    cfg = types.SimpleNamespace(
-        model_type="time",
-        model_time=types.SimpleNamespace(time_buy=1200, time_sell=1400),
-    )
-    assert TimeStrategyModel.get_id(None, cfg) == "time_1200_1400"
+def test_opens_long_at_the_buy_hour():
+    assert _model(14, 21).get_action(_env(14), None) == 1
 
 
-# --- buy --------------------------------------------------------------------
-
-def test_buy_when_close_exactly_on_buy_minute():
-    # 12:00:00 close -> time_close 120000 == buy_time (1200*100) -> BUY.
-    env, obs = _env(_epoch(12, 0, 0))
-    assert _model(time_buy=1200).get_action(env, obs) == 1
+def test_closes_long_at_the_sell_hour():
+    assert _model(14, 21).get_action(_env(21), None) == 2
 
 
-def test_buy_via_one_second_offset():
-    # 11:59:59 close + 1s -> 12:00:00 offset == buy_time -> BUY (handles :59 exchange close stamps).
-    env, obs = _env(_epoch(11, 59, 59))
-    assert _model(time_buy=1200).get_action(env, obs) == 1
+def test_holds_at_every_other_hour():
+    m = _model(14, 21)
+    for h in (0, 1, 13, 15, 20, 22, 23):
+        assert m.get_action(_env(h), None) == 0
 
 
-def test_no_buy_when_off_by_two_seconds():
-    # 11:59:58 close: neither it (115958) nor its +1s offset (115959) equals 120000.
-    env, obs = _env(_epoch(11, 59, 58))
-    assert _model(time_buy=1200, time_sell=2359).get_action(env, obs) == 0
+def test_overnight_config_buys_late_sells_early_and_holds_through_the_night():
+    # buy 21, sell 14 (next day) -> an overnight hold of the off-US-session window.
+    m = _model(21, 14)
+    assert m.get_action(_env(21), None) == 1  # open at night
+    assert m.get_action(_env(14), None) == 2  # close mid-next-day
+    assert m.get_action(_env(3), None) == 0  # hold through the night
 
 
-# --- sell -------------------------------------------------------------------
-
-def test_sell_when_close_exactly_on_sell_minute():
-    env, obs = _env(_epoch(14, 0, 0))
-    assert _model(time_sell=1400).get_action(env, obs) == 2
-
-
-def test_sell_via_one_second_offset():
-    env, obs = _env(_epoch(13, 59, 59))
-    assert _model(time_sell=1400).get_action(env, obs) == 2
-
-
-# --- precedence + hold ------------------------------------------------------
-
-def test_buy_takes_precedence_when_buy_and_sell_times_coincide():
-    # buy and sell both set to 12:00; buy is checked first so BUY wins.
-    env, obs = _env(_epoch(12, 0, 0))
-    assert _model(time_buy=1200, time_sell=1200).get_action(env, obs) == 1
-
-
-def test_hold_when_no_time_matches():
-    env, obs = _env(_epoch(10, 30, 0))
-    assert _model(time_buy=1200, time_sell=1400).get_action(env, obs) == 0
-
-
-def test_uses_last_bar_of_lookback_window():
-    # lookback=2: a stale first bar at the buy time must be ignored; the recent bar at 09:00 -> HOLD.
-    item_size = len(COLUMNS)
-    stale = [float(_epoch(12, 0, 0)), 0.0]
-    recent = [float(_epoch(9, 0, 0)), 0.0]
-    obs = list(stale) + list(recent) + [99999.0]
-    env = types.SimpleNamespace(
-        env_config=types.SimpleNamespace(lookback_window_size=2),
-        df=types.SimpleNamespace(columns=pd.Index(COLUMNS)),
-    )
-    assert item_size == 2
-    assert _model(time_buy=1200, time_sell=1400).get_action(env, obs) == 0
-
-
-def test_minute_granularity_buy_at_thirty_past():
-    # time_buy 1230 -> 12:30:00 fires.
-    env, obs = _env(_epoch(12, 30, 0))
-    assert _model(time_buy=1230, time_sell=2359).get_action(env, obs) == 1
+def test_id_encodes_the_two_hours():
+    mid = _model(14, 21).id
+    assert "time" in mid and "14" in mid and "21" in mid

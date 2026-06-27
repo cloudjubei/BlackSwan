@@ -16,7 +16,7 @@ from omegaconf import OmegaConf
 
 from src.conf.data_config import DataConfig
 from src.conf.env_config import EnvConfig
-from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervisedConfig, ModelMomentumConfig, model_rl
+from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervisedConfig, ModelMomentumConfig, ModelTimeConfig, ModelDayConfig, model_rl
 from src.model.model_factory import get_model_combinations
 from src.model.rl_model import is_recurrent_model_name
 from trainer.fidelity import resolve_fidelity
@@ -195,6 +195,14 @@ def is_momentum(cfg):
     return str(cfg.get("model_name", "")).lower() == "momentum" or cfg.get("model_type") == "momentum"
 
 
+def is_time(cfg):
+    return str(cfg.get("model_name", "")).lower() == "time" or cfg.get("model_type") == "time"
+
+
+def is_weekday(cfg):
+    return str(cfg.get("model_name", "")).lower() == "weekday" or cfg.get("model_type") == "weekday"
+
+
 def build_model_config(cfg):
     """Return one concrete ModelConfig for the lever values in ``cfg``."""
     if is_hodl(cfg):
@@ -206,6 +214,28 @@ def build_model_config(cfg):
     if is_momentum(cfg):
         momentum = ModelMomentumConfig(lookback_periods=int(cfg.get("momentum_lookback", 30)))
         config = ModelConfig(model_type="momentum", model_momentum=momentum)
+        config.iterations_to_pick_best = 1
+        return config
+
+    if is_time(cfg):
+        # Deterministic time-of-day baseline: long from UTC hour `time_buy` to hour `time_sell`. Needs
+        # intraday (1h) data so the hour varies.
+        time_cfg = ModelTimeConfig(
+            time_buy=int(cfg.get("time_buy", 14)),
+            time_sell=int(cfg.get("time_sell", 21)),
+        )
+        config = ModelConfig(model_type="time", model_time=time_cfg)
+        config.iterations_to_pick_best = 1
+        return config
+
+    if is_weekday(cfg):
+        # Deterministic day-of-week baseline: long from weekday `day_buy` (0=Mon..6=Sun) to `day_sell`.
+        # Runs at a daily step (timeframe=1d) so the weekday is unambiguous.
+        day_cfg = ModelDayConfig(
+            day_buy=int(cfg.get("day_buy", 0)),
+            day_sell=int(cfg.get("day_sell", 4)),
+        )
+        config = ModelConfig(model_type="weekday", model_day=day_cfg)
         config.iterations_to_pick_best = 1
         return config
 

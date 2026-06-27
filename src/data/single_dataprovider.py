@@ -2,6 +2,7 @@ from abc import abstractmethod
 from typing import List
 
 import numpy as np
+import pandas as pd
 from src.conf.data_config import DataConfig
 from src.data.abstract_dataprovider import AbstractDataProvider
 
@@ -14,6 +15,7 @@ class SingleDataProvider(AbstractDataProvider):
         df, prices, timestamps, buy_sells, rewards_buy_profitable, rewards_buy_drawdown = self.get_data(self.paths, self.config.type, config.timestamp, config.indicator, config.buyreward_percent, config.buyreward_maxwait)
         self.df = df
         self.prices = prices
+        self.timestamps = timestamps
         self.signals_buy_sell = buy_sells
         self.signals_buy_profitable = rewards_buy_profitable
         self.signals_buy_drawdown = rewards_buy_drawdown
@@ -22,7 +24,13 @@ class SingleDataProvider(AbstractDataProvider):
 
     def get_timesteps(self) -> int:
         return self.df.shape[0] - self.get_start_index() - 1
-    
+
+    def get_timestamp(self, step: int) -> pd.Timestamp:
+        # `timestamps` are the bar CLOSE in ms + 1 (see process_df); subtract that 1 to recover the true
+        # close, whose hour-of-day IS the bar's hour (an hourly 14:00-15:00 bar closes 14:59:59 -> hour 14).
+        ms = int(self.timestamps[step + self.get_start_index()]) - 1
+        return pd.to_datetime(ms, unit="ms", utc=True)
+
     def get_start_index(self):
         return self.config.lookback_window_size - 1
 

@@ -199,6 +199,13 @@ class MultiTimelineDataProvider(AbstractDataProvider):
         # return self.prices[step*self.divider_run + self.get_start_index()]
         return self.prices[step]
 
+    def get_timestamp(self, step: int):
+        # The current decision bar's datetime — the SAME base row get_price/the observation anchor on
+        # (start_index + step*divider_run). get_timestamp_datetime reads the bar OPEN, so .hour is the
+        # bar's hour-of-day (what the time-of-day strategy keys on). Resolved-fidelity path only.
+        offset = self.get_start_index() + step * self.divider_run
+        return self.get_timestamp_datetime(self.raw_df, offset)
+
     def get_timestamp_datetime(self, df, i):
         # Reuse the once-converted decision-bar datetimes (set in _precompute_values) instead of
         # re-running pd.to_datetime(df.iloc[i]) on every mapping lookup — the per-step hot cost. getattr
