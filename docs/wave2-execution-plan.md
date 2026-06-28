@@ -46,6 +46,41 @@ hold in exactly one cell — 2022, where being flat beats a −57% market (not s
 fluff once 0.1% fees apply, because turnover dominates) replicated decisively; its constructive
 "cost-aware filter restores it" half does not transfer to beating B&H on single-asset spot.
 
+**RL replications (#2–5) — first pass (2024 window, seed 0, PURE-RETURN objective).** Each trained with
+`combo_direct` isolated (all other combo weights zeroed) so the agent optimizes the *paper's* return
+objective, NOT BlackSwan's tuned shaping. `return_vs_hold_pct`:
+
+| Paper | Model | return% | vs hold | trades | read |
+|---|---|---|---|---|---|
+| TDQN (Théate & Ernst) | `dqn` | +41.95 | **+4.19** | 13 | near-B&H + slight edge — the only beat; validating across windows |
+| Moody & Saffell (RRL) | `reppo-custom` | 0.00 | −37.77 | **0** | degenerate — never enters under a pure-return reward |
+| Lim (Deep Momentum) | `duel-dqn-custom-lstm` | +13.42 | −24.34 | 17 | under-participates, lags the bull |
+| Borrageiro (RRL crypto) | `reppo-custom` (1h) | −28.37 | −14.69 | 156 | turnover bleed (like Bysik) |
+
+3 of 4 refuted in the 2024 bull, each for a *distinct, informative* reason. The keystone finding:
+**Moody & Saffell's RecurrentPPO won't even enter (0 trades) under the pure per-step return objective** —
+the structural flip-side of why BlackSwan uses heavy reward shaping (combo_sell=1000 etc.). The papers'
+"train on raw return/Sharpe" prescription does not produce a *trading* policy in this position-gated env
+without shaping.
+
+**TDQN — full 3-window validation: REFUTED.** Its 2024 +4.19% was a bull-window artifact. Across windows
+(`return_vs_hold_pct`): 2022 **+130%** (ret +65% with **0 completed trades** — it held a short through the
+bear, so the objective gates it to 0 for under-trading), 2023 **−132%** (ret +21% vs +153% hold — lags the
+bull catastrophically), 2024 +4.2%. Beats hold in 2/3, **fails the 2023 bull**, so not REPLICATED. The
+shape is the same defensive-in-bear / lag-in-bull signature as momentum — not genuine timing alpha. Note
+the 2022 metric quirk: a large return_vs_hold from a held position that `traded_return` zeroes via the
+under-trading gate (a discrepancy the verdict layer should surface, not hide).
+
+**Wave-2 scorecard so far: 6/6 tested papers refuted** (Moskowitz, Bysik, TDQN fully; Moody, Lim,
+Borrageiro on the 2024 first pass). None beats buy-and-hold OOS net of 0.1% fees across regimes — the
+pre-registered thesis holds across non-ML rules, supervised ML, and deep RL alike.
+
+Two engineering notes from this batch: (a) **MPS crashes on the LSTM-gradient kernel**
+(`GPURNNOps.mm` assertion) — RecurrentPPO/dueling-LSTM must train on CPU (which is also ~7× faster here);
+`trainer/run.py` `_MPS_FASTER_MODELS` wrongly lists `reppo`/`reppo-custom` and should drop them. (b) The
+catalogued `replicateConfig`s under-specify training (default `episodes=1` < `learning_starts`, so no
+learning at 1d) — the runs added `episodes`/`learning_starts`/`buffer_size`.
+
 ## The BAR (what "survives" means)
 A replication SURVIVES only if it: beats buy-and-hold **out-of-sample net of 0.1%/trade fees**, with
 profit **NOT concentrated in up-regimes** (genuine timing, not beta), **stable across seeds AND across

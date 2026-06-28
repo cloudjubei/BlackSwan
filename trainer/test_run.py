@@ -200,10 +200,14 @@ def test_resolve_device_explicit_value_wins_over_auto_logic():
     assert run_mod._resolve_device({}) == "cpu"  # default
 
 
-def test_resolve_device_auto_picks_mps_for_measured_winners(monkeypatch):
+def test_resolve_device_auto_never_picks_mps_for_trading_models(monkeypatch):
+    # MPS is measurably SLOWER for the trading line's small-net, single-env models (bench_mps.py:
+    # dqn 18.6s cpu vs 44.9s mps) and the LSTM models additionally hit an intermittent Metal
+    # LSTM-gradient assertion (GPURNNOps.mm) that aborts training mid-run. So `auto` stays on CPU;
+    # only an explicit device="mps" forces Metal.
     monkeypatch.setattr(run_mod, "_mps_available", lambda: True)
-    for name in ("reppo", "reppo-custom", "dqn"):
-        assert run_mod._resolve_device({"device": "auto", "model_name": name}) == "mps"
+    for name in ("reppo", "reppo-custom", "dqn", "duel-dqn-custom-lstm"):
+        assert run_mod._resolve_device({"device": "auto", "model_name": name}) == "cpu"
 
 
 def test_resolve_device_auto_keeps_cpu_for_mlp_models(monkeypatch):

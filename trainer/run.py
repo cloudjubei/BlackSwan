@@ -94,16 +94,19 @@ def _mps_available():
         return False
 
 
-# Models measured ~1.45-1.6x faster on Apple MPS than on a 2-thread CPU (LSTM/heavy-matmul); the MLP
-# models (ppo/a2c/ars) are SLOWER on MPS, so `auto` leaves them on CPU.
-_MPS_FASTER_MODELS = ("reppo", "reppo-custom", "dqn")
+# Every trading-line model is SLOWER on Apple MPS than on CPU here: small nets stepped through a single
+# sequential env mean each step is a batch-of-1 with a host<->Metal round-trip that dominates (bench_mps.py:
+# dqn 18.6s cpu vs 44.9s mps on the same config). The LSTM models ALSO hit an intermittent Metal
+# LSTM-gradient assertion (GPURNNOps.mm `shape4.size() >= 3`) that aborts training mid-run. So `auto`
+# never picks MPS — set device="mps" explicitly to force Metal (e.g. an ad-hoc large-net experiment).
+_MPS_FASTER_MODELS = ()  # empty: nothing in the trading line is faster (or reliable) on MPS
 
 
 def _resolve_device(cfg):
-    """Resolve cfg['device'], expanding 'auto'. 'auto' picks MPS for the models measured faster on it
-    (recurrent + dqn), else CPU. Use 'auto'/'mps' for a SINGLE latency-bound run (e.g. a final
-    confirmation run); keep 'cpu' (the default) for parallel SWEEPS — one GPU can't be shared across the
-    runs A1 packs onto the host, and MPS breaks bit-reproducibility."""
+    """Resolve cfg['device'], expanding 'auto'. 'auto' resolves to CPU: every trading-line model is
+    slower on MPS here, and the LSTM models can intermittently abort on Metal's LSTM-gradient kernel
+    (see _MPS_FASTER_MODELS). An explicit device="mps"/"cuda" is honored as-is; MPS also breaks
+    bit-reproducibility, so keep 'cpu' (the default) for sweeps."""
     requested = str(cfg.get("device", "cpu"))
     if requested != "auto":
         return requested

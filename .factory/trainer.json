@@ -563,7 +563,8 @@
         "cuda"
       ],
       "default": "cpu",
-      "description": "Compute device: cpu, mps (Apple GPU), or cuda (NVIDIA GPU)."
+      "description": "Compute device: cpu, mps (Apple GPU), or cuda (NVIDIA GPU).",
+      "scope": "ignore"
     },
     "seed": {
       "type": "number",
@@ -583,6 +584,31 @@
     }
   },
   "presets": [
+    {
+      "label": "Window robustness — supervised vs RL (1d · 2022/2023/2024)",
+      "thesis": "Cross-window OOS robustness: does each setup beat buy-and-hold net of 0.1% fees in 2022, 2023 AND 2024 — not just one lucky window? Pass = return_vs_hold_pct > 0 in every window with positive down-regime pnl. Supervised arms are deterministic (1 seed is exact); the RL arm runs the same single seed here — do a dedicated RL seed sweep as a follow-up if it looks promising.",
+      "thesisTarget": "walk_forward_window",
+      "fixed": {
+        "timeframe": "1d",
+        "fidelity_set": "1d",
+        "use_indicators": true,
+        "position_sizing": "vol_target",
+        "vol_target": 0.02,
+        "stop_loss": 0.02,
+        "transaction_fee": 0.001
+      },
+      "datasets": [
+        { "walk_forward_window": "2022" },
+        { "walk_forward_window": "2023" },
+        { "walk_forward_window": "2024" }
+      ],
+      "environments": [
+        { "model_name": "supervised-logreg", "forward_horizon": 5, "prob_threshold": 0.5, "allow_shorting": true },
+        { "model_name": "supervised-gbm", "forward_horizon": 1, "prob_threshold": 0.5, "allow_shorting": false },
+        { "model_name": "reppo-custom", "allow_shorting": false, "reward_model": "combo_unified", "episodes": 1 }
+      ],
+      "seeds": 1
+    }
   ],
   "papers": [
     {
