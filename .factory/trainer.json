@@ -1228,7 +1228,7 @@
         },
         "seeds": 1
       },
-      "verdictNote": "Replicated via the deterministic `momentum` model (long when the trailing momentum_lookback-bar return is positive, flat otherwise; long/flat single-asset BTC spot, fixed sizing — vol-target sizing deferred as a multi-asset precursor, shorting a future extension), swept over 30/90/252-bar lookbacks. Seminal, but transplanting the ~1.2 Sharpe to single-asset spot BTC under 0.1% fees + walk-forward is unjustified for three compounding reasons. (1) Diversification: the strong Sharpe is a 58-instrument cross-asset portfolio; a single asset loses nearly all the variance reduction — expect single-asset TSM Sharpe far lower (often <0.5). (2) Costs: results are essentially GROSS; 0.1%/trade spot fees plus a vol-scaled frequently-resized rule bleed materially, and crypto's high vol forces more turnover. (3) The registry is long-biased spot, so the short leg (TSM's crisis-alpha) is constrained, cutting return. Net: TSM is the RIGHT honest, parameter-light non-ML CONTROL to beat — a deep model that cannot beat this adapted, net-of-fee, walk-forward control is fluff.",
+      "verdictNote": "MEASURED 2026-06-27 (momentum lookback 30/90/252 × walk-forward 2022/2023/2024, 0.1% fees): REFUTED — no lookback beats buy-and-hold in all three windows. Best (lookback 30) wins the 2022 bear (+19.5% vs hold) and the short 2024 window (+6.6%) but badly lags the 2023 bull (−70.6% vs hold); a textbook downside-protection-but-trend-lag pattern that nets out negative against a long-biased B&H. (DSR-graded status pending the verdict layer; the basic beats-hold criterion already fails.) Replicated via the deterministic `momentum` model (long when the trailing momentum_lookback-bar return is positive, flat otherwise; long/flat single-asset BTC spot, fixed sizing — vol-target sizing deferred as a multi-asset precursor, shorting a future extension), swept over 30/90/252-bar lookbacks. Seminal, but transplanting the ~1.2 Sharpe to single-asset spot BTC under 0.1% fees + walk-forward is unjustified for three compounding reasons. (1) Diversification: the strong Sharpe is a 58-instrument cross-asset portfolio; a single asset loses nearly all the variance reduction — expect single-asset TSM Sharpe far lower (often <0.5). (2) Costs: results are essentially GROSS; 0.1%/trade spot fees plus a vol-scaled frequently-resized rule bleed materially, and crypto's high vol forces more turnover. (3) The registry is long-biased spot, so the short leg (TSM's crisis-alpha) is constrained, cutting return. Net: TSM is the RIGHT honest, parameter-light non-ML CONTROL to beat — a deep model that cannot beat this adapted, net-of-fee, walk-forward control is fluff.",
       "tags": [
         "non-ML-control",
         "momentum",
@@ -1243,7 +1243,7 @@
         "foundational",
         "baseline-to-beat"
       ],
-      "status": "untested",
+      "status": "fluff",
       "source": "manual"
     },
     {
@@ -1292,7 +1292,7 @@
         },
         "seeds": 3
       },
-      "verdictNote": "HIGH constructive-skeptic value: directly demonstrates the registry's central thesis — sign-based ML that looks great gross is FLUFF once a realistic 0.1% per-trade fee applies, because turnover dominates the edge. The restored result is fragile: cost-aware long-only XGBoost Sharpe ~1.09 / ~65.4% barely exceeds B&H (~0.82 / ~56.3%), so most apparent edge is just BTC's bull drift, and the win is a SELECTED configuration with no DSR/PBO deflation. The 27-fold walk-forward and net-of-cost reporting are sound; under the registry's 0.1% + walk-forward bar, naive strategies clearly FAIL and the filtered strategy only marginally survives, likely losing Sharpe>1 after deflation. Best as a calibration/skeptical anchor and a single-asset BTC walk-forward template — replicate the cost-aware filter and apply DSR/PBO to its winning spec.",
+      "verdictNote": "MEASURED 2026-06-27 (supervised-gbm, 1h+1d, prob_threshold 0.5/0.6/0.7 × walk-forward 2022/2023/2024, 0.1% fees): collapse CONFIRMED — thr 0.5 does ~1400 trades/window and returns −210% to −377% vs hold (0/3 beat); thr 0.6 still −58%/−190%/−107% (0/3). Raising prob_threshold cuts turnover (1394→493→5 trades) but 'restores' returns only by converging to CASH (thr 0.7 ≈ 5 trades, ~0% return — beats hold ONLY in the 2022 bear, by being flat). NO threshold yields a tradeable edge over buy-and-hold: the skeptical thesis HOLDS UP, the cost-aware-filter restoration does NOT transfer to beating B&H on single-asset spot. HIGH constructive-skeptic value: directly demonstrates the registry's central thesis — sign-based ML that looks great gross is FLUFF once a realistic 0.1% per-trade fee applies, because turnover dominates the edge. The restored result is fragile: cost-aware long-only XGBoost Sharpe ~1.09 / ~65.4% barely exceeds B&H (~0.82 / ~56.3%), so most apparent edge is just BTC's bull drift, and the win is a SELECTED configuration with no DSR/PBO deflation. The 27-fold walk-forward and net-of-cost reporting are sound; under the registry's 0.1% + walk-forward bar, naive strategies clearly FAIL and the filtered strategy only marginally survives, likely losing Sharpe>1 after deflation. Best as a calibration/skeptical anchor and a single-asset BTC walk-forward template — replicate the cost-aware filter and apply DSR/PBO to its winning spec.",
       "tags": [
         "skeptical",
         "transaction-costs",
@@ -1310,7 +1310,7 @@
         "long-biased",
         "hourly"
       ],
-      "status": "untested",
+      "status": "holds-up",
       "source": "manual"
     },
     {

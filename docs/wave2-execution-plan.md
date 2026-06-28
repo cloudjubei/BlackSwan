@@ -11,6 +11,41 @@ infra to build, and fixes the verdict criteria.
 > the rigor/verdict layer (enablingBuild #1) is NOT yet built, so runs produce raw claimed-vs-measured
 > rows, not graded verdicts, until it lands.
 
+## Results (live, raw — formal grade awaits the DSR/verdict layer)
+
+**Moskowitz TSMom (#7) — REFUTED on single-asset BTC spot.** First completed replication (2026-06-27):
+the deterministic `momentum` model, long/flat, fixed sizing, 0.1% fees, swept over lookback 30/90/252 ×
+walk-forward 2022/2023/2024. `return_vs_hold_pct` per cell:
+
+| lookback | 2022 (bear, hold −65%) | 2023 (bull, hold +153%) | 2024 (hold +38%) | windows > hold |
+|---|---|---|---|---|
+| 30  | **+19.5%** | −70.6% | **+6.6%** | 2/3 |
+| 90  | **+28.2%** | −145.9% | −41.5% | 1/3 |
+| 252 | +65.3% (0 trades, window-limited) | −93.0% (1 trade) | 0 trades | degenerate |
+
+No lookback beats buy-and-hold in ALL three windows → fails criterion 1 (no DSR needed). The signature is
+the textbook one: momentum is **downside protection** (wins the 2022 bear by going to cash) but
+**trend-lags in bulls** (loses 2023/2024), and against a long-biased B&H benchmark it nets out negative.
+Note: the 1d walk-forward windows are only ~181–364 bars, so lookback 252 is degenerate (rarely/never
+trades) — meaningful momentum lookbacks here are ≤ ~60. Verdict matches the pre-registered thesis.
+
+**Bysik & Slepaczuk (#1) — REFUTED as a strategy; the skeptical thesis HOLDS UP.** `supervised-gbm`,
+1h+1d, 0.1% fees, swept `prob_threshold` 0.5/0.6/0.7 × the three windows. `return_vs_hold_pct` / trades:
+
+| `prob_threshold` | 2022 (bear) | 2023 (bull) | 2024 | avg trades | windows > hold |
+|---|---|---|---|---|---|
+| 0.5 | −262% (1592) | −377% (1593) | −210% (998) | 1394 | 0/3 |
+| 0.6 | −58% (432) | −190% (658) | −107% (390) | 493 | 0/3 |
+| 0.7 | +56% (5) | −78% (7) | −37% (4) | 5 | 1/3 |
+
+The central Wave-2 falsification, confirmed. It's a U-shape: low threshold → ~1400 trades → turnover
+annihilates returns (−210% to −377% vs hold); raising the threshold cuts turnover (1394 → 493 → **5**
+trades) and "restores" returns **only by converging to cash** (thr 0.7 ≈ 5 trades, ~0% return). It beats
+hold in exactly one cell — 2022, where being flat beats a −57% market (not skill, just not trading).
+**No threshold yields a tradeable edge over buy-and-hold.** The paper's skeptical claim (sign-based ML is
+fluff once 0.1% fees apply, because turnover dominates) replicated decisively; its constructive
+"cost-aware filter restores it" half does not transfer to beating B&H on single-asset spot.
+
 ## The BAR (what "survives" means)
 A replication SURVIVES only if it: beats buy-and-hold **out-of-sample net of 0.1%/trade fees**, with
 profit **NOT concentrated in up-regimes** (genuine timing, not beta), **stable across seeds AND across
