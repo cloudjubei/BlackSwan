@@ -17,6 +17,7 @@ import math
 import numpy as np
 
 from trainer.fidelity import resolve_fidelity
+from trainer.sharpe import sharpe_stats
 
 _MAX_SERIES_POINTS = 200
 
@@ -433,6 +434,23 @@ def _health(env, state, is_rl, lookback):
     return {"status": "degenerate" if flags else "ok", "flags": flags}
 
 
+def _oos_stats(equity):
+    """Per-step return distribution of the test-window equity curve — the Deflated-Sharpe inputs the
+    Wave-2 verdict layer aggregates across runs (oos_sharpe + skew/kurtosis/n for the PSR/DSR). Empty
+    when the curve is too short (<3 points) or degenerate, so callers can `metrics.update(...)` safely."""
+    eq = [_finite(x) for x in equity]
+    rets = [eq[i] / eq[i - 1] - 1.0 for i in range(1, len(eq)) if eq[i - 1] > 0]
+    if len(rets) < 2:
+        return {}
+    s = sharpe_stats(rets)
+    return {
+        "oos_sharpe": s["sharpe"],
+        "oos_n_obs": s["n_obs"],
+        "oos_ret_skew": s["skew"],
+        "oos_ret_kurt": s["kurtosis"],
+    }
+
+
 def build_summary(env, state, cfg, model, ran_at, is_rl):
     lookback = _lookback(env, cfg)
     fidelity = resolve_fidelity(cfg)[1]["fidelity_run"]
@@ -466,6 +484,7 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         "final_net_worth": equity[-1] if equity else initial,
         "realized_cost_bps": _finite(fees_paid / initial * 10000) if initial else 0.0,
     }
+    metrics.update(_oos_stats(equity))
     benchmark = _benchmark(env, lookback)
     if benchmark:
         metrics["hold_return_pct"] = benchmark["hold_return_pct"]

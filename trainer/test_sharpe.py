@@ -10,6 +10,7 @@ import pytest
 
 from trainer.sharpe import (
     sharpe_ratio,
+    sharpe_stats,
     probabilistic_sharpe_ratio,
     expected_max_sharpe,
     deflated_sharpe_ratio,
@@ -40,6 +41,28 @@ def test_sharpe_ratio_zero_variance_returns_zero_not_inf():
 def test_sharpe_ratio_too_few_points_is_zero():
     assert sharpe_ratio([0.05]) == 0.0
     assert sharpe_ratio([]) == 0.0
+
+
+# --- sharpe_stats (the per-run bundle summary.py emits) ---------------------
+
+def test_sharpe_stats_bundle_matches_components():
+    s = sharpe_stats(POS)
+    assert set(s) == {"sharpe", "skew", "kurtosis", "n_obs"}
+    assert s["sharpe"] == pytest.approx(sharpe_ratio(POS), rel=1e-12)
+    assert s["n_obs"] == len(POS)
+    assert math.isfinite(s["skew"]) and math.isfinite(s["kurtosis"])
+    assert s["kurtosis"] > 0  # non-excess (Pearson): normal == 3
+
+
+def test_sharpe_stats_constant_series_is_safe():
+    # A flat equity (no trades) -> constant returns -> defined, normal-shaped defaults, never nan.
+    s = sharpe_stats([0.0] * 50)
+    assert s == {"sharpe": 0.0, "skew": 0.0, "kurtosis": 3.0, "n_obs": 50}
+
+
+def test_sharpe_stats_too_few_points_is_safe():
+    s = sharpe_stats([0.01])
+    assert s["sharpe"] == 0.0 and s["n_obs"] == 1 and math.isfinite(s["skew"])
 
 
 # --- probabilistic_sharpe_ratio --------------------------------------------

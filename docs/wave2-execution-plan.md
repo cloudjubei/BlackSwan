@@ -71,9 +71,23 @@ shape is the same defensive-in-bear / lag-in-bull signature as momentum — not 
 the 2022 metric quirk: a large return_vs_hold from a held position that `traded_return` zeroes via the
 under-trading gate (a discrepancy the verdict layer should surface, not hide).
 
-**Wave-2 scorecard so far: 6/6 tested papers refuted** (Moskowitz, Bysik, TDQN fully; Moody, Lim,
-Borrageiro on the 2024 first pass). None beats buy-and-hold OOS net of 0.1% fees across regimes — the
-pre-registered thesis holds across non-ML rules, supervised ML, and deep RL alike.
+**Moody / Lim / Borrageiro — full 3-window sweep: all REFUTED (1/3 each).** `return_vs_hold_pct` per window:
+
+| Paper | 2022 (bear) | 2023 (bull) | 2024 (bull) | trades (22/23/24) | windows > hold |
+|---|---|---|---|---|---|
+| Moody (`reppo-custom`) | +65.3% | −153.1% | −37.8% | **0 / 0 / 0** | 1/3 |
+| Lim (`duel-dqn-lstm`) | +57.2% | −84.3% | −24.3% | 2 / 2 / 17 | 1/3 |
+| Borrageiro (`reppo-custom` 1h) | +89.3% | −129.7% | −14.7% | 192 / 86 / 156 | 1/3 |
+
+Each beats hold ONLY in the 2022 bear, and only by being defensive (Moody never trades; Lim barely;
+Borrageiro shorts/churns the downtrend). All fail both bull windows. Moody's all-windows **0 trades** is
+the sharpest result: under a pure-return reward the RecurrentPPO never learns to enter at all.
+
+**Wave-2 scorecard: 6/6 papers refuted across the FULL 3-window sweep.** None beats buy-and-hold OOS net
+of 0.1% fees across regimes — the pre-registered thesis holds across non-ML rules, supervised ML, and deep
+RL alike. The universal signature: *defensive-in-bear, lose-in-bull* — these methods only "win" by being
+flat/short when the market crashes, which on a long-biased single asset is downside protection, not
+tradeable timing alpha.
 
 Two engineering notes from this batch: (a) **MPS crashes on the LSTM-gradient kernel**
 (`GPURNNOps.mm` assertion) — RecurrentPPO/dueling-LSTM must train on CPU (which is also ~7× faster here);
@@ -207,3 +221,39 @@ STATUS waits on enablingBuild #1 — until then it is a recorded claimed-vs-meas
   perpetual-swap funding carry (Borrageiro ~71% of headline), and artificial-trajectory augmentation (full
   TDQN). All untransferable to single-asset BTC spot; their single-asset directional kernels still run in
   Wave 2 as falsification tests.
+
+## App ingestion — getting these into the Model Trainer (done + your steps)
+
+The hub stores three record kinds in `.factory/data/` (papers, **hypotheses** = falsifiable claims with a
+`spec`, runs = evidence matched to a hypothesis by config). **Key correction:** `trainer.json` is a one-time
+**import seed** — the live app never reads it directly. Nothing was imported yet (the store held only the 248
+legacy runs), so my earlier `verdictNote`/`status` edits to `trainer.json` reached nothing live. The
+reusable, checkable evidence lives on **hypotheses + runs**, not on the paper.
+
+**Done (written to the app store):**
+- **6 hypothesis records** (`blackswan-hypothesis`), ids computed with the app's real `hashTrainingConfig`
+  (validated against an existing record → no duplicates), each `verdictSource: 'manual'` with the MEASURED
+  verdict pinned (the `minRuns=3` gate would otherwise hold a single/no-run hypothesis at `untested`):
+  moskowitz `de7d9c3ad13d` · bysik `e4ed1bb153b6` (**proven**, framed as the cost-skeptic claim so the
+  paper rolls up to `holds-up`) · tdqn `a77d68b0bc3a` · moody `2be4a112aa49` · lim `186501860be3` ·
+  borrageiro `ccdfc4ba59ab` (the last five **disproved** → `fluff`).
+- **6 paper seeds linked** via `hypothesisIds` in `trainer.json`, so the paper verdict rolls up from the
+  hypothesis on import.
+
+**Your steps:**
+1. Open the Overseer Model Trainer viewer → **Papers** tab → click the **"Import"** starter-papers banner
+   (materializes the 25 seeds as live `blackswan-paper` records, key = paper.id). Reload so it reads the
+   hypothesis records. The 6 Wave-2 papers now show their verdicts (5 `fluff`, bysik `holds-up`).
+2. **Re-run to add real run evidence** (your offer): launch each hypothesis's `spec` via
+   `runTrainingCampaign` (it hashes the key, stamps `setupKey/status/ranAt`, upserts the `blackswan-run`
+   record, and fires `onRecordWritten` so the verdict auto-derives + is reusable across hypotheses). Each
+   spec's `fixed`+`sweep` is recorded on its hypothesis (and mirrors the corrected `replicateConfig`s above).
+   Once **≥3 matching runs** land per hypothesis, clear the manual pin and the verdict auto-derives from the
+   real runs. NB: the in-process batch runs (moody/lim/borrageiro full sweep, tdqn 2023, etc.) were
+   tabulated but **not persisted as summaries**, so they must be re-run; RL LSTM models must use
+   `device="cpu"` (MPS is slower + intermittently crashes the LSTM-grad kernel).
+
+Why hypotheses were hand-written but runs were not: a hypothesis id is `hash(spec)` with `spec` carrying
+only non-empty `fixed`+`sweep`, so `normalizeSpec` is a no-op and the id provably matches the app's — safe.
+A run key is `hash(the hub's fully-expanded+migrated config)`, which I can't reproduce exactly offline, so a
+hand-written run risks a divergent key (duplicate on re-run) — hence the hub-run path for evidence.

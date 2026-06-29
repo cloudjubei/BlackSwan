@@ -1,9 +1,31 @@
+import math
 import types
 
 import numpy as np
 import pytest
 
 from trainer import summary as summary_mod
+from trainer.summary import _oos_stats
+
+
+# --- _oos_stats: Deflated-Sharpe inputs from the equity curve ----------------
+
+def test_oos_stats_from_rising_equity_curve():
+    eq = [100, 101, 102, 101.5, 103, 104, 103, 105]
+    s = _oos_stats(eq)
+    assert s["oos_n_obs"] == len(eq) - 1  # one return per step transition
+    assert math.isfinite(s["oos_sharpe"]) and s["oos_sharpe"] > 0  # net-rising -> positive Sharpe
+    assert math.isfinite(s["oos_ret_skew"]) and math.isfinite(s["oos_ret_kurt"])
+
+
+def test_oos_stats_empty_when_too_short():
+    assert _oos_stats([100]) == {}
+    assert _oos_stats([100, 100]) == {}  # only one return -> < 2 -> empty (safe to .update())
+
+
+def test_oos_stats_flat_curve_is_zero_sharpe():
+    s = _oos_stats([100.0] * 8)
+    assert s["oos_sharpe"] == 0.0 and s["oos_n_obs"] == 7
 
 
 class _FakeProvider:

@@ -843,6 +843,9 @@
     },
     {
       "id": "theate-ernst-tdqn-2021",
+      "hypothesisIds": [
+        "a77d68b0bc3a"
+      ],
       "title": "An Application of Deep Reinforcement Learning to Algorithmic Trading",
       "url": "https://arxiv.org/abs/2004.06627",
       "authors": "Thibaut Théate, Damien Ernst",
@@ -970,6 +973,9 @@
     },
     {
       "id": "moody-saffell-rrl-2001",
+      "hypothesisIds": [
+        "2be4a112aa49"
+      ],
       "title": "Learning to Trade via Direct Reinforcement",
       "url": "https://doi.org/10.1109/72.935097",
       "authors": "John Moody, Matthew Saffell",
@@ -1025,6 +1031,9 @@
     },
     {
       "id": "borrageiro-rrl-crypto-2022",
+      "hypothesisIds": [
+        "ccdfc4ba59ab"
+      ],
       "title": "The Recurrent Reinforcement Learning Crypto Agent",
       "url": "https://arxiv.org/abs/2201.04699",
       "authors": "Gabriel Borrageiro, Nick Firoozye, Paolo Barucca",
@@ -1084,6 +1093,9 @@
     },
     {
       "id": "lim-deep-momentum-2019",
+      "hypothesisIds": [
+        "186501860be3"
+      ],
       "title": "Enhancing Time Series Momentum Strategies Using Deep Neural Networks (Deep Momentum Networks)",
       "url": "https://arxiv.org/abs/1904.04912",
       "authors": "Bryan Lim, Stefan Zohren, Stephen Roberts",
@@ -1208,6 +1220,9 @@
     },
     {
       "id": "moskowitz-tsmom-2012",
+      "hypothesisIds": [
+        "de7d9c3ad13d"
+      ],
       "title": "Time Series Momentum",
       "url": "https://doi.org/10.1016/j.jfineco.2011.11.003",
       "authors": "Tobias J. Moskowitz, Yao Hua Ooi, Lasse Heje Pedersen",
@@ -1274,6 +1289,9 @@
     },
     {
       "id": "bysik-slepaczuk-btc-costs-2026",
+      "hypothesisIds": [
+        "e4ed1bb153b6"
+      ],
       "title": "Machine Learning-Based Bitcoin Trading Under Transaction Costs: Evidence From Walk-Forward Forecasting",
       "url": "https://arxiv.org/abs/2606.00060",
       "authors": "Andrei Bysik, Robert Ślepaczuk",
@@ -1649,13 +1667,18 @@
       "id": "dqn",
       "slug": "dqn",
       "name": "DQN",
-      "description": "Deep Q-network (replay buffer + target net). Covers the stock MLP policy, the custom head, the LSTM features-extractor variant, and the JAX/SBX build.",
+      "description": "Deep Q-network (replay buffer + target net). Covers the stock MLP policy, the custom head, the LSTM features-extractor variant, the JAX/SBX build, and Théate & Ernst's Trading DQN (TDQN) — mechanically the custom-head DQN under a specific launch config.",
       "category": "rl",
       "status": "implemented",
+      "aliases": ["tdqn"],
       "flavors": [
         {
           "name": "vanilla",
           "modelName": "dqn"
+        },
+        {
+          "name": "TDQN (trading)",
+          "modelName": "tdqn"
         },
         {
           "name": "custom head",
@@ -1894,12 +1917,16 @@
       "id": "a2c",
       "slug": "a2c",
       "name": "A2C",
-      "description": "Advantage Actor-Critic — a synchronous on-policy actor-critic. Covers the stock SB3 MLP build and the tuned custom-net-arch head.",
+      "description": "Advantage Actor-Critic — a synchronous on-policy actor-critic. Covers the stock SB3 MLP build and the tuned custom-net-arch head. Also the project's Policy-Gradient representative (Zhang/Zohren/Roberts 2020): vanilla REINFORCE is subsumed by A2C, which adds a learned baseline and is strictly stronger.",
       "category": "rl",
       "status": "implemented",
+      "aliases": ["policy-gradient"],
       "flavors": [
         { "name": "vanilla", "modelName": "a2c" },
         { "name": "custom head", "modelName": "a2c-custom" }
+      ],
+      "paperIds": [
+        "zhang-zohren-roberts-drl-2020"
       ],
       "source": "manual"
     },
@@ -1975,37 +2002,6 @@
       "implPath": "src/model/custom/rrl/esn_rrl_model.py",
       "paperIds": [
         "borrageiro-rrl-crypto-2022"
-      ],
-      "source": "manual"
-    },
-    {
-      "id": "tdqn",
-      "slug": "tdqn",
-      "name": "TDQN (Trading Deep Q-Network)",
-      "description": "Théate & Ernst (2021) Trading DQN — a deep double-DQN for single-asset trading. Mechanically the custom-head DQN (CustomDQNPolicy); its faithful identity is the LAUNCH CONFIG: a deep feedforward Q-net (e.g. 256-128-64 + BatchNorm), a low discount (gamma≈0.4), long/short positioning, and indicator inputs — carried by the paper's replicate spec. Selectable as model_name 'tdqn'.",
-      "category": "rl",
-      "status": "implemented",
-      "flavors": [
-        { "name": "default", "modelName": "tdqn" }
-      ],
-      "implPath": "src/model/model_factory.py",
-      "paperIds": [
-        "theate-ernst-tdqn-2021"
-      ],
-      "source": "manual"
-    },
-    {
-      "id": "policy-gradient",
-      "slug": "policy-gradient",
-      "name": "Policy Gradient",
-      "description": "Temporarily mapped to A2C. Vanilla policy-gradient (REINFORCE) is covered by the exposed actor-critic policy-gradient methods (A2C / PPO), which add a learned baseline and are strictly stronger; Zhang/Zohren/Roberts (2020) compare DQN / Policy-Gradient / A2C, and A2C is the policy-gradient representative here. Repoint to a dedicated REINFORCE only if a falsification arm is wanted.",
-      "category": "rl",
-      "status": "implemented",
-      "flavors": [
-        { "name": "via A2C", "modelName": "a2c" }
-      ],
-      "paperIds": [
-        "zhang-zohren-roberts-drl-2020"
       ],
       "source": "manual"
     },

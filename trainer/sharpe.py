@@ -27,11 +27,21 @@ def sharpe_ratio(returns):
 
 
 def _moments(r):
-    """Observed Sharpe, skewness, and non-excess kurtosis (normal == 3) of a return series."""
+    """Observed Sharpe, skewness, and non-excess kurtosis (normal == 3) of a return series.
+    Constant / too-short series have undefined higher moments -> normal-shaped defaults (0, 3)."""
+    r = np.asarray(r, dtype=float)
     sr = sharpe_ratio(r)
-    g3 = float(skew(r, bias=False))
-    g4 = float(kurtosis(r, fisher=False, bias=False))  # Pearson (non-excess): normal -> 3
-    return sr, g3, g4
+    if r.size < 2 or np.ptp(r) == 0:
+        return sr, 0.0, 3.0
+    return sr, float(skew(r, bias=False)), float(kurtosis(r, fisher=False, bias=False))
+
+
+def sharpe_stats(returns):
+    """The per-run bundle the verdict layer's Deflated Sharpe Ratio needs: per-observation Sharpe, the
+    return distribution's skew + non-excess kurtosis, and the sample length. Safe on flat/short series."""
+    r = np.asarray(returns, dtype=float)
+    sr, g3, g4 = _moments(r)
+    return {"sharpe": sr, "skew": g3, "kurtosis": g4, "n_obs": int(r.size)}
 
 
 def probabilistic_sharpe_ratio(returns, sr_benchmark=0.0):
