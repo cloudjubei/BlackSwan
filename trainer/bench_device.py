@@ -2,9 +2,10 @@
 
 The Model Trainer's per-model "Benchmark device" button runs this through the trainer's compute runner
 (same {summaryOut} contract as --calibrate). The model to benchmark is named by the BENCH_MODEL_NAME env
-var (the tool sets it from the model record); BENCH_BUDGET / BENCH_WINDOW tune the probe. It trains a
-short fixed step budget on each AVAILABLE device (cpu always; mps when torch reports it), times it, and
-writes the comparison + the winning device to the summary so the tool can persist `preferredDevice`.
+var (the tool sets it from the model record); BENCH_BUDGET / BENCH_WARMUP / BENCH_DEVICE_TIMEOUT / BENCH_WINDOW
+tune the probe. It trains a short fixed step budget on each AVAILABLE device (cpu always; mps when torch
+reports it) under a per-device wall-clock cap, times it, and writes the comparison + the winning device to
+the summary so the tool can persist `preferredDevice`.
 
   BENCH_MODEL_NAME=reppo-custom .venv/bin/python -m trainer.bench_device --summary-out out.json
 
@@ -14,6 +15,7 @@ Pure helpers (pick_best_device / build_device_summary) are unit-tested; main() d
 import argparse
 import json
 import os
+import signal
 import sys
 import time
 
@@ -90,6 +92,30 @@ def _time_device(model_name, device, budget, warmup, prov, env_cfg):
     return time.time() - started
 
 
+class _BenchTimeout(Exception):
+    pass
+
+
+def _time_device_bounded(model_name, device, budget, warmup, prov, env_cfg, timeout_s):
+    """`_time_device` with a best-effort per-device wall-clock cap (SIGALRM). A device that stalls (e.g. an
+    MPS op that falls back / hangs) is raised as an error and caught per-device, so the OTHER device still
+    reports and a summary is always written — instead of the whole probe blowing the compute-runner timeout
+    and persisting nothing (which surfaces as 'Benchmark did not settle')."""
+    if not (timeout_s and timeout_s > 0 and hasattr(signal, "SIGALRM")):
+        return _time_device(model_name, device, budget, warmup, prov, env_cfg)
+
+    def _on_alarm(signum, frame):
+        raise _BenchTimeout(f"exceeded {timeout_s}s cap")
+
+    prev = signal.signal(signal.SIGALRM, _on_alarm)
+    signal.alarm(int(timeout_s))
+    try:
+        return _time_device(model_name, device, budget, warmup, prov, env_cfg)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, prev)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="trainer.bench_device")
     parser.add_argument("--summary-out", required=True)
@@ -97,8 +123,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
     os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-    budget = int(os.environ.get("BENCH_BUDGET", "1500"))
-    warmup = int(os.environ.get("BENCH_WARMUP", "300"))
+    # A device-SPEED probe only needs enough post-warmup steps for a stable us/step (warmup covers the
+    # learning_starts=200 buffer-fill + graph compile, so the timed budget is real training). Kept small so
+    # the whole cpu+mps run finishes well inside the compute-runner + viewer 10-min windows; tune via env.
+    budget = int(os.environ.get("BENCH_BUDGET", "300"))
+    warmup = int(os.environ.get("BENCH_WARMUP", "200"))
+    device_timeout = int(os.environ.get("BENCH_DEVICE_TIMEOUT", "240"))
     window = os.environ.get("BENCH_WINDOW", "2024")
     model_name = args.model_name
 
@@ -124,11 +154,27 @@ def main(argv=None):
     except Exception:
         pass
 
+    # cpu is always probed first (it can't be skipped + sets the baseline). Each LATER device gets an
+    # ADAPTIVE cap = a multiple of the fastest time already seen (with a floor) — so a device that can't keep
+    # within ~SLOWNESS_FACTOR x the best is declared slower in seconds instead of burning the full backstop.
+    # This is the common case on Apple silicon, where MPS' per-kernel launch overhead makes these small RL
+    # nets far slower than cpu; a model where MPS genuinely WINS still finishes well inside the cap.
+    slowness_factor = float(os.environ.get("BENCH_SLOWNESS_FACTOR", "4"))
+    min_device_seconds = int(os.environ.get("BENCH_MIN_DEVICE_SECONDS", "30"))
     timings, errors = {}, {}
+    best_so_far = None
     for device in _available_devices():
+        cap = device_timeout
+        if best_so_far is not None:
+            cap = min(cap, max(min_device_seconds, int(slowness_factor * best_so_far)))
         try:
-            timings[device] = _time_device(model_name, device, budget, warmup, prov, env_cfg)
-            print(f"{model_name} on {device}: {timings[device]:.2f}s for {budget} steps", flush=True)
+            secs = _time_device_bounded(model_name, device, budget, warmup, prov, env_cfg, cap)
+            timings[device] = secs
+            best_so_far = secs if best_so_far is None else min(best_so_far, secs)
+            print(f"{model_name} on {device}: {secs:.2f}s for {budget} steps", flush=True)
+        except _BenchTimeout as exc:
+            errors[device] = f"too slow — {exc}"
+            print(f"{model_name} on {device}: SKIPPED ({errors[device]})", flush=True)
         except Exception as exc:
             errors[device] = f"{type(exc).__name__}: {str(exc)[:160]}"
             print(f"{model_name} on {device}: FAILED {errors[device]}", flush=True)
