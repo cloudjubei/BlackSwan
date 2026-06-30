@@ -300,10 +300,11 @@
         "RMSprop",
         "AdamW",
         "NAdam",
-        "Adam"
+        "Adam",
+        "DGWO"
       ],
       "default": "RMSprop",
-      "description": "Gradient optimizer. RMSprop was the tuned choice."
+      "description": "Gradient optimizer. RMSprop was the tuned choice. DGWO is an experimental Grey-Wolf-guided gradient optimizer (gradient descent + decaying metaheuristic exploration) — unproven vs Adam, kept as a sweep candidate."
     },
     "activation_fn": {
       "type": "choice",
@@ -1581,7 +1582,7 @@
       "flavors": [
         {
           "name": "custom (LSTM)",
-          "modelName": "reppo-custom"
+          "modelName": "reppo-custom", "components": ["custom-policies"]
         },
         {
           "name": "vanilla",
@@ -1606,7 +1607,7 @@
       "flavors": [
         {
           "name": "custom head",
-          "modelName": "ppo-custom"
+          "modelName": "ppo-custom", "components": ["custom-policies", "custom-mlp-extractor"]
         },
         {
           "name": "vanilla",
@@ -1633,7 +1634,7 @@
       "flavors": [
         {
           "name": "custom head",
-          "modelName": "trpo-custom"
+          "modelName": "trpo-custom", "components": ["custom-policies", "custom-mlp-extractor"]
         },
         {
           "name": "vanilla",
@@ -1653,7 +1654,7 @@
       "flavors": [
         {
           "name": "default",
-          "modelName": "attn-ppo"
+          "modelName": "attn-ppo", "components": ["sequence-features-extractor"]
         }
       ],
       "implPath": "src/model/custom/sequence_extractor.py",
@@ -1678,15 +1679,15 @@
         },
         {
           "name": "TDQN (trading)",
-          "modelName": "tdqn"
+          "modelName": "tdqn", "components": ["custom-policies", "custom-q-network"]
         },
         {
           "name": "custom head",
-          "modelName": "dqn-custom"
+          "modelName": "dqn-custom", "components": ["custom-policies", "custom-q-network"]
         },
         {
           "name": "LSTM",
-          "modelName": "dqn-lstm"
+          "modelName": "dqn-lstm", "components": ["lstm-features-extractor"]
         },
         {
           "name": "SBX (JAX)",
@@ -1709,23 +1710,23 @@
       "flavors": [
         {
           "name": "custom",
-          "modelName": "duel-dqn-custom"
+          "modelName": "duel-dqn-custom", "components": ["custom-policies"]
         },
         {
           "name": "vanilla",
-          "modelName": "duel-dqn"
+          "modelName": "duel-dqn", "components": ["dueling-dqn-policy"]
         },
         {
           "name": "custom + LSTM (h2)",
-          "modelName": "duel-dqn-custom-lstm"
+          "modelName": "duel-dqn-custom-lstm", "components": ["custom-policies", "lstm-features-extractor"]
         },
         {
           "name": "custom + LSTM (h3)",
-          "modelName": "duel-dqn-custom-lstm3"
+          "modelName": "duel-dqn-custom-lstm3", "components": ["custom-policies", "lstm-features-extractor"]
         },
         {
           "name": "LSTM (h4)",
-          "modelName": "duel-dqn-lstm"
+          "modelName": "duel-dqn-lstm", "components": ["dueling-dqn-policy", "lstm-features-extractor"]
         }
       ],
       "implPath": "src/model/dueling_dqn/dueling_dqn.py",
@@ -1744,7 +1745,7 @@
       "flavors": [
         {
           "name": "custom",
-          "modelName": "munchausen-dqn-custom"
+          "modelName": "munchausen-dqn-custom", "components": ["custom-policies"]
         },
         {
           "name": "vanilla",
@@ -1752,11 +1753,11 @@
         },
         {
           "name": "dueling (custom)",
-          "modelName": "munchausen-duel-dqn-custom"
+          "modelName": "munchausen-duel-dqn-custom", "components": ["custom-policies"]
         },
         {
           "name": "dueling + LSTM",
-          "modelName": "munchausen-duel-dqn-custom-lstm"
+          "modelName": "munchausen-duel-dqn-custom-lstm", "components": ["custom-policies", "lstm-features-extractor"]
         }
       ],
       "implPath": "src/model/munchhausen_dqn/munchhausen_dqn.py",
@@ -1772,11 +1773,11 @@
       "flavors": [
         {
           "name": "custom",
-          "modelName": "rainbow-dqn-custom"
+          "modelName": "rainbow-dqn-custom", "components": ["custom-policies", "prioritized-replay-buffer"]
         },
         {
           "name": "SB3-subclass",
-          "modelName": "rainbow-dqn"
+          "modelName": "rainbow-dqn", "components": ["prioritized-replay-buffer"]
         }
       ],
       "implPath": "src/model/rainbow_dqn/rainbow_dqn.py",
@@ -1796,7 +1797,7 @@
         },
         {
           "name": "custom",
-          "modelName": "iqn-custom"
+          "modelName": "iqn-custom", "components": ["custom-iqn-policy"]
         }
       ],
       "implPath": "src/model/iqn/iqn.py",
@@ -1812,7 +1813,7 @@
       "flavors": [
         {
           "name": "default",
-          "modelName": "agent57"
+          "modelName": "agent57", "components": ["custom-policies", "agent57-replay-buffer"]
         }
       ],
       "implPath": "src/model/custom/agent57/agent57.py",
@@ -1828,7 +1829,7 @@
       "flavors": [
         {
           "name": "default",
-          "modelName": "ensemble"
+          "modelName": "ensemble", "components": ["custom-policies"]
         }
       ],
       "implPath": "src/model/custom/ensemble/ensemble.py",
@@ -1902,7 +1903,7 @@
       "flavors": [
         {
           "name": "default",
-          "modelName": "itransformer-ppo"
+          "modelName": "itransformer-ppo", "components": ["sequence-features-extractor"]
         }
       ],
       "implPath": "src/model/custom/sequence_extractor.py",
@@ -1923,7 +1924,7 @@
       "aliases": ["policy-gradient"],
       "flavors": [
         { "name": "vanilla", "modelName": "a2c" },
-        { "name": "custom head", "modelName": "a2c-custom" }
+        { "name": "custom head", "modelName": "a2c-custom", "components": ["custom-policies", "custom-mlp-extractor"] }
       ],
       "paperIds": [
         "zhang-zohren-roberts-drl-2020"
@@ -1939,7 +1940,7 @@
       "status": "implemented",
       "flavors": [
         { "name": "vanilla", "modelName": "qrdqn" },
-        { "name": "custom net", "modelName": "qrdqn-custom" }
+        { "name": "custom net", "modelName": "qrdqn-custom", "components": ["custom-policies"] }
       ],
       "source": "manual"
     },
@@ -2061,6 +2062,141 @@
       "paperIds": [
         "aharon-qadan-day-of-week-bitcoin-2019"
       ],
+      "source": "manual"
+    },
+    {
+      "id": "sequence-features-extractor",
+      "slug": "sequence-features-extractor",
+      "name": "Sequence Features Extractor",
+      "description": "An SB3 features extractor that encodes the lookback window with a modern sequence model — single-block self-attention, a dilated-causal TCN, or an inverted-transformer (iTransformer) — instead of flattening the bars. The shared sequence backbone behind the attn-ppo / tcn-ppo / itransformer-ppo models.",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/custom/sequence_extractor.py",
+      "paperIds": [
+        "itransformer-inverted-2024"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "lstm-features-extractor",
+      "slug": "lstm-features-extractor",
+      "name": "LSTM Features Extractor (LSTMFCE)",
+      "description": "A recurrent (LSTM) features extractor that carries hidden state across bars before the value/policy head — the sequence memory reused by the DQN-family `*-lstm` variants.",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/dqn_lstm_policy.py",
+      "source": "manual"
+    },
+    {
+      "id": "custom-mlp-extractor",
+      "slug": "custom-mlp-extractor",
+      "name": "Custom MLP Extractor",
+      "description": "A configurable shared-trunk MLP feature extractor for actor-critic policies, letting trunk width/depth follow the `net_arch` lever.",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/custom/custommlpextractor.py",
+      "source": "manual"
+    },
+    {
+      "id": "custom-policies",
+      "slug": "custom-policies",
+      "name": "Custom Policies & Q-Nets",
+      "description": "The custom policy library the `*-custom` models train through: regularised ActorCritic and RecurrentActorCritic heads plus DQN, Dueling, Rainbow and QR-DQN policies.",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/custom/policies.py",
+      "source": "manual"
+    },
+    {
+      "id": "custom-iqn-policy",
+      "slug": "custom-iqn-policy",
+      "name": "Custom IQN Policy",
+      "description": "An Implicit Quantile Network policy and its quantile network (CustomIQNPolicy / CustomQuantileNetwork) for distributional value estimation, used by the iqn-custom model.",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/custom/policy_iqn.py",
+      "source": "manual"
+    },
+    {
+      "id": "custom-q-network",
+      "slug": "custom-q-network",
+      "name": "Custom Q-Network",
+      "description": "A configurable Q-network builder (`create_mlp_custom`) that tiles a `-custom` recipe's hidden block pattern to an exact layer count — the shared Q-head for the custom DQN family.",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/custom/customqnetwork.py",
+      "source": "manual"
+    },
+    {
+      "id": "dueling-dqn-policy",
+      "slug": "dueling-dqn-policy",
+      "name": "Dueling DQN Policy",
+      "description": "A dueling Q-head that splits estimation into separate value and advantage streams (DuelingQNetwork / DuelingDQNPolicy), reducing action-value variance.",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/dueling_dqn/policies.py",
+      "source": "manual"
+    },
+    {
+      "id": "prioritized-replay-buffer",
+      "slug": "prioritized-replay-buffer",
+      "name": "Prioritized Replay Buffer",
+      "description": "A proportional prioritized experience-replay buffer that samples transitions by TD-error priority — the replay component behind the Rainbow / prioritized-DQN line.",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/rainbow_dqn/prioritized_replay_buffer.py",
+      "source": "manual"
+    },
+    {
+      "id": "agent57-replay-buffer",
+      "slug": "agent57-replay-buffer",
+      "name": "Agent57 Replay Buffer & Episodic Memory",
+      "description": "Agent57's replay buffer paired with an episodic-memory module (CustomAgent57ReplayBuffer / EpisodicMemory) that supplies an intrinsic novelty signal.",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/custom/agent57/agent57.py",
+      "source": "manual"
+    },
+    {
+      "id": "dgwo-optimizer",
+      "slug": "dgwo-optimizer",
+      "name": "DGWO — Grey-Wolf Optimizer",
+      "description": "A Grey-Wolf-guided gradient optimizer (gradient-descent update plus a decaying metaheuristic exploration pull toward a tracked leader), selectable via the `optimizer_class` lever as an experimental alternative to Adam/RMSprop.",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/custom/dgwo.py",
+      "source": "manual"
+    },
+    {
+      "id": "attention-blocks",
+      "slug": "attention-blocks",
+      "name": "Attention Blocks",
+      "description": "A kit of attention modules — scaled-dot-product, multi-head, additive, global-context and a self-attention wrapper — selectable as blocks in the custom Q-network `custom_net_arch` recipes (consumed by `create_mlp_custom`).",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/custom/attention.py",
+      "source": "manual"
+    },
+    {
+      "id": "nn-building-blocks",
+      "slug": "nn-building-blocks",
+      "name": "NN Building Blocks",
+      "description": "Small reusable NN primitives for assembling custom policies: NoisyLinear (NoisyNet exploration, `noisylinear.py`), DropConnectLinear (`dropconnect.py`), ResidualBlock (`residualblock.py`), DenseBlock (`denseblock.py`), and local LSTM/GRU memory cells (`memorymodels.py`).",
+      "category": "component",
+      "status": "implemented",
+      "flavors": [],
+      "implPath": "src/model/custom/noisylinear.py",
       "source": "manual"
     }
   ],

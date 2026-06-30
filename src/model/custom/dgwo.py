@@ -1,8 +1,17 @@
 import torch
 from torch.optim import Optimizer
-import numpy as np
+
 
 class DGWO(Optimizer):
+    """Grey-Wolf-flavoured gradient optimiser — a usable drop-in `torch.optim.Optimizer`.
+
+    `step()` applies a gradient-descent update (so it works inside SB3's training loop, which calls
+    `step()` with NO closure) plus a Grey-Wolf exploration pull toward a tracked leader position. The
+    exploration coefficient ``a`` decays linearly to zero over ``max_iters`` steps, after which the update
+    is pure gradient descent — giving early metaheuristic exploration while still converging on a convex
+    objective. A closure, when supplied, is evaluated and its loss returned (standard torch contract).
+    """
+
     def __init__(self, params, lr=0.01, alpha=0.1, beta=0.2, max_iters=100):
         if lr <= 0.0:
             raise ValueError(f"Invalid learning rate: {lr}")
@@ -12,65 +21,46 @@ class DGWO(Optimizer):
             raise ValueError(f"Invalid beta: {beta}")
         if max_iters <= 0:
             raise ValueError(f"Invalid max_iters: {max_iters}")
-        
         defaults = dict(lr=lr, alpha=alpha, beta=beta, max_iters=max_iters)
-        super(DGWO, self).__init__(params, defaults)
-    
+        super().__init__(params, defaults)
+
+    @torch.no_grad()
     def step(self, closure=None):
-        # Closure is required to reevaluate the model
-        if closure is None:
-            raise RuntimeError("DGWO requires a closure to reevaluate the model.")
-        
-        # Initialize state for the first step
-        state = self.state
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+
         for group in self.param_groups:
-            if len(state) == 0:
-                state['best_solution'] = {}
-                state['best_fitness'] = float('inf')
-                for p in group['params']:
-                    state['best_solution'][p] = p.clone()
-                    state[p] = {'alpha_pos': p.clone(), 'beta_pos': p.clone(), 'delta_pos': p.clone()}
-        
-        # Update alpha, beta, and delta positions
-        alpha = group['alpha']
-        beta = group['beta']
-        max_iters = group['max_iters']
-        lr = group['lr']
-        
-        a = 2 - self._step_count * (2 / max_iters)  # Linearly decreasing factor
+            lr = group["lr"]
+            alpha = group["alpha"]
+            beta = group["beta"]
+            max_iters = group["max_iters"]
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                grad = p.grad
+                state = self.state[p]
+                if len(state) == 0:
+                    state["step"] = 0
+                    state["leader"] = p.detach().clone()
 
-        # Evaluate fitness for current parameters
-        fitness = closure()
-        
-        # Update best solution if current fitness is better
-        if fitness < state['best_fitness']:
-            state['best_fitness'] = fitness
-            for p in group['params']:
-                state['best_solution'][p].copy_(p.data)
-        
-        # Update the positions of the wolves
-        for p in group['params']:
-            if p.grad is None:
-                continue
-            grad = p.grad.data
+                # Gradient-descent base step — the term that makes the policy actually learn.
+                update = grad.mul(-lr)
 
-            # Grey wolf positions updates
-            X = p.data
-            A = 2 * a * np.random.random() - a
-            C = 2 * np.random.random()
+                # Decaying Grey-Wolf exploration toward the tracked leader position.
+                a = max(0.0, 2.0 - state["step"] * (2.0 / max_iters))
+                if a > 0.0:
+                    A = (2.0 * torch.rand_like(p) - 1.0) * a
+                    C = 2.0 * torch.rand_like(p)
+                    D = torch.abs(C * state["leader"] - p)
+                    explore = (state["leader"] - A * D) - p
+                    update = update + explore.mul(alpha * a * 0.5)
 
-            D_alpha = abs(C * state['best_solution'][p] - X)
-            X1 = state['best_solution'][p] - A * D_alpha
+                p.add_(update)
 
-            D_beta = abs(C * state['best_solution'][p] - X)
-            X2 = state['best_solution'][p] - A * D_beta
+                # The leader drifts toward the latest position (EMA), keeping a moving pack centre.
+                state["leader"].mul_(1.0 - beta).add_(p, alpha=beta)
+                state["step"] += 1
 
-            D_delta = abs(C * state['best_solution'][p] - X)
-            X3 = state['best_solution'][p] - A * D_delta
-
-            # Update the position of the wolf
-            p.data = (X1 + X2 + X3) / 3
-
-        self._step_count += 1
-
-DGWO._step_count = 0
+        return loss
