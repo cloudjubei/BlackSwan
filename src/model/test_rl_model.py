@@ -144,9 +144,10 @@ def test_test_reppo_custom_branch_uses_recurrent_predict():
     assert bool(np.all(sb3.predict_calls[0]["episode_start"]))
 
 
-def test_is_recurrent_model_name_covers_both_reppo_variants():
-    assert is_recurrent_model_name("reppo")
-    assert is_recurrent_model_name("reppo-custom")
+def test_is_recurrent_model_name_covers_all_recurrent_cores():
+    # LSTM, GRU and S4D cores all thread recurrent state at eval and must take the recurrent branch.
+    for name in ("reppo", "reppo-custom", "gru", "gru-custom", "s4d", "s4d-custom"):
+        assert is_recurrent_model_name(name), name
     assert not is_recurrent_model_name("dqn")
     assert not is_recurrent_model_name(None)
 

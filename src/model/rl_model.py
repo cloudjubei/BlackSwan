@@ -9,10 +9,12 @@ import os
 
 # based on https://stable-baselines3.readthedocs.io/en/master/modules/base.html
 
-# RecurrentPPO-backed models (see model_factory): their LSTM hidden state MUST be threaded across
+# RecurrentPPO-backed models (see model_factory): their recurrent state MUST be threaded across
 # predict() calls at eval. Miss one and SB3 re-zeros the memory every step, so a model trained WITH
 # memory is evaluated WITHOUT it — a silent train/eval mismatch. "reppo-custom" was previously omitted.
-RECURRENT_MODEL_NAMES = ("reppo", "reppo-custom")
+# Covers the LSTM (reppo*), GRU (gru*) and diagonal-SSM (s4d*) cores — eval threads opaque state, so
+# the same branch serves all three.
+RECURRENT_MODEL_NAMES = ("reppo", "reppo-custom", "gru", "gru-custom", "s4d", "s4d-custom")
 
 
 def is_recurrent_model_name(model_name) -> bool:

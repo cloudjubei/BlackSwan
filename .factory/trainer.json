@@ -88,6 +88,10 @@
       "type": "choice",
       "choices": [
         "reppo-custom",
+        "gru-custom",
+        "gru",
+        "s4d-custom",
+        "s4d",
         "trpo-custom",
         "ppo-custom",
         "duel-dqn-custom",
@@ -1569,6 +1573,44 @@
       "replicateConfig": {"fixed": {"model_name": "weekday", "timeframe": "1d"}, "sweep": {"day_buy": [0, 1, 4, 6], "day_sell": [0, 2, 5], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 1},
       "status": "untested",
       "source": "manual"
+    },
+    {
+      "id": "cho-gru-2014",
+      "title": "Learning Phrase Representations using RNN Encoder-Decoder for Statistical Machine Translation",
+      "url": "https://arxiv.org/abs/1406.1078",
+      "authors": "Cho, van Merrienboer, Gulcehre, Bahdanau, Bougares, Schwenk, Bengio",
+      "year": 2014,
+      "claim": "Introduces the gated recurrent unit (GRU) — a reset/update-gated RNN cell with no separate cell state — that matches LSTM-quality sequence modelling with fewer gates and parameters.",
+      "approach": "Proposes the GRU inside an RNN encoder-decoder for translation; since widely used as a lighter LSTM alternative for sequence modelling.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "NLP / sequence modelling, not trading P&L — the relevance is the RECURRENT CORE, not the task."
+      },
+      "verdictNote": "For BlackSwan: the GRU recurrent core (gru / gru-custom) is the lighter-gate sibling of the reppo LSTM arm, with recurrent state in the POLICY (not a features-extractor). Expected ~wash vs LSTM — a cheap architecture control; credit only a margin that survives seeds + walk-forward windows.",
+      "tags": ["architecture-evidence", "recurrent", "gru", "rnn", "skeptical"],
+      "replicateConfig": {"fixed": {"model_name": "gru-custom"}, "sweep": {"model_name": ["gru-custom", "reppo-custom"], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 3},
+      "status": "implemented",
+      "source": "manual"
+    },
+    {
+      "id": "gu-s4d-2022",
+      "title": "On the Parameterization and Initialization of Diagonal State Space Models",
+      "url": "https://arxiv.org/abs/2206.11893",
+      "authors": "Gu, Gupta, Goel, Re",
+      "year": 2022,
+      "claim": "A purely DIAGONAL state-space model (S4D) — diagonal complex A with ZOH discretisation and the S4D-Lin/Inv initialisation — recovers the full structured S4 (DPLR) on long-range sequence benchmarks while being far simpler to implement.",
+      "approach": "Reduces S4's structured kernel to a diagonal SSM and identifies the parameterisation + initialisation that matches S4's long-range performance.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "Long-range sequence-modelling benchmarks (LRA etc.), not trading P&L — the relevance is the SSM recurrent core."
+      },
+      "verdictNote": "For BlackSwan: the s4d / s4d-custom arm is an SSM FALSIFICATION arm — an alternative recurrent core to the LSTM/GRU, threaded across env steps in the policy (the complex state is packed real/imag into the SB3 (hidden, cell) slots). Low prior; credit only if it beats reppo net of fees across seeds + windows.",
+      "tags": ["architecture-evidence", "state-space-model", "s4d", "ssm", "recurrent", "skeptical"],
+      "replicateConfig": {"fixed": {"model_name": "s4d"}, "sweep": {"model_name": ["s4d", "reppo"], "ssm_state_dim": [16, 64], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 3},
+      "status": "implemented",
+      "source": "manual"
     }
   ],
   "models": [
@@ -1594,6 +1636,53 @@
         "moody-saffell-rrl-2001",
         "borrageiro-rrl-crypto-2022",
         "lim-deep-momentum-2019"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "gru",
+      "slug": "gru",
+      "name": "Recurrent PPO (GRU core)",
+      "description": "On-policy RecurrentPPO whose recurrent core is a GRU carried across bars in the POLICY (not a features-extractor) — the lighter-gate sibling of the reppo LSTM arm. 'gru-custom' adds the regularised custom actor-critic head. Expected ~wash vs LSTM.",
+      "category": "rl",
+      "status": "implemented",
+      "flavors": [
+        {
+          "name": "custom head",
+          "modelName": "gru-custom", "components": ["gru-recurrent-core", "custom-policies", "custom-mlp-extractor"]
+        },
+        {
+          "name": "vanilla",
+          "modelName": "gru", "components": ["gru-recurrent-core"]
+        }
+      ],
+      "implPath": "src/model/custom/recurrent_core_policies.py",
+      "paperIds": [
+        "cho-gru-2014",
+        "moody-saffell-rrl-2001"
+      ],
+      "source": "manual"
+    },
+    {
+      "id": "s4d",
+      "slug": "s4d",
+      "name": "Recurrent PPO (S4D diagonal SSM core)",
+      "description": "On-policy RecurrentPPO whose recurrent core is a diagonal state-space model (S4D) threaded across env steps in the POLICY — an SSM FALSIFICATION arm vs the LSTM/GRU cores. The complex SSM state is packed real/imag into the SB3 (hidden, cell) slots; ssm_state_dim sets the modes per channel. 's4d-custom' adds the custom head.",
+      "category": "rl",
+      "status": "implemented",
+      "flavors": [
+        {
+          "name": "custom head",
+          "modelName": "s4d-custom", "components": ["s4d-ssm-layer", "custom-policies", "custom-mlp-extractor"]
+        },
+        {
+          "name": "vanilla",
+          "modelName": "s4d", "components": ["s4d-ssm-layer"]
+        }
+      ],
+      "implPath": "src/model/custom/recurrent_cores.py",
+      "paperIds": [
+        "gu-s4d-2022"
       ],
       "source": "manual"
     },

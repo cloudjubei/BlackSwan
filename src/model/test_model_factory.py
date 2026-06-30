@@ -19,6 +19,7 @@ from src.conf.model_config import (
     ModelConfigSearch,
     ModelRegressionConfig,
     ModelRLConfig,
+    ModelRLConfigSearch,
     ModelTechnicalConfig,
     ModelTechnicalConfigSearch,
     ModelTimeConfig,
@@ -42,6 +43,12 @@ from src.model.custom.policies import (
     CustomDuelingDQNPolicy,
     CustomQRDQNPolicy,
     CustomRecurrentActorCriticPolicy,
+)
+from src.model.custom.recurrent_core_policies import (
+    GRURecurrentActorCriticPolicy,
+    CustomGRURecurrentActorCriticPolicy,
+    S4DRecurrentActorCriticPolicy,
+    CustomS4DRecurrentActorCriticPolicy,
 )
 from src.model.custom.policy_iqn import CustomIQNPolicy
 from src.model.hodl_model import HodlModel
@@ -80,6 +87,25 @@ def test_get_model_combinations_hodl_is_single_config():
     combos = get_model_combinations(OmegaConf.structured(ModelConfigSearch(model_type="hodl")))
     assert len(combos) == 1
     assert combos[0].model_type == "hodl"
+
+
+def test_get_model_combinations_skips_empty_sweep_lists_using_defaults():
+    # An empty sweep list means "don't sweep this lever" -> fall back to the ModelRLConfig default,
+    # NOT zero out the entire cartesian product (which would yield no runnable config at all).
+    search = OmegaConf.structured(
+        ModelConfigSearch(
+            model_type="rl",
+            model_rl=ModelRLConfigSearch(
+                model_name=["s4d"],
+                reward_model=["combo_all"],
+                ssm_state_dim=[],
+            ),
+        )
+    )
+    combos = get_model_combinations(search)
+    assert len(combos) == 1
+    assert combos[0].model_rl.model_name == "s4d"
+    assert combos[0].model_rl.ssm_state_dim == 64  # the dataclass default
 
 
 def test_get_model_combinations_time_cartesian_product():
@@ -280,6 +306,10 @@ _DISPATCH_CASES = [
     ("ppo-custom", "PPO", CustomActorCriticPolicy),
     ("reppo", "RecurrentPPO", "MlpLstmPolicy"),
     ("reppo-custom", "RecurrentPPO", CustomRecurrentActorCriticPolicy),
+    ("gru", "RecurrentPPO", GRURecurrentActorCriticPolicy),
+    ("gru-custom", "RecurrentPPO", CustomGRURecurrentActorCriticPolicy),
+    ("s4d", "RecurrentPPO", S4DRecurrentActorCriticPolicy),
+    ("s4d-custom", "RecurrentPPO", CustomS4DRecurrentActorCriticPolicy),
     ("trpo", "TRPO", "MlpPolicy"),
     ("trpo-custom", "TRPO", CustomActorCriticPolicy),
     ("dqn", "DQN", "MlpPolicy"),

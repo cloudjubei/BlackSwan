@@ -31,6 +31,8 @@ class ModelRLConfigSearch:
     shared_lstm: List[bool] = field(default_factory=list)
     enable_critic_lstm: List[bool] = field(default_factory=list)
 
+    ssm_state_dim: List[int] = field(default_factory=list)
+
     episodes: List[int] = field(default_factory=list)
 
     reward_multiplier_combo_noaction: List[float] = field(default_factory=list)
@@ -90,6 +92,10 @@ class ModelRLConfig:
     lstm_hidden_size: int = 256
     shared_lstm: bool = False
     enable_critic_lstm: bool = True
+
+    # Diagonal-SSM (s4d / s4d-custom) recurrent core: number of complex state modes per channel
+    # (the channel count is lstm_hidden_size). Unused by the LSTM/GRU cores.
+    ssm_state_dim: int = 64
 
     episodes: int = 1
 

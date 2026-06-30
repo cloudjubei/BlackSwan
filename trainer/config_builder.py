@@ -284,6 +284,8 @@ def build_model_config(cfg):
         rl.shared_lstm = [bool(cfg["shared_lstm"])]
     if "enable_critic_lstm" in cfg:
         rl.enable_critic_lstm = [bool(cfg["enable_critic_lstm"])]
+    if "ssm_state_dim" in cfg:
+        rl.ssm_state_dim = [int(cfg["ssm_state_dim"])]
     if "net_arch" in cfg:
         rl.net_arch = [_parse_net_arch(cfg["net_arch"])]
     if "optimizer_class" in cfg:

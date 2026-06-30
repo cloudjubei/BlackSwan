@@ -14,6 +14,7 @@ from src.model.custom.customqnetwork import CustomQNetwork
 from src.model.custom.dgwo import DGWO
 from src.model.custom.ensemble.ensemble import EnsembleModel
 from src.model.custom.policies import CustomActorCriticPolicy, CustomDQNPolicy, CustomDuelingDQNPolicy, CustomQRDQNPolicy, CustomRainbowPolicy, CustomRecurrentActorCriticPolicy
+from src.model.custom.recurrent_core_policies import GRURecurrentActorCriticPolicy, CustomGRURecurrentActorCriticPolicy, S4DRecurrentActorCriticPolicy, CustomS4DRecurrentActorCriticPolicy
 from src.model.custom.sequence_extractor import SequenceFeaturesExtractor
 from src.model.custom.policy_iqn import CustomIQNPolicy
 from src.model.dqn_lstm_policy import LSTMFCE
@@ -128,50 +129,50 @@ def get_model_combinations(config: ModelConfigSearch) -> List[ModelConfig]:
         return [ModelConfig(model_type="hodl")]
     if config.model_type == "rl":
         data = config.model_rl
-        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
-        list_values = [value for value in data.values() if type(value) == ListConfig]
+        list_keys = [key for key, value in data.items() if type(value) == ListConfig and len(value) > 0]
+        list_values = [value for value in data.values() if type(value) == ListConfig and len(value) > 0]
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="rl", model_rl=ModelRLConfig(**get_combo(c, list_keys, non_lists))), combinations))
     if config.model_type == "regression":
         data = config.model_regression
-        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
-        list_values = [value for value in data.values() if type(value) == ListConfig]
+        list_keys = [key for key, value in data.items() if type(value) == ListConfig and len(value) > 0]
+        list_values = [value for value in data.values() if type(value) == ListConfig and len(value) > 0]
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="regression", model_regression=ModelRegressionConfig(**get_combo(c, list_keys, non_lists))), combinations))
     if config.model_type == "supervised":
         data = config.model_supervised
-        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
-        list_values = [value for value in data.values() if type(value) == ListConfig]
+        list_keys = [key for key, value in data.items() if type(value) == ListConfig and len(value) > 0]
+        list_values = [value for value in data.values() if type(value) == ListConfig and len(value) > 0]
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="supervised", model_supervised=ModelSupervisedConfig(**get_combo(c, list_keys, non_lists))), combinations))
     elif config.model_type == "technical":
         data = config.model_technical
-        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
-        list_values = [value for value in data.values() if type(value) == ListConfig]
+        list_keys = [key for key, value in data.items() if type(value) == ListConfig and len(value) > 0]
+        list_values = [value for value in data.values() if type(value) == ListConfig and len(value) > 0]
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="technical", model_technical=ModelTechnicalConfig(**get_combo(c, list_keys, non_lists))), combinations))
     elif config.model_type == "time":
         data = config.model_time
-        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
-        list_values = [value for value in data.values() if type(value) == ListConfig]
+        list_keys = [key for key, value in data.items() if type(value) == ListConfig and len(value) > 0]
+        list_values = [value for value in data.values() if type(value) == ListConfig and len(value) > 0]
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="time", model_time=ModelTimeConfig(**get_combo(c, list_keys, non_lists))), combinations))
     elif config.model_type == "momentum":
         data = config.model_momentum
-        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
-        list_values = [value for value in data.values() if type(value) == ListConfig]
+        list_keys = [key for key, value in data.items() if type(value) == ListConfig and len(value) > 0]
+        list_values = [value for value in data.values() if type(value) == ListConfig and len(value) > 0]
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="momentum", model_momentum=ModelMomentumConfig(**get_combo(c, list_keys, non_lists))), combinations))
     elif config.model_type == "weekday":
         data = config.model_day
-        list_keys = [key for key, value in data.items() if type(value) == ListConfig]
-        list_values = [value for value in data.values() if type(value) == ListConfig]
+        list_keys = [key for key, value in data.items() if type(value) == ListConfig and len(value) > 0]
+        list_values = [value for value in data.values() if type(value) == ListConfig and len(value) > 0]
         non_lists = {key: value for key, value in data.items() if type(value) != ListConfig }
         combinations = itertools.product(*list_values)
         return list(map(lambda c: ModelConfig(model_type="weekday", model_day=ModelDayConfig(**get_combo(c, list_keys, non_lists))), combinations))
@@ -294,7 +295,50 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                            "shared_lstm": config.model_rl.shared_lstm,
                            "enable_critic_lstm": config.model_rl.enable_critic_lstm
                        })
-    
+    elif config.model_rl.model_name in ("gru", "gru-custom"):
+        # RecurrentPPO with a GRU recurrent core in the POLICY (state threaded across env steps),
+        # not a features-extractor. lstm_hidden_size is the GRU hidden width.
+        print(f"Loading RecurrentPPO - GRU based PPO model")
+
+        policy_cls = CustomGRURecurrentActorCriticPolicy if config.model_rl.model_name == "gru-custom" else GRURecurrentActorCriticPolicy
+        rl_model = RecurrentPPO(env=env, policy= policy_cls, device= device, learning_rate= config.model_rl.learning_rate, n_steps=config.model_rl.target_update_interval, batch_size= config.model_rl.batch_size,
+                       n_epochs=1,
+                       gamma= config.model_rl.gamma,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch,
+                           "lstm_hidden_size": config.model_rl.lstm_hidden_size,
+                           "shared_lstm": config.model_rl.shared_lstm,
+                           "enable_critic_lstm": config.model_rl.enable_critic_lstm
+                       })
+    elif config.model_rl.model_name in ("s4d", "s4d-custom"):
+        # RecurrentPPO with a diagonal state-space (S4D) recurrent core in the POLICY; an SSM
+        # falsification arm. lstm_hidden_size is the SSM channel count, ssm_state_dim the modes/channel.
+        print(f"Loading RecurrentPPO - S4D (diagonal SSM) based PPO model")
+
+        policy_cls = CustomS4DRecurrentActorCriticPolicy if config.model_rl.model_name == "s4d-custom" else S4DRecurrentActorCriticPolicy
+        rl_model = RecurrentPPO(env=env, policy= policy_cls, device= device, learning_rate= config.model_rl.learning_rate, n_steps=config.model_rl.target_update_interval, batch_size= config.model_rl.batch_size,
+                       n_epochs=1,
+                       gamma= config.model_rl.gamma,
+                       policy_kwargs= {
+                           "normalize_images": False,
+                           "optimizer_class": optimizer_classes[config.model_rl.optimizer_class],
+                           "optimizer_kwargs": {
+                           },
+                           "activation_fn": activation_fns[config.model_rl.activation_fn],
+                           "net_arch": config.model_rl.net_arch,
+                           "custom_net_arch": config.model_rl.custom_net_arch,
+                           "lstm_hidden_size": config.model_rl.lstm_hidden_size,
+                           "shared_lstm": config.model_rl.shared_lstm,
+                           "enable_critic_lstm": config.model_rl.enable_critic_lstm,
+                           "ssm_state_dim": config.model_rl.ssm_state_dim
+                       })
+
     elif config.model_rl.model_name in ("attn-ppo", "tcn-ppo", "itransformer-ppo"):
         # PPO over a true SEQUENCE features-extractor (self-attention over bars / TCN / iTransformer
         # inverted-attention over variates) that reshapes the flat obs back to its [lookback, per_bar] bar
