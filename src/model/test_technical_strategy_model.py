@@ -181,6 +181,12 @@ def test_sell_price_up_check_sells_when_price_at_or_above_indicator():
     assert m.get_action(env, obs) == 2
 
 
+def test_sell_price_up_check_no_sell_when_price_below_indicator():
+    m = _model(buy_is_down_check=False, buy_amount_threshold=999.0, sell_is_price_check=True, sell_is_up_check=True)
+    env, obs = _env(last_item=[0.0, 120.0, 0.0], price=110.0)
+    assert m.get_action(env, obs) == 0
+
+
 def test_sell_price_down_check_sells_when_price_at_or_below_indicator():
     m = _model(buy_is_down_check=False, buy_amount_threshold=999.0, sell_is_price_check=True, sell_is_up_check=False)
     env, obs = _env(last_item=[0.0, 120.0, 0.0], price=110.0)

@@ -67,6 +67,25 @@ def test_get_values_returns_lookback_window_grid():
     assert np.array_equal(v, np.array([[0.0, 1000.0], [1.0, 1001.0], [2.0, 1002.0]]))
 
 
+def test_get_feature_reads_named_column_at_the_get_values_decision_bar():
+    # Look-ahead regression guard: get_feature(step, name) must equal the LAST (most-recent, closed) row of
+    # get_values(step) for that column — never a future bar. Ties the accessor to the vetted windowing path.
+    df = _df(n=8, cols=2)  # columns f0, f1
+    p = _provider(df, lookback=3)  # start_index 2
+    for step in range(0, 4):
+        last_row = p.get_values(step)[-1]  # the decision bar get_values ends its window on
+        assert p.get_feature(step, "f0") == last_row[0] == df.loc[step + 2, "f0"]
+        assert p.get_feature(step, "f1") == last_row[1] == df.loc[step + 2, "f1"]
+
+
+def test_get_feature_clamps_out_of_range_step_to_last_row():
+    # The env reads one bar PAST the last decision step at `done`; the clamp keeps that in-range (reading the
+    # last real bar), never indexing forward off the end.
+    df = _df(n=6, cols=1)
+    p = _provider(df, lookback=1)  # start_index 0
+    assert p.get_feature(999, "f0") == df.loc[5, "f0"]
+
+
 def test_get_values_window_slides_with_step():
     df = _df(n=6, cols=1)
     p = _provider(df, lookback=2)  # start_index 1

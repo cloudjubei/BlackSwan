@@ -516,3 +516,62 @@ def test_get_timestamp_datetime_parses_step_row():
     p = _bare()
     dt = p.get_timestamp_datetime(df, 1)
     assert dt.hour == 9 and dt.minute == 10
+
+
+# --------------------------------------------------------------------------------------------------
+# get_feature / _decision_layer_index (named-feature accessor for deterministic indicator strategies)
+# --------------------------------------------------------------------------------------------------
+
+def test_decision_layer_index_prefers_the_run_granularity_layer():
+    p = _bare()
+    p.fidelity_run = "1h"
+    p.layers = ["1h", "1d"]
+    p.multipliers = [1, 24]
+    p.divider_run = 1
+    assert p._decision_layer_index() == 0
+
+
+def test_decision_layer_index_falls_back_to_coarsest_layer_within_the_step():
+    # No layer matches the run granularity, so pick the coarsest layer whose bar still closes AT the step
+    # (largest multiplier <= divider_run) — the run-cadence layer for a daily step over a 1h base.
+    p = _bare()
+    p.fidelity_run = "4h"  # deliberately NOT one of the observed layers
+    p.layers = ["1h", "1d", "1w"]
+    p.multipliers = [1, 24, 168]
+    p.divider_run = 24
+    assert p._decision_layer_index() == 1  # the 24-multiplier (daily) layer, not the finer 1h or coarser 1w
+
+
+def test_get_feature_reads_decision_layer_at_the_precomputed_top():
+    # Reuses the SAME per-(layer, step) substream + window-top indices get_values uses, so the feature comes
+    # from the decision bar of the run-cadence layer.
+    p = _bare()
+    p.fidelity_run = "1h"
+    p.layers = ["1h", "1d"]
+    p.multipliers = [1, 24]
+    p.divider_run = 1
+    p.steps = 3
+    l0 = pd.DataFrame({"rsi10": [0.10, 0.20, 0.30, 0.40], "f1": [0, 1, 2, 3]})
+    l1 = pd.DataFrame({"rsi10": [-0.5, -0.6], "f1": [7, 8]})
+    p.fidelity_dfs = [[l0], [l1]]
+    p._step_mapping = [[0, 0, 0], [0, 0, 0]]
+    p._step_top = [[0, 1, 2], [0, 0, 1]]
+    assert p.get_feature(0, "rsi10") == 0.10
+    assert p.get_feature(1, "rsi10") == 0.20
+    assert p.get_feature(2, "rsi10") == 0.30
+
+
+def test_get_feature_reads_the_closed_bar_not_a_future_row():
+    # Look-ahead guard: with the decision bar's top at index 1, get_feature returns row 1 even though later
+    # (future) rows exist in the substream — it never indexes forward past top.
+    p = _bare()
+    p.fidelity_run = "1h"
+    p.layers = ["1h"]
+    p.multipliers = [1]
+    p.divider_run = 1
+    p.steps = 2
+    df = pd.DataFrame({"rsi10": [0.1, 0.2, 0.9, 0.9]})  # rows 2,3 are the FUTURE relative to step 1
+    p.fidelity_dfs = [[df]]
+    p._step_mapping = [[0, 0]]
+    p._step_top = [[0, 1]]
+    assert p.get_feature(1, "rsi10") == 0.2
