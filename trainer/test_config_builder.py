@@ -229,6 +229,30 @@ def test_build_model_config_technical_defaults_to_rsi_mean_reversion():
     assert config.model_technical.sell_is_up_check is True
 
 
+def test_build_model_config_technical_defaults_direction_to_mean_reversion():
+    config = config_builder.build_model_config({"model_name": "technical"})
+    # Default flags = buy oversold / sell overbought (mean-reversion).
+    assert config.model_technical.buy_is_down_check is True
+    assert config.model_technical.sell_is_up_check is True
+
+
+def test_build_model_config_technical_direction_flags_enable_trend_following():
+    # Trend-following (buy ABOVE / sell BELOW) needs both flags flipped off — the config a moving-average /
+    # breakout paper replicates via trendSlope10 crossing 0.
+    config = config_builder.build_model_config(
+        {
+            "model_name": "technical",
+            "technical_buy_indicator": "trendSlope10",
+            "technical_buy_is_down_check": False,
+            "technical_sell_indicator": "trendSlope10",
+            "technical_sell_is_up_check": False,
+        }
+    )
+    assert config.model_technical.buy_indicator == "trendSlope10"
+    assert config.model_technical.buy_is_down_check is False
+    assert config.model_technical.sell_is_up_check is False
+
+
 def test_build_data_config_technical_forces_use_indicators(monkeypatch):
     _echo_daily(monkeypatch)
     # A technical run needs the curated indicator columns (rsi10, ...) present even if the user left

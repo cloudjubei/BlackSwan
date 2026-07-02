@@ -501,7 +501,7 @@
       "default": -0.4,
       "range": [-1, 1],
       "appliesWhen": { "model_name": ["technical"] },
-      "description": "TECHNICAL baseline only: the buy trigger level on the [-1,1]-normalised buy indicator (rsi10 maps classic RSI 30 → -0.4). Buy when the indicator is at or below this (oversold). Ignored by other models."
+      "description": "TECHNICAL baseline only: the buy trigger level on the [-1,1]-normalised buy indicator. With technical_buy_is_down_check=true (default, mean-reversion) buy when the indicator is at or BELOW this (oversold, e.g. rsi10 -0.4 ≈ RSI 30); with it false (trend-following) buy when at or ABOVE this (e.g. trendSlope10 ≥ 0 = price above its MA). Ignored by other models."
     },
     "technical_sell_indicator": {
       "type": "choice",
@@ -525,7 +525,19 @@
       "default": 0.4,
       "range": [-1, 1],
       "appliesWhen": { "model_name": ["technical"] },
-      "description": "TECHNICAL baseline only: the sell trigger level on the [-1,1]-normalised sell indicator (rsi10 maps classic RSI 70 → +0.4). Sell when the indicator is at or above this (overbought). Ignored by other models."
+      "description": "TECHNICAL baseline only: the sell trigger level on the [-1,1]-normalised sell indicator. With technical_sell_is_up_check=true (default, mean-reversion) sell when the indicator is at or ABOVE this (overbought, e.g. rsi10 +0.4 ≈ RSI 70); with it false (trend-following) sell when at or BELOW this (e.g. trendSlope10 ≤ 0 = price back under its MA). Ignored by other models."
+    },
+    "technical_buy_is_down_check": {
+      "type": "boolean",
+      "default": true,
+      "appliesWhen": { "model_name": ["technical"] },
+      "description": "TECHNICAL baseline only: rule FAMILY for the buy leg. true (default) = MEAN-REVERSION — buy when the indicator falls to/below technical_buy_threshold (oversold, e.g. rsi10 ≤ -0.4). false = TREND-FOLLOWING/breakout — buy when it rises to/above the threshold (e.g. trendSlope10 ≥ 0 = price above its MA, the moving-average/breakout rule the crypto TA papers test). Ignored by other models."
+    },
+    "technical_sell_is_up_check": {
+      "type": "boolean",
+      "default": true,
+      "appliesWhen": { "model_name": ["technical"] },
+      "description": "TECHNICAL baseline only: rule FAMILY for the sell leg. true (default) = MEAN-REVERSION — sell when the indicator rises to/above technical_sell_threshold (overbought). false = TREND-FOLLOWING — sell when it falls to/below the threshold (trend rolled over, e.g. trendSlope10 ≤ 0). Pair both flags false with trendSlope10 for a moving-average crossover rule. Ignored by other models."
     },
     "obs_squash": {
       "type": "choice",
@@ -1659,6 +1671,331 @@
       "tags": ["architecture-evidence", "state-space-model", "s4d", "ssm", "recurrent", "skeptical"],
       "replicateConfig": {"fixed": {"model_name": "s4d"}, "sweep": {"model_name": ["s4d", "reppo"], "ssm_state_dim": [16, 64], "walk_forward_window": [2022, 2023, 2024]}, "seeds": 3},
       "status": "implemented",
+      "source": "manual"
+    },
+    {
+      "id": "detzel-btc-technical-analysis-2021",
+      "title": "Learning and Predictability via Technical Analysis: Evidence from Bitcoin and Stocks with Hard-to-Value Fundamentals",
+      "url": "https://onlinelibrary.wiley.com/doi/abs/10.1111/fima.12310",
+      "authors": "Detzel, Liu, Strauss, Zhou, Zhu",
+      "year": 2021,
+      "claim": "Bitcoin returns are largely unpredictable by macro variables but ARE predictable by 5-to-100-day moving averages of price (buy when price is above its MA), in- and out-of-sample; MA strategies add ~0.2-0.6/yr to an already-high buy-and-hold Sharpe (~1.9) and cut drawdowns.",
+      "approach": "Out-of-sample forecasting + moving-average trend rules on daily Bitcoin (and hard-to-value NASDAQ stocks), with a break-even transaction-cost analysis.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": true,
+        "notes": "Cost-aware via the break-even one-way fee that erases each strategy's alpha; daily BTC. The edge is INCREMENTAL over an already-high hold Sharpe (~1.9), not a reversal."
+      },
+      "verdictNote": "The strongest SUPPORT for a trend/MA technical rule on BTC specifically. For BlackSwan: does a trendSlope10 MA-cross rule (buy above MA) beat buy-and-hold OOS net of 0.1% across 2022/23/24? Detzel's edge is INCREMENTAL over a high hold Sharpe -- demand it survive fees AND all three windows.",
+      "tags": [
+        "technical-analysis",
+        "moving-average",
+        "crypto",
+        "bitcoin",
+        "trend-following",
+        "cost-aware",
+        "supports-technical",
+        "baseline-to-beat"
+      ],
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "technical",
+          "timeframe": "1d",
+          "technical_buy_indicator": "trendSlope10",
+          "technical_buy_is_down_check": false,
+          "technical_sell_indicator": "trendSlope10",
+          "technical_sell_is_up_check": false
+        },
+        "sweep": {
+          "technical_buy_threshold": [
+            0.0,
+            0.1
+          ],
+          "technical_sell_threshold": [
+            0.0,
+            -0.1
+          ],
+          "walk_forward_window": [
+            "2022",
+            "2023",
+            "2024"
+          ]
+        },
+        "seeds": 1
+      },
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "svogun-crypto-ta-costs-2022",
+      "title": "Technical analysis in cryptocurrency markets: Do transaction costs and bubbles matter?",
+      "url": "https://ideas.repec.org/a/eee/intfin/v79y2022ics1042443122000816.html",
+      "authors": "Svogun, Bazan-Palomino",
+      "year": 2022,
+      "claim": "69 moving-average and breakout rules on five cryptos (BTC/ETH/XRP/LTC/BCH), daily and 1-minute 2016-2021, evaluated explicitly WITH and WITHOUT transaction costs and across bubble regimes; profitability is coin- and regime-dependent -- costs LOWER the odds of beating buy-and-hold for XRP/LTC but RAISE them for BTC/ETH, and bubbles help ETH/XRP/LTC (not BTC/BCH).",
+      "approach": "Grid of 69 MA-crossover + trading-range-breakout rules on five cryptos, with transaction costs and bubble regimes as primary treatments.",
+      "assumptions": {
+        "fees": true,
+        "netOfCosts": true,
+        "notes": "Transaction costs are the CENTRAL variable; the result is coin- and regime-dependent, NOT a clean 'TA wins on BTC'. For BTC, costs can raise the odds of beating hold (fewer whipsaws)."
+      },
+      "verdictNote": "The cost-honest crypto TA benchmark -- matches BlackSwan's 0.1%-fee / OOS discipline. For BTC it finds costs can HELP (fewer whipsaws) but the edge is regime-dependent. Test whether a trendSlope10 rule on BTC survives fees across the three windows; expect regime sensitivity, not a stable win.",
+      "tags": [
+        "technical-analysis",
+        "moving-average",
+        "breakout",
+        "crypto",
+        "bitcoin",
+        "transaction-costs",
+        "regime-dependent",
+        "cost-aware",
+        "skeptical"
+      ],
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "technical",
+          "timeframe": "1d",
+          "technical_buy_indicator": "trendSlope10",
+          "technical_buy_is_down_check": false,
+          "technical_sell_indicator": "trendSlope10",
+          "technical_sell_is_up_check": false
+        },
+        "sweep": {
+          "technical_buy_threshold": [
+            0.0,
+            0.1,
+            0.2
+          ],
+          "technical_sell_threshold": [
+            0.0,
+            -0.1
+          ],
+          "walk_forward_window": [
+            "2022",
+            "2023",
+            "2024"
+          ]
+        },
+        "seeds": 1
+      },
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "gerritsen-btc-trading-rules-2020",
+      "title": "The profitability of technical trading rules in the Bitcoin market",
+      "url": "https://ideas.repec.org/a/eee/finlet/v34y2020ics1544612319303770.html",
+      "authors": "Gerritsen, Bouri, Ramezanifar, Roubaud",
+      "year": 2020,
+      "claim": "Applying trend-following technical indicators to daily Bitcoin (2010-2019), trading-range BREAKOUT rules have significant forecasting power and let a rule-based strategy outperform buy-and-hold on a bootstrapped Sharpe basis, strongest in strongly trending markets.",
+      "approach": "Bootstrapped tests of seven trend-following technical rules (breakout the headline winner) on daily BTC.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "Breakout is the headline; the paper's ABSTRACT does not confirm RSI inclusion or transaction-cost robustness (secondary-source only) -- treat net-of-costs as UNVERIFIED. 2010-2019 includes the early illiquid/hyper-trending BTC era (OOS-decay risk)."
+      },
+      "verdictNote": "SUPPORT for a breakout rule on BTC, but the profitability is GROSS and drawn from an early hyper-trending sample. For BlackSwan: run a trendSlope10 breakout (buy_threshold > 0) net of 0.1% on 2022/23/24 -- the modern, fee-honest test the paper doesn't provide.",
+      "tags": [
+        "technical-analysis",
+        "breakout",
+        "crypto",
+        "bitcoin",
+        "trend-following",
+        "supports-technical",
+        "unverified-costs",
+        "skeptical"
+      ],
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "technical",
+          "timeframe": "1d",
+          "technical_buy_indicator": "trendSlope10",
+          "technical_buy_is_down_check": false,
+          "technical_sell_indicator": "trendSlope10",
+          "technical_sell_is_up_check": false
+        },
+        "sweep": {
+          "technical_buy_threshold": [
+            0.1,
+            0.2,
+            0.3
+          ],
+          "technical_sell_threshold": [
+            0.0,
+            -0.1
+          ],
+          "walk_forward_window": [
+            "2022",
+            "2023",
+            "2024"
+          ]
+        },
+        "seeds": 1
+      },
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "grobys-crypto-trading-rules-2020",
+      "title": "Technical trading rules in the cryptocurrency market",
+      "url": "https://ideas.repec.org/a/eee/finlet/v32y2020ics1544612319308852.html",
+      "authors": "Grobys, Ahmed, Sapkota",
+      "year": 2020,
+      "claim": "A (1,20) variable moving-average crossover generates a statistically significant ~8.76% p.a. excess return across 11 cryptos (2016-2018) -- but the effect is significant only when EXCLUDING Bitcoin, and only the (1,20) rule is jointly significant across coins.",
+      "approach": "Variable-MA crossover rules (long MA n=20..200) tested for joint significance across the 11 most-traded cryptocurrencies.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "Headline edge is EX-BITCOIN -- a caution that MA-crossover profitability may NOT hold for BTC alone; short 2016-2018 sample; no explicit cost adjustment."
+      },
+      "verdictNote": "SKEPTICAL for BlackSwan (BTC-only): Grobys' MA-crossover edge is significant only when Bitcoin is EXCLUDED, implying the rule may fail on the exact single asset we trade. Direct test: does a trendSlope10 (1,20-style) rule beat hold on BTC OOS? Grobys predicts probably not.",
+      "tags": [
+        "technical-analysis",
+        "moving-average",
+        "crypto",
+        "bitcoin",
+        "trend-following",
+        "skeptical",
+        "bitcoin-excluded"
+      ],
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "technical",
+          "timeframe": "1d",
+          "technical_buy_indicator": "trendSlope10",
+          "technical_buy_is_down_check": false,
+          "technical_sell_indicator": "trendSlope10",
+          "technical_sell_is_up_check": false
+        },
+        "sweep": {
+          "technical_buy_threshold": [
+            0.0,
+            0.1
+          ],
+          "technical_sell_threshold": [
+            0.0,
+            -0.1
+          ],
+          "walk_forward_window": [
+            "2022",
+            "2023",
+            "2024"
+          ]
+        },
+        "seeds": 1
+      },
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "brock-technical-trading-rules-1992",
+      "title": "Simple Technical Trading Rules and the Stochastic Properties of Stock Returns",
+      "url": "https://ideas.repec.org/a/bla/jfinan/v47y1992i5p1731-64.html",
+      "authors": "Brock, Lakonishok, LeBaron",
+      "year": 1992,
+      "claim": "Moving-average and trading-range-breakout rules on the Dow Jones Index (1897-1986) generate buy-signal returns that exceed sell-signal returns in ways inconsistent with random-walk, AR(1), GARCH-M and EGARCH null models (bootstrap inference).",
+      "approach": "Bootstrap inference on two simple rule families (MA crossover + trading-range breakout) against parametric null models of the DJIA.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "Foundational EQUITY result reported GROSS of costs (the classic critique); pre-crypto; full-sample in-sample. The direct ancestor of every MA/breakout crypto paper."
+      },
+      "verdictNote": "The FOUNDATIONAL MA/breakout evidence -- but equity, pre-cost, and later shown fragile OOS (see sullivan-data-snooping-1999). It motivates the trendSlope10 rule family; credit it only if the crypto, fee-net, OOS test (Detzel/Svogun-style) also holds.",
+      "tags": [
+        "technical-analysis",
+        "moving-average",
+        "breakout",
+        "equity",
+        "trend-following",
+        "foundational",
+        "pre-cost",
+        "baseline-to-beat"
+      ],
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "technical",
+          "timeframe": "1d",
+          "technical_buy_indicator": "trendSlope10",
+          "technical_buy_is_down_check": false,
+          "technical_sell_indicator": "trendSlope10",
+          "technical_sell_is_up_check": false
+        },
+        "sweep": {
+          "technical_buy_threshold": [
+            0.0,
+            0.1
+          ],
+          "technical_sell_threshold": [
+            0.0,
+            -0.1
+          ],
+          "walk_forward_window": [
+            "2022",
+            "2023",
+            "2024"
+          ]
+        },
+        "seeds": 1
+      },
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "sullivan-data-snooping-1999",
+      "title": "Data-Snooping, Technical Trading Rule Performance, and the Bootstrap",
+      "url": "https://ideas.repec.org/a/bla/jfinan/v54y1999i5p1647-1691.html",
+      "authors": "Sullivan, Timmermann, White",
+      "year": 1999,
+      "claim": "Using White's Reality Check bootstrap over ~7,846 rules on 100 years of DJIA data, the best Brock-era rule survives data-snooping adjustment IN-sample but does NOT deliver superior performance in the subsequent OUT-of-sample decade -- once you correct for rule-mining, technical-trading profitability is far weaker.",
+      "approach": "White's Reality Check over a ~7,846-rule universe (filters, MAs, breakouts, channels, OBV) to test whether the best mined rule survives data-snooping and holds out of sample.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "The data-snooping NEGATIVE control: mine enough rules and one looks great in-sample but decays OOS. Directly relevant to sweeping many technical_* configs -- the caution, not a strategy to run."
+      },
+      "verdictNote": "The essential CAUTION for BlackSwan's technical sweeps: the more (indicator x threshold x direction) rules we grid, the more a 'winner' is data-snooping, not edge. Mirrors our OOS-across-windows + seed-stability bar -- a technical config counts only if it holds across 2022/23/24, never just the best single-window cell. This paper's replicateConfig IS a wide rule grid, on purpose.",
+      "tags": [
+        "technical-analysis",
+        "data-snooping",
+        "methodology",
+        "overfitting",
+        "equity",
+        "caution",
+        "skeptical"
+      ],
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "technical",
+          "timeframe": "1d"
+        },
+        "sweep": {
+          "technical_buy_indicator": [
+            "rsi10",
+            "williams10",
+            "stochasticOscillator10",
+            "trendSlope10",
+            "meanReversion10"
+          ],
+          "technical_buy_threshold": [
+            -0.4,
+            -0.2,
+            0.0,
+            0.2
+          ],
+          "technical_sell_threshold": [
+            0.4,
+            0.2,
+            0.0
+          ],
+          "walk_forward_window": [
+            "2022",
+            "2023",
+            "2024"
+          ]
+        },
+        "seeds": 1
+      },
+      "status": "untested",
       "source": "manual"
     }
   ],

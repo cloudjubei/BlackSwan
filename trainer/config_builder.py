@@ -267,6 +267,10 @@ def build_model_config(cfg):
             buy_amount_threshold=float(cfg.get("technical_buy_threshold", -0.4)),
             sell_indicator=str(cfg.get("technical_sell_indicator", "rsi10")),
             sell_amount_threshold=float(cfg.get("technical_sell_threshold", 0.4)),
+            # Direction flags pick the rule FAMILY: default (down/up) = mean-reversion (buy oversold, sell
+            # overbought); both off = trend-following (buy above / sell below, e.g. trendSlope10 crossing 0).
+            buy_is_down_check=bool(cfg.get("technical_buy_is_down_check", True)),
+            sell_is_up_check=bool(cfg.get("technical_sell_is_up_check", True)),
         )
         config = ModelConfig(model_type="technical", model_technical=technical)
         config.iterations_to_pick_best = 1
