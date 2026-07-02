@@ -1,37 +1,32 @@
 """Direct unit tests for the deterministic TechnicalStrategyModel baseline.
 
-get_action slices the most-recent bar out of a flattened lookback window, then applies a
-buy rule (BUY=1) and, failing that, a sell rule (SELL=2), defaulting to HOLD=0. Each rule has a
-2x2 matrix: price-check vs amount-check, and direction (down/up). We feed a crafted obs vector and
-indicator columns and assert the exact action for every branch.
+get_action reads the current decision bar's indicator value from the data provider's look-ahead-safe
+named-feature accessor (env.data_provider.get_feature(step, name)), then applies a buy rule (BUY=1)
+and, failing that, a sell rule (SELL=2), defaulting to HOLD=0. Each rule has a 2x2 matrix: price-check
+vs amount-check, and direction (down/up). We stub the provider's feature values and assert the exact
+action for every branch.
 """
 
 import types
 
-import pandas as pd
-
 from src.model.technical_strategy_model import TechnicalStrategyModel
 
 
-# Column layout of the synthetic "bar": index 0 = buy indicator, index 1 = sell indicator.
+# The synthetic indicator columns the buy/sell rules key on.
 COLUMNS = ["buy_ind", "sell_ind", "filler"]
 
 
-def _env(*, last_item, price, lookback=1):
-    """Build a flattened obs whose final lookback bar equals ``last_item`` (plus a net_worth tail).
-
-    obs layout = [bar_0 ... bar_{lookback-1}, net_worth]; item_size = (len(obs)-1)/lookback.
-    For a single-bar window we just prepend filler bars of the right size.
-    """
-    item_size = len(last_item)
-    obs = [0.0] * (item_size * (lookback - 1)) + list(last_item) + [99999.0]
+def _env(*, last_item, price):
+    """A minimal env whose provider returns ``last_item`` values by indicator NAME (aligned to COLUMNS),
+    mirroring the real contract: the model reads env.data_provider.get_feature(current_step, name)."""
+    feats = dict(zip(COLUMNS, last_item))
+    provider = types.SimpleNamespace(get_feature=lambda step, name: feats[name])
     env = types.SimpleNamespace(
-        env_config=types.SimpleNamespace(lookback_window_size=lookback),
-        df=types.SimpleNamespace(columns=pd.Index(COLUMNS)),
         current_step=0,
         get_price=lambda step: price,
+        data_provider=provider,
     )
-    return env, obs
+    return env, None
 
 
 def _model(**tech):
@@ -236,20 +231,17 @@ def test_hold_when_neither_rule_triggers():
     assert m.get_action(env, obs) == 0
 
 
-def test_get_action_uses_last_bar_of_lookback_window():
-    # With lookback=2, the model must read the SECOND (most recent) bar, not the first.
-    # First bar would trigger a buy (10<=100) but is stale; second bar (150>100 down-check) must not.
+def test_get_action_reads_feature_at_current_step_via_provider():
+    # The model delegates decision-bar selection to the provider: it must query get_feature at the env's
+    # CURRENT step (not step 0), so per-step values drive the action. Here step 7's buy indicator is 150
+    # (>100 down-check) -> no buy; step 0 would be 10 (<=100) -> a stale buy the model must NOT make.
     m = _model(buy_is_down_check=True, buy_amount_threshold=100.0, sell_is_up_check=True,
                sell_amount_threshold=999.0)
-    item_size = len(COLUMNS)
-    recent_bar = [150.0, 0.0, 0.0]
-    stale_bar = [10.0, 0.0, 0.0]
-    obs = list(stale_bar) + list(recent_bar) + [99999.0]
+    by_step = {0: {"buy_ind": 10.0, "sell_ind": 0.0}, 7: {"buy_ind": 150.0, "sell_ind": 0.0}}
+    provider = types.SimpleNamespace(get_feature=lambda step, name: by_step[step][name])
     env = types.SimpleNamespace(
-        env_config=types.SimpleNamespace(lookback_window_size=2),
-        df=types.SimpleNamespace(columns=pd.Index(COLUMNS)),
-        current_step=0,
+        current_step=7,
         get_price=lambda step: 500.0,
+        data_provider=provider,
     )
-    assert item_size == 3
-    assert m.get_action(env, obs) == 0
+    assert m.get_action(env, None) == 0

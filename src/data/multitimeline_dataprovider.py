@@ -256,6 +256,36 @@ class MultiTimelineDataProvider(AbstractDataProvider):
             self._step_mapping.append(maps)
             self._step_top.append(tops)
 
+    def _decision_layer_index(self):
+        # The run-cadence layer whose bar closes AT the decision step (top=index in get_values, i.e. the
+        # layer that anchors the price/reward cadence). Prefer the explicit run-granularity layer; else the
+        # coarsest layer that still closes within the step.
+        if self.fidelity_run in self.layers:
+            return self.layers.index(self.fidelity_run)
+        best, best_m = 0, -1
+        for i, m in enumerate(self.multipliers):
+            if m <= self.divider_run and m > best_m:
+                best, best_m = i, m
+        return best
+
+    def get_feature(self, step: int, name: str) -> float:
+        # Read a named feature at the decision bar of the run-cadence layer, reusing the SAME per-(layer,
+        # step) substream + window-top indices get_values uses (precomputed; the compute-path fallback
+        # mirrors _compute_values), so the look-ahead-safe mapping lives in ONE place.
+        i = self._decision_layer_index()
+        dfs = self.fidelity_dfs[i]
+        if getattr(self, "_step_mapping", None) is not None and 0 <= step < self.steps:
+            sub = self._step_mapping[i][step]
+            top = self._step_top[i][step]
+        else:
+            offset = step * self.divider_run + self.get_start_index()
+            sub = self.get_current_mapping(self.raw_df, offset, self.layers[i], self.fidelity_run)
+            index = int((offset - sub) / self.multipliers[i])
+            top = index if self.multipliers[i] <= self.divider_run else index - 1
+        df = dfs[sub]
+        row = min(max(int(top), 0), df.shape[0] - 1)
+        return float(df.iloc[row][name])
+
     def get_values(self, step: int):
         # Fast O(1)-pandas path for in-range steps once precomputed; the per-step compute path otherwise
         # (the out-of-range edge step the env reads at `done`, the non-fidelity branch, and the white-box

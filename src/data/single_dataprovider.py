@@ -47,6 +47,12 @@ class SingleDataProvider(AbstractDataProvider):
             return np.array(vs.flatten())
         return np.array(vs)
     
+    def get_feature(self, step: int, name: str) -> float:
+        # Same decision-bar row get_values ends its window on (offset = step + start_index), read by
+        # column name — clamped to the last row for the out-of-range edge step the env reads at `done`.
+        offset = min(max(step + self.get_start_index(), 0), self.df.shape[0] - 1)
+        return float(self.df.loc[offset, name])
+
     def get_signal_buy_sell(self, step: int) -> int:
         return self.signals_buy_sell[step + self.get_start_index()]
     

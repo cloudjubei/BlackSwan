@@ -134,10 +134,11 @@
         "momentum",
         "time",
         "weekday",
+        "technical",
         "hodl"
       ],
       "default": "reppo-custom",
-      "description": "The algorithm / policy. Naming conventions: a bare name is the vanilla SB3 build, '-custom' uses tuned network internals, '-lstm' adds a recurrent features-extractor, '-sbx' is the JAX/SBX build. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'reppo'/'reppo-custom' = RecurrentPPO; 'trpo'/'trpo-custom' = TRPO; 'a2c'/'a2c-custom' = A2C. DQN line: 'dqn'/'dqn-custom'/'dqn-lstm'/'dqn-sbx'; dueling 'duel-dqn*'; 'munchausen-*' add the Munchausen log-policy bonus; 'rainbow-dqn'/'rainbow-dqn-custom' add prioritized experience replay (importance-weighted sampling by TD-error). Distributional: 'iqn'/'iqn-custom' (implicit quantile) and 'qrdqn'/'qrdqn-custom' (quantile-regression). 'ars'/'ars-mlp' are Augmented Random Search (gradient-free) baselines. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'momentum' is a deterministic time-series-momentum baseline (long when the trailing `momentum_lookback`-bar return is positive, flat otherwise — Moskowitz-style), a non-RL control to beat. 'time' is a deterministic time-of-day baseline — long from UTC hour `time_buy` to hour `time_sell` every day (intraday round-trip, or overnight when buy>sell); needs intraday data (timeframe=1h) and is a control + a probe for time-of-day/overnight seasonality. 'weekday' is a deterministic day-of-week baseline — long from weekday `day_buy` (0=Mon..6=Sun) to `day_sell` every week (intra-week, or across the weekend when buy>sell); runs at a daily step (timeframe=1d) and probes weekly seasonality (the Monday/day-of-week effect). 'hodl' is the buy-and-hold control."
+      "description": "The algorithm / policy. Naming conventions: a bare name is the vanilla SB3 build, '-custom' uses tuned network internals, '-lstm' adds a recurrent features-extractor, '-sbx' is the JAX/SBX build. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'reppo'/'reppo-custom' = RecurrentPPO; 'trpo'/'trpo-custom' = TRPO; 'a2c'/'a2c-custom' = A2C. DQN line: 'dqn'/'dqn-custom'/'dqn-lstm'/'dqn-sbx'; dueling 'duel-dqn*'; 'munchausen-*' add the Munchausen log-policy bonus; 'rainbow-dqn'/'rainbow-dqn-custom' add prioritized experience replay (importance-weighted sampling by TD-error). Distributional: 'iqn'/'iqn-custom' (implicit quantile) and 'qrdqn'/'qrdqn-custom' (quantile-regression). 'ars'/'ars-mlp' are Augmented Random Search (gradient-free) baselines. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'momentum' is a deterministic time-series-momentum baseline (long when the trailing `momentum_lookback`-bar return is positive, flat otherwise — Moskowitz-style), a non-RL control to beat. 'time' is a deterministic time-of-day baseline — long from UTC hour `time_buy` to hour `time_sell` every day (intraday round-trip, or overnight when buy>sell); needs intraday data (timeframe=1h) and is a control + a probe for time-of-day/overnight seasonality. 'weekday' is a deterministic day-of-week baseline — long from weekday `day_buy` (0=Mon..6=Sun) to `day_sell` every week (intra-week, or across the weekend when buy>sell); runs at a daily step (timeframe=1d) and probes weekly seasonality (the Monday/day-of-week effect). 'technical' is a deterministic technical-indicator baseline — buy/sell when a chosen [-1,1]-normalised indicator (rsi10, williams10, ...) crosses `technical_buy_threshold` / `technical_sell_threshold`; defaults to classic RSI mean-reversion (oversold buy / overbought sell) and auto-enables the curated indicators. 'hodl' is the buy-and-hold control."
     },
     "reward_model": {
       "type": "choice",
@@ -477,6 +478,54 @@
       ],
       "appliesWhen": { "model_name": ["weekday"] },
       "description": "WEEKDAY baseline only: the day-of-week (0=Mon..6=Sun) to CLOSE the long. With day_sell > day_buy it's an intra-week hold (e.g. long Mon 0 -> Fri 4); with day_sell < day_buy it holds across the WEEKEND (e.g. buy Fri 4, sell Mon 0 = the weekend-return probe, crypto trades the weekend). Ignored by other models."
+    },
+    "technical_buy_indicator": {
+      "type": "choice",
+      "choices": [
+        "rsi10",
+        "williams10",
+        "stochasticOscillator10",
+        "choppiness30",
+        "meanReversion10",
+        "turbulenceIndex10",
+        "obv10",
+        "volRegime10",
+        "trendSlope10"
+      ],
+      "default": "rsi10",
+      "appliesWhen": { "model_name": ["technical"] },
+      "description": "TECHNICAL baseline only: which curated indicator column drives the BUY signal (all [-1,1]-normalised, computed at runtime). Buy fires when it crosses technical_buy_threshold from above (mean-reversion 'oversold' default). Ignored by other models."
+    },
+    "technical_buy_threshold": {
+      "type": "number",
+      "default": -0.4,
+      "range": [-1, 1],
+      "appliesWhen": { "model_name": ["technical"] },
+      "description": "TECHNICAL baseline only: the buy trigger level on the [-1,1]-normalised buy indicator (rsi10 maps classic RSI 30 → -0.4). Buy when the indicator is at or below this (oversold). Ignored by other models."
+    },
+    "technical_sell_indicator": {
+      "type": "choice",
+      "choices": [
+        "rsi10",
+        "williams10",
+        "stochasticOscillator10",
+        "choppiness30",
+        "meanReversion10",
+        "turbulenceIndex10",
+        "obv10",
+        "volRegime10",
+        "trendSlope10"
+      ],
+      "default": "rsi10",
+      "appliesWhen": { "model_name": ["technical"] },
+      "description": "TECHNICAL baseline only: which curated indicator column drives the SELL signal. Sell fires when it crosses technical_sell_threshold from below (mean-reversion 'overbought' default). Ignored by other models."
+    },
+    "technical_sell_threshold": {
+      "type": "number",
+      "default": 0.4,
+      "range": [-1, 1],
+      "appliesWhen": { "model_name": ["technical"] },
+      "description": "TECHNICAL baseline only: the sell trigger level on the [-1,1]-normalised sell indicator (rsi10 maps classic RSI 70 → +0.4). Sell when the indicator is at or above this (overbought). Ignored by other models."
     },
     "obs_squash": {
       "type": "choice",

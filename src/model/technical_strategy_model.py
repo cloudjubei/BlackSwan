@@ -13,16 +13,14 @@ class TechnicalStrategyModel(BaseStrategyModel):
         return f'{config.model_technical.buy_indicator}_{config.model_technical.buy_amount_threshold}_{config.model_technical.sell_indicator if config.model_technical.buy_indicator != config.model_technical.sell_indicator else ""}_{config.model_technical.sell_amount_threshold}'.replace('.', '~').replace('|', ']')
 
     def get_action(self, env: AbstractEnv, obs):
-        # net_worth = obs[-1]
-        
-        lookback_window = env.env_config.lookback_window_size
-        item_size = int((len(obs) - 1) / lookback_window)
-        last_item_start = (lookback_window - 1) * item_size
-        last_item = obs[last_item_start : last_item_start + item_size]
-        
-        price = env.get_price(env.current_step)
+        # BUY (1) when the buy indicator crosses its threshold, else SELL (2) when the sell indicator does,
+        # else HOLD (0). The indicator value at the current decision bar comes from the data provider's
+        # look-ahead-safe named-feature accessor (NOT the flattened obs), so it stays correct across the
+        # single/multi-fidelity providers and their stride mapping.
+        step = env.current_step
+        price = env.get_price(step)
 
-        buy_indicator = last_item[env.df.columns.get_loc(self.technical_config.buy_indicator)]
+        buy_indicator = env.data_provider.get_feature(step, self.technical_config.buy_indicator)
         if self.technical_config.buy_amount_is_multiplier:
             buy_indicator = buy_indicator * self.technical_config.buy_amount_threshold
 
@@ -41,7 +39,7 @@ class TechnicalStrategyModel(BaseStrategyModel):
                 if buy_indicator >= self.technical_config.buy_amount_threshold:
                     return 1 #BUY
 
-        sell_indicator = last_item[env.df.columns.get_loc(self.technical_config.sell_indicator)]
+        sell_indicator = env.data_provider.get_feature(step, self.technical_config.sell_indicator)
         if self.technical_config.sell_amount_is_multiplier:
             sell_indicator = sell_indicator * self.technical_config.sell_amount_threshold
 

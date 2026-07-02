@@ -16,7 +16,7 @@ from omegaconf import OmegaConf
 
 from src.conf.data_config import DataConfig
 from src.conf.env_config import EnvConfig
-from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervisedConfig, ModelMomentumConfig, ModelTimeConfig, ModelDayConfig, model_rl
+from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervisedConfig, ModelMomentumConfig, ModelTimeConfig, ModelDayConfig, ModelTechnicalConfig, model_rl
 from src.model.model_factory import get_model_combinations
 from src.model.rl_model import is_recurrent_model_name
 from trainer.fidelity import resolve_fidelity
@@ -63,6 +63,9 @@ def _parse_net_arch(value):
 
 def build_data_config(cfg):
     asset = str(cfg.get("asset", _SYMBOL))
+    # The technical baseline reads curated indicator columns (rsi10, ...) by name, so enable them even when
+    # the user left use_indicators off — otherwise the column lookup would fail at run time.
+    use_indicators = bool(cfg.get("use_indicators", False)) or is_technical(cfg)
     train_pairs, test_pairs, window = resolve_walk_forward_window(cfg)
     wf = window["walk_forward_window"]
     fset_id, fspec = resolve_fidelity(cfg)
@@ -93,7 +96,7 @@ def build_data_config(cfg):
                 test_data_paths=[test_files],
                 lookback_window_size=int(cfg.get("lookback_window") or lookback),
                 type=str(cfg.get("data_type", "only_price_percent")),
-                use_indicators=bool(cfg.get("use_indicators", False)),
+                use_indicators=use_indicators,
                 timestamp="day_of_week",
                 obs_squash=str(cfg.get("obs_squash", "none")),
                 fidelity_input="1m",
@@ -122,7 +125,7 @@ def build_data_config(cfg):
                 test_data_paths=[ensure_derived(asset, test_pairs, "1h")],
                 lookback_window_size=int(cfg.get("lookback_window") or lookback),
                 type=str(cfg.get("data_type", "only_price_percent")),
-                use_indicators=bool(cfg.get("use_indicators", False)),
+                use_indicators=use_indicators,
                 timestamp="day_of_week",
                 obs_squash=str(cfg.get("obs_squash", "none")),
                 fidelity_input="1h",
@@ -140,7 +143,7 @@ def build_data_config(cfg):
             test_data_paths=[_daily_files(test_pairs, asset)],
             lookback_window_size=lookback,
             type=str(cfg.get("data_type", "only_price_percent")),
-            use_indicators=bool(cfg.get("use_indicators", False)),
+            use_indicators=use_indicators,
             timestamp="none",
             obs_squash=str(cfg.get("obs_squash", "none")),
             fidelity_input="1d",
@@ -203,6 +206,10 @@ def is_weekday(cfg):
     return str(cfg.get("model_name", "")).lower() == "weekday" or cfg.get("model_type") == "weekday"
 
 
+def is_technical(cfg):
+    return str(cfg.get("model_name", "")).lower() == "technical" or cfg.get("model_type") == "technical"
+
+
 def build_model_config(cfg):
     """Return one concrete ModelConfig for the lever values in ``cfg``."""
     if is_hodl(cfg):
@@ -247,6 +254,21 @@ def build_model_config(cfg):
             seed=int(cfg["seed"]) if cfg.get("seed") is not None else None,
         )
         config = ModelConfig(model_type="supervised", model_supervised=supervised)
+        config.iterations_to_pick_best = 1
+        return config
+
+    if is_technical(cfg):
+        # Deterministic technical-indicator baseline: buy/sell when a chosen [-1,1]-normalised indicator
+        # crosses its threshold. Defaults to classic RSI mean-reversion (oversold buy / overbought sell);
+        # the direction flags in ModelTechnicalConfig (buy_is_down_check / sell_is_up_check) stay at their
+        # mean-reversion defaults. Needs the curated indicator columns (build_data_config forces them on).
+        technical = ModelTechnicalConfig(
+            buy_indicator=str(cfg.get("technical_buy_indicator", "rsi10")),
+            buy_amount_threshold=float(cfg.get("technical_buy_threshold", -0.4)),
+            sell_indicator=str(cfg.get("technical_sell_indicator", "rsi10")),
+            sell_amount_threshold=float(cfg.get("technical_sell_threshold", 0.4)),
+        )
+        config = ModelConfig(model_type="technical", model_technical=technical)
         config.iterations_to_pick_best = 1
         return config
 

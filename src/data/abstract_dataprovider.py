@@ -50,6 +50,13 @@ class AbstractDataProvider(ABC):
     def get_lookback_window(self) -> int:
         return self.config.lookback_window_size
 
+    def get_feature(self, step: int, name: str) -> float:
+        """Value of a named feature column at ``step``'s most-recent CLOSED decision bar. Deterministic
+        indicator strategies (TechnicalStrategyModel) read their signal columns through this — it reuses
+        each provider's OWN look-ahead-safe decision-bar mapping, so the strategy never re-derives the
+        stride/fidelity math. Providers with no named feature frame don't implement it."""
+        raise NotImplementedError(f"{type(self).__name__} does not expose named features")
+
     def get_start_index(self):
         return 0
     

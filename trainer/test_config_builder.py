@@ -192,6 +192,57 @@ def test_build_model_config_momentum_defaults_lookback():
     assert config.model_momentum.lookback_periods == 30
 
 
+def test_is_technical_detects_technical_model():
+    assert config_builder.is_technical({"model_name": "technical"})
+    assert config_builder.is_technical({"model_type": "technical"})
+    assert not config_builder.is_technical({"model_name": "momentum"})
+    assert not config_builder.is_technical({"model_name": "reppo-custom"})
+
+
+def test_build_model_config_technical_maps_levers():
+    config = config_builder.build_model_config(
+        {
+            "model_name": "technical",
+            "technical_buy_indicator": "williams10",
+            "technical_buy_threshold": -0.5,
+            "technical_sell_indicator": "stochasticOscillator10",
+            "technical_sell_threshold": 0.6,
+        }
+    )
+    assert config.model_type == "technical"
+    assert config.model_technical.buy_indicator == "williams10"
+    assert config.model_technical.buy_amount_threshold == -0.5
+    assert config.model_technical.sell_indicator == "stochasticOscillator10"
+    assert config.model_technical.sell_amount_threshold == 0.6
+
+
+def test_build_model_config_technical_defaults_to_rsi_mean_reversion():
+    config = config_builder.build_model_config({"model_name": "technical"})
+    assert config.model_type == "technical"
+    # Classic RSI mean-reversion on the [-1,1]-normalised rsi10 (oversold -0.4 / overbought +0.4).
+    assert config.model_technical.buy_indicator == "rsi10"
+    assert config.model_technical.buy_amount_threshold == -0.4
+    assert config.model_technical.sell_indicator == "rsi10"
+    assert config.model_technical.sell_amount_threshold == 0.4
+    # The default direction flags make it buy-the-dip / sell-the-rip (oversold buy, overbought sell).
+    assert config.model_technical.buy_is_down_check is True
+    assert config.model_technical.sell_is_up_check is True
+
+
+def test_build_data_config_technical_forces_use_indicators(monkeypatch):
+    _echo_daily(monkeypatch)
+    # A technical run needs the curated indicator columns (rsi10, ...) present even if the user left
+    # use_indicators off — build_data_config must enable them for the technical model.
+    cfg = config_builder.build_data_config({"timeframe": "1d", "model_name": "technical"})
+    assert cfg.use_indicators is True
+
+
+def test_build_data_config_non_technical_keeps_use_indicators_off(monkeypatch):
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config({"timeframe": "1d", "model_name": "reppo-custom"})
+    assert cfg.use_indicators is False
+
+
 def test_build_model_config_lstm_levers_default_to_separate_256():
     # Byte-compat default: a reppo-custom run without the new levers keeps SB3's separate-LSTM,
     # hidden-size-256 topology (what the policy used before these levers existed).
