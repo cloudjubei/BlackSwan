@@ -16,7 +16,7 @@ from omegaconf import OmegaConf
 
 from src.conf.data_config import DataConfig
 from src.conf.env_config import EnvConfig
-from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervisedConfig, ModelMomentumConfig, ModelTimeConfig, ModelDayConfig, ModelTechnicalConfig, model_rl
+from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervisedConfig, ModelMomentumConfig, ModelMaCrossoverConfig, ModelBreakoutConfig, ModelTimeConfig, ModelDayConfig, ModelTechnicalConfig, model_rl
 from src.model.model_factory import get_model_combinations
 from src.model.rl_model import is_recurrent_model_name
 from trainer.fidelity import resolve_fidelity
@@ -198,6 +198,14 @@ def is_momentum(cfg):
     return str(cfg.get("model_name", "")).lower() == "momentum" or cfg.get("model_type") == "momentum"
 
 
+def is_ma_crossover(cfg):
+    return str(cfg.get("model_name", "")).lower() == "ma_crossover" or cfg.get("model_type") == "ma_crossover"
+
+
+def is_breakout(cfg):
+    return str(cfg.get("model_name", "")).lower() == "breakout" or cfg.get("model_type") == "breakout"
+
+
 def is_time(cfg):
     return str(cfg.get("model_name", "")).lower() == "time" or cfg.get("model_type") == "time"
 
@@ -221,6 +229,30 @@ def build_model_config(cfg):
     if is_momentum(cfg):
         momentum = ModelMomentumConfig(lookback_periods=int(cfg.get("momentum_lookback", 30)))
         config = ModelConfig(model_type="momentum", model_momentum=momentum)
+        config.iterations_to_pick_best = 1
+        return config
+
+    if is_ma_crossover(cfg):
+        # Variable-length MA crossover (BLL 1992 / Grobys 2020): long when the short MA is above the long
+        # MA by more than the band, flat when below, hold inside. Windows are in BARS (use a daily timeframe
+        # for the papers' daily 1/50, 1/150, 1/200, 1/20 rules).
+        ma = ModelMaCrossoverConfig(
+            short_window=int(cfg.get("ma_short_window", 1)),
+            long_window=int(cfg.get("ma_long_window", 50)),
+            band=float(cfg.get("ma_band", 0.0)),
+        )
+        config = ModelConfig(model_type="ma_crossover", model_ma_crossover=ma)
+        config.iterations_to_pick_best = 1
+        return config
+
+    if is_breakout(cfg):
+        # Trading-range breakout (BLL 1992): long when price breaks above the prior `window`-bar high by
+        # more than the band, flat when it breaks below the low. `window` is in BARS (daily 50/150/200).
+        breakout = ModelBreakoutConfig(
+            window=int(cfg.get("breakout_window", 50)),
+            band=float(cfg.get("breakout_band", 0.0)),
+        )
+        config = ModelConfig(model_type="breakout", model_breakout=breakout)
         config.iterations_to_pick_best = 1
         return config
 

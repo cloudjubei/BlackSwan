@@ -192,6 +192,52 @@ def test_build_model_config_momentum_defaults_lookback():
     assert config.model_momentum.lookback_periods == 30
 
 
+def test_is_ma_crossover_detects_ma_crossover_model():
+    assert config_builder.is_ma_crossover({"model_name": "ma_crossover"})
+    assert config_builder.is_ma_crossover({"model_type": "ma_crossover"})
+    assert not config_builder.is_ma_crossover({"model_name": "momentum"})
+
+
+def test_build_model_config_ma_crossover_maps_windows_and_band():
+    config = config_builder.build_model_config(
+        {"model_name": "ma_crossover", "ma_short_window": 1, "ma_long_window": 200, "ma_band": 0.01}
+    )
+    assert config.model_type == "ma_crossover"
+    assert config.model_ma_crossover.short_window == 1
+    assert config.model_ma_crossover.long_window == 200
+    assert config.model_ma_crossover.band == 0.01
+
+
+def test_build_model_config_ma_crossover_defaults():
+    config = config_builder.build_model_config({"model_name": "ma_crossover"})
+    assert config.model_type == "ma_crossover"
+    assert config.model_ma_crossover.short_window == 1
+    assert config.model_ma_crossover.long_window == 50
+    assert config.model_ma_crossover.band == 0.0
+
+
+def test_is_breakout_detects_breakout_model():
+    assert config_builder.is_breakout({"model_name": "breakout"})
+    assert config_builder.is_breakout({"model_type": "breakout"})
+    assert not config_builder.is_breakout({"model_name": "ma_crossover"})
+
+
+def test_build_model_config_breakout_maps_window_and_band():
+    config = config_builder.build_model_config(
+        {"model_name": "breakout", "breakout_window": 150, "breakout_band": 0.02}
+    )
+    assert config.model_type == "breakout"
+    assert config.model_breakout.window == 150
+    assert config.model_breakout.band == 0.02
+
+
+def test_build_model_config_breakout_defaults():
+    config = config_builder.build_model_config({"model_name": "breakout"})
+    assert config.model_type == "breakout"
+    assert config.model_breakout.window == 50
+    assert config.model_breakout.band == 0.0
+
+
 def test_is_technical_detects_technical_model():
     assert config_builder.is_technical({"model_name": "technical"})
     assert config_builder.is_technical({"model_type": "technical"})

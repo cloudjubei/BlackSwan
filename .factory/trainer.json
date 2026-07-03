@@ -132,13 +132,15 @@
         "supervised-logreg",
         "supervised-gbm",
         "momentum",
+        "ma_crossover",
+        "breakout",
         "time",
         "weekday",
         "technical",
         "hodl"
       ],
       "default": "reppo-custom",
-      "description": "The algorithm / policy. Naming conventions: a bare name is the vanilla SB3 build, '-custom' uses tuned network internals, '-lstm' adds a recurrent features-extractor, '-sbx' is the JAX/SBX build. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'reppo'/'reppo-custom' = RecurrentPPO; 'trpo'/'trpo-custom' = TRPO; 'a2c'/'a2c-custom' = A2C. DQN line: 'dqn'/'dqn-custom'/'dqn-lstm'/'dqn-sbx'; dueling 'duel-dqn*'; 'munchausen-*' add the Munchausen log-policy bonus; 'rainbow-dqn'/'rainbow-dqn-custom' add prioritized experience replay (importance-weighted sampling by TD-error). Distributional: 'iqn'/'iqn-custom' (implicit quantile) and 'qrdqn'/'qrdqn-custom' (quantile-regression). 'ars'/'ars-mlp' are Augmented Random Search (gradient-free) baselines. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'momentum' is a deterministic time-series-momentum baseline (long when the trailing `momentum_lookback`-bar return is positive, flat otherwise — Moskowitz-style), a non-RL control to beat. 'time' is a deterministic time-of-day baseline — long from UTC hour `time_buy` to hour `time_sell` every day (intraday round-trip, or overnight when buy>sell); needs intraday data (timeframe=1h) and is a control + a probe for time-of-day/overnight seasonality. 'weekday' is a deterministic day-of-week baseline — long from weekday `day_buy` (0=Mon..6=Sun) to `day_sell` every week (intra-week, or across the weekend when buy>sell); runs at a daily step (timeframe=1d) and probes weekly seasonality (the Monday/day-of-week effect). 'technical' is a deterministic technical-indicator baseline — buy/sell when a chosen [-1,1]-normalised indicator (rsi10, williams10, ...) crosses `technical_buy_threshold` / `technical_sell_threshold`; defaults to classic RSI mean-reversion (oversold buy / overbought sell) and auto-enables the curated indicators. 'hodl' is the buy-and-hold control."
+      "description": "The algorithm / policy. Naming conventions: a bare name is the vanilla SB3 build, '-custom' uses tuned network internals, '-lstm' adds a recurrent features-extractor, '-sbx' is the JAX/SBX build. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'reppo'/'reppo-custom' = RecurrentPPO; 'trpo'/'trpo-custom' = TRPO; 'a2c'/'a2c-custom' = A2C. DQN line: 'dqn'/'dqn-custom'/'dqn-lstm'/'dqn-sbx'; dueling 'duel-dqn*'; 'munchausen-*' add the Munchausen log-policy bonus; 'rainbow-dqn'/'rainbow-dqn-custom' add prioritized experience replay (importance-weighted sampling by TD-error). Distributional: 'iqn'/'iqn-custom' (implicit quantile) and 'qrdqn'/'qrdqn-custom' (quantile-regression). 'ars'/'ars-mlp' are Augmented Random Search (gradient-free) baselines. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'momentum' is a deterministic time-series-momentum baseline (long when the trailing `momentum_lookback`-bar return is positive, flat otherwise — Moskowitz-style), a non-RL control to beat. 'ma_crossover' is a deterministic variable-length moving-average crossover baseline (Brock/Lakonishok/LeBaron 1992; Grobys 2020) — long when the `ma_short_window`-bar MA is above the `ma_long_window`-bar MA by more than `ma_band`, flat when below; set ma_short_window=1 for the classic 1/N price-vs-MA rule (e.g. 1/50, 1/150, 1/200, 1/20). 'breakout' is a deterministic trading-range-breakout baseline (BLL 1992) — long when price breaks above the prior `breakout_window`-bar high by more than `breakout_band`, flat when it breaks below the low (50/150/200). Both take windows in BARS, so use a daily timeframe for the papers' daily rules. 'time' is a deterministic time-of-day baseline — long from UTC hour `time_buy` to hour `time_sell` every day (intraday round-trip, or overnight when buy>sell); needs intraday data (timeframe=1h) and is a control + a probe for time-of-day/overnight seasonality. 'weekday' is a deterministic day-of-week baseline — long from weekday `day_buy` (0=Mon..6=Sun) to `day_sell` every week (intra-week, or across the weekend when buy>sell); runs at a daily step (timeframe=1d) and probes weekly seasonality (the Monday/day-of-week effect). 'technical' is a deterministic technical-indicator baseline — buy/sell when a chosen [-1,1]-normalised indicator (rsi10, williams10, ...) crosses `technical_buy_threshold` / `technical_sell_threshold`; defaults to classic RSI mean-reversion (oversold buy / overbought sell) and auto-enables the curated indicators. 'hodl' is the buy-and-hold control."
     },
     "reward_model": {
       "type": "choice",
@@ -438,6 +440,56 @@
       ],
       "appliesWhen": { "model_name": ["momentum"] },
       "description": "MOMENTUM baseline only: the trailing window (in bars) whose return SIGN sets the position — long when the price now exceeds the price this many bars ago, flat otherwise. Re-evaluated every bar. E.g. at 1d cadence 30 ≈ monthly, 252 ≈ Moskowitz's ~12-month time-series-momentum rule. Ignored by RL/supervised/hodl models."
+    },
+    "ma_short_window": {
+      "type": "number",
+      "default": 1,
+      "range": [
+        1,
+        400
+      ],
+      "appliesWhen": { "model_name": ["ma_crossover"] },
+      "description": "MA-CROSSOVER baseline only: the SHORT moving-average window, in bars. 1 makes the short MA the current price (the classic 1/N variable-MA rule, e.g. 1/50, 1/150, 1/200 from Brock et al. 1992 or 1/20 from Grobys 2020). Long when the short MA is above the long MA by more than ma_band. Ignored by other models."
+    },
+    "ma_long_window": {
+      "type": "number",
+      "default": 50,
+      "range": [
+        2,
+        400
+      ],
+      "appliesWhen": { "model_name": ["ma_crossover"] },
+      "description": "MA-CROSSOVER baseline only: the LONG moving-average window, in bars (e.g. 50, 150, 200). Windows are in BARS, so use a daily timeframe (timeframe=1d) to reproduce the papers' daily rules. Ignored by other models."
+    },
+    "ma_band": {
+      "type": "number",
+      "default": 0.0,
+      "range": [
+        0,
+        0.1
+      ],
+      "appliesWhen": { "model_name": ["ma_crossover"] },
+      "description": "MA-CROSSOVER baseline only: the fractional no-trade band around the crossover (e.g. 0.01 = 1%). A signal fires only when the short MA is above/below the long MA by more than this band; inside it the current position is held — the classic BLL/Grobys whipsaw filter. 0 = plain crossover. Ignored by other models."
+    },
+    "breakout_window": {
+      "type": "number",
+      "default": 50,
+      "range": [
+        2,
+        400
+      ],
+      "appliesWhen": { "model_name": ["breakout"] },
+      "description": "BREAKOUT baseline only: the look-back window, in bars, whose PRIOR high/low forms the trading range (e.g. 50, 150, 200 from Brock et al. 1992). Long when price breaks above the range high, flat when it breaks below the low. Windows are in BARS — use a daily timeframe for the paper's daily rules. Ignored by other models."
+    },
+    "breakout_band": {
+      "type": "number",
+      "default": 0.0,
+      "range": [
+        0,
+        0.1
+      ],
+      "appliesWhen": { "model_name": ["breakout"] },
+      "description": "BREAKOUT baseline only: the fractional band a breakout must clear (e.g. 0.01 = 1%). Price must exceed the prior high by (1+band) to go long, or fall below the prior low by (1−band) to go flat; inside the band the position is held — the BLL filter for marginal penetrations. 0 = plain breakout. Ignored by other models."
     },
     "time_buy": {
       "type": "number",

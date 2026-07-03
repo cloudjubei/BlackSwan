@@ -243,18 +243,38 @@ class ModelMomentumConfigSearch:
 class ModelMomentumConfig:
     lookback_periods: int
 @dataclass
+class ModelMaCrossoverConfigSearch:
+    short_window: List[int] = field(default_factory=lambda: [1])
+    long_window: List[int] = field(default_factory=lambda: [50])
+    band: List[float] = field(default_factory=lambda: [0.0])
+@dataclass
+class ModelMaCrossoverConfig:
+    short_window: int = 1
+    long_window: int = 50
+    band: float = 0.0
+@dataclass
+class ModelBreakoutConfigSearch:
+    window: List[int] = field(default_factory=lambda: [50])
+    band: List[float] = field(default_factory=lambda: [0.0])
+@dataclass
+class ModelBreakoutConfig:
+    window: int = 50
+    band: float = 0.0
+@dataclass
 class ModelConfigSearch:
-    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time", "momentum"]
+    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time", "momentum", "ma_crossover", "breakout"]
     model_rl: ModelRLConfigSearch | None = None
     model_regression: ModelRegressionConfigSearch | None = None
     model_supervised: ModelSupervisedConfigSearch | None = None
     model_technical: ModelTechnicalConfigSearch | None = None
     model_time: ModelTimeConfigSearch | None = None
     model_momentum: ModelMomentumConfigSearch | None = None
+    model_ma_crossover: ModelMaCrossoverConfigSearch | None = None
+    model_breakout: ModelBreakoutConfigSearch | None = None
     model_day: ModelDayConfigSearch | None = None
 @dataclass
 class ModelConfig:
-    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time", "momentum", "weekday"]
+    model_type: str # possible ["hodl", "rl", "supervised", "technical", "time", "momentum", "ma_crossover", "breakout", "weekday"]
     iterations_to_pick_best: int = 10
     # iterations_to_pick_best: int = 1
     model_rl: ModelRLConfig | None = None
@@ -263,6 +283,8 @@ class ModelConfig:
     model_technical: ModelTechnicalConfig | None = None
     model_time: ModelTimeConfig | None = None
     model_momentum: ModelMomentumConfig | None = None
+    model_ma_crossover: ModelMaCrossoverConfig | None = None
+    model_breakout: ModelBreakoutConfig | None = None
     model_day: ModelDayConfig | None = None
 
     def is_deep(self) -> bool:
