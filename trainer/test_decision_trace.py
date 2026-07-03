@@ -339,6 +339,22 @@ def test_replay_enrichment_groups_attribution_by_layer():
     assert attribution["byGroup"] == {"layer:1d": 1.0}
 
 
+def test_replay_enrichment_attaches_per_step_group_saliency():
+    # buy(1) fires step 0 (attributed); hold(0) step 1 is not attributed → carries no per-step saliency.
+    env = _ReplayEnv([[1.0, 0, 0, 0], [0.0, 0, 0, 0]], lookback=1, layers=["1d"])
+    enrichment, _ = dt.replay_enrichment(env, _Model(_QPolicy(_q_net(_W, _B))))
+    assert enrichment[0]["saliencyByGroup"] == {"layer:1d": 1.0}
+    assert "saliencyByGroup" not in enrichment[1]
+
+
+def test_replay_enrichment_omits_per_step_group_saliency_when_layout_unreconcilable():
+    # obs_dim 4 with lookback 3 can't reconcile → the run-level perFeature still ships, but no per-step group.
+    env = _ReplayEnv([[1.0, 0, 0, 0], [0.0, 0, 0, 0]], lookback=3, layers=["1d"])
+    enrichment, attribution = dt.replay_enrichment(env, _Model(_QPolicy(_q_net(_W, _B))))
+    assert "saliencyByGroup" not in enrichment[0]
+    assert len(attribution["perFeature"]) == 4
+
+
 def test_replay_enrichment_skips_unexecuted_for_attribution():
     # both steps choose buy, but the second was not executed (a no-op) → not attributed.
     env = _ReplayEnv([[1.0, 0, 0, 0], [1.0, 0, 0, 0]], made=[True, False])
@@ -461,6 +477,40 @@ def test_replay_enrichment_uses_occlusion_when_requested():
     env = _ReplayEnv([[1.0, 0, 0, 0], [0.0, 0, 0, 0]], lookback=1, layers=["1d"])
     _, attribution = dt.replay_enrichment(env, _Model(_TorchPolicy(_q_net(_W, _B))), method="occlusion")
     assert attribution["method"] == "occlusion"
+    assert attribution["byGroup"] == {"layer:1d": 1.0}
+
+
+# --- Tabular SHAP (permutation-sampled Shapley values) -----------------------
+
+
+def test_shap_values_linear_net_equals_input_contribution():
+    # For a linear value net SHAP φ_j = w_j·obs_j (baseline 0); buy(1) row = [1,0,0,0], obs feature0=1 → [1,0,0,0].
+    shap = dt._shap_values(_Model(_QPolicy(_q_net(_W, _B))).rl_model, np.array([1.0, 2.0, 3.0, 4.0]), 1)
+    assert shap is not None
+    assert abs(shap[0] - 1.0) < 1e-6
+    assert all(abs(v) < 1e-6 for v in shap[1:])
+
+
+def test_shap_values_none_without_a_value_net():
+    policy = types.SimpleNamespace(obs_to_tensor=lambda o: (torch.zeros(1, 4), None))
+    assert dt._shap_values(_Model(policy).rl_model, np.array([1.0, 0, 0, 0]), 0) is None
+
+
+def test_shap_values_deterministic_across_calls():
+    # A nonlinear (softmax) policy so the permutation sampling actually matters; seeded ⇒ reproducible.
+    model = _Model(_DistPolicy([[0.0, 1.0, 0.0], [0.5, 0, 0], [0, 0.3, 0], [0, 0, 0.2]]))
+    a = dt._shap_values(model.rl_model, np.array([1.0, 2.0, 3.0, 4.0]), 1)
+    b = dt._shap_values(model.rl_model, np.array([1.0, 2.0, 3.0, 4.0]), 1)
+    assert a is not None
+    assert np.array_equal(a, b)
+
+
+def test_replay_enrichment_uses_tabular_shap_when_requested():
+    env = _ReplayEnv([[1.0, 0, 0, 0], [0.0, 0, 0, 0]], lookback=1, layers=["1d"])
+    _, attribution = dt.replay_enrichment(
+        env, _Model(_TorchPolicy(_q_net(_W, _B))), method="tabular-shap"
+    )
+    assert attribution["method"] == "tabular-shap"
     assert attribution["byGroup"] == {"layer:1d": 1.0}
 
 

@@ -36,6 +36,10 @@ _ATTRIBUTION_MAX_SAMPLES = 256
 # Riemann-sum steps for Integrated Gradients (opt-in, `decision_trace_ig`). More steps = a tighter
 # completeness approximation at linear extra cost (one backprop each); 32 is the common default.
 _IG_STEPS = 32
+# Sampled feature orderings for permutation SHAP (opt-in, `decision_trace_method="tabular-shap"`). Each
+# ordering costs one forward pass per feature; more orderings = a tighter Shapley estimate. Exact for a
+# linear value net regardless of count; 16 is a modest default for this heavier, model-agnostic method.
+_SHAP_PERMUTATIONS = 16
 # Adebayo et al. "Sanity Checks for Saliency Maps": a FAITHFUL attribution should change when the model's
 # weights are randomized. We recompute saliency on the SAME observations with a randomly re-initialised
 # copy of the policy; if its rank-correlation with the real saliency stays AT/ABOVE this, the saliency is
@@ -249,12 +253,50 @@ def _occlusion_importance(rl_model, obs, action, baseline=0.0):
     return out
 
 
+def _shap_values(rl_model, obs, action, baseline=0.0, permutations=_SHAP_PERMUTATIONS):
+    """Permutation-sampled SHAP (Štrumbelj & Kononenko 2014): the mean marginal contribution each feature
+    makes to value[action] as it is added, over random feature orderings, from a zero baseline — a
+    model-agnostic Shapley attribution. No gradients (like occlusion), so it works for any introspectable
+    policy; deterministic (seeded orderings). Exact for a linear value net and → exact Shapley as
+    ``permutations`` → n!. Returns per-feature |attribution|, or ``None`` when the policy exposes no value."""
+    values, _, _ = _policy_action_values(rl_model, obs, action, False)
+    if values is None or action >= len(values):
+        return None
+    flat = np.asarray(obs, dtype=float).reshape(-1)
+    n = len(flat)
+    if n == 0:
+        return None
+    rng = np.random.default_rng(0)  # fixed so the attribution is reproducible across re-runs
+
+    def value_at(mask):
+        v, _, _ = _policy_action_values(rl_model, np.where(mask, flat, baseline), action, False)
+        return None if v is None or action >= len(v) else float(v[action])
+
+    base_v = value_at(np.zeros(n, dtype=bool))
+    if base_v is None:
+        return None
+    phi = np.zeros(n)
+    for _ in range(permutations):
+        mask = np.zeros(n, dtype=bool)
+        prev = base_v
+        for j in rng.permutation(n):
+            mask[j] = True
+            cur = value_at(mask)
+            if cur is None:
+                return None
+            phi[j] += cur - prev
+            prev = cur
+    return np.abs(phi / permutations)
+
+
 def _attribution_of(rl_model, obs, action, method):
     """One per-feature |attribution| for ``obs``/``action`` by the chosen ``method``."""
     if method == "integrated-gradients":
         return _integrated_gradients(rl_model, obs, action)
     if method == "occlusion":
         return _occlusion_importance(rl_model, obs, action)
+    if method == "tabular-shap":
+        return _shap_values(rl_model, obs, action)
     return _policy_action_values(rl_model, obs, action, True)[2]
 
 
@@ -430,7 +472,7 @@ def replay_enrichment(
         action_int = int(np.asarray(action).reshape(-1)[0])
 
         want_grad = budget > 0 and action_int != 0
-        if want_grad and method in ("integrated-gradients", "occlusion"):
+        if want_grad and method in ("integrated-gradients", "occlusion", "tabular-shap"):
             values, kind, _ = _policy_action_values(rl_model, obs, action_int, False)
             saliency = _attribution_of(rl_model, obs, action_int, method)
         else:
@@ -457,6 +499,9 @@ def replay_enrichment(
             saliency_count += 1
             attributed_obs.append(obs_prev)
             budget -= 1
+            step_groups = _group_attribution(saliency, env)
+            if step_groups:
+                enrich["saliencyByGroup"] = step_groups
         if done:
             break
 
