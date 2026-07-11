@@ -277,6 +277,9 @@ class ModelConfig:
     model_type: str # possible ["hodl", "rl", "supervised", "technical", "time", "momentum", "ma_crossover", "breakout", "weekday"]
     iterations_to_pick_best: int = 10
     # iterations_to_pick_best: int = 1
+    # Whether training PERSISTS the trained weights as a checkpoint file (the large .zip / .pt). The save code
+    # stays in each model, gated on this flag; the project master switch lives in config_builder.SAVE_CHECKPOINTS.
+    save_checkpoint: bool = True
     model_rl: ModelRLConfig | None = None
     model_regression: ModelRegressionConfig | None = None
     model_supervised: ModelSupervisedConfig | None = None

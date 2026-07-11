@@ -540,7 +540,10 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     if run_chart:
         artifacts["runChart"] = run_chart
     checkpoint = getattr(model, "id", None)
-    if getattr(model, "produces_checkpoint", lambda: False)() and checkpoint:
+    # Only advertise the checkpoint artifact when one was actually persisted — with save_checkpoint off there is
+    # no file, so recording the path would make --evaluate / replay fail trying to load it.
+    saved_checkpoint = getattr(getattr(model, "config", None), "save_checkpoint", True)
+    if getattr(model, "produces_checkpoint", lambda: False)() and checkpoint and saved_checkpoint:
         artifacts["checkpoint"] = f"checkpoints/{checkpoint}.zip"
         artifacts["best"] = False
     if artifacts:

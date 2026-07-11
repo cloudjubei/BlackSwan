@@ -10,8 +10,14 @@
     "name": "traded_return",
     "direction": "max"
   },
-  "pipelineVersion": "5.0",
+  "pipelineVersion": "6.0",
   "pipelineChangelog": [
+    {
+      "version": "6.0",
+      "date": "2026-07-09",
+      "breaking": true,
+      "summary": "Fidelity price/observation LOOK-AHEAD fix in the multi-timeline (resolved-from-fidelity) data provider, for the family where an hourly/minute step observes ONLY coarser layers (the run cadence AND the base are BOTH absent from layers): timeframe=1h with fidelity_set 1d or 1d+1w, plus the minute-step equivalents. MultiTimelineDataProvider never sliced self.prices/raw_df_for_plotting to the decision cadence for this family, so get_price(step) read raw base row `step` while the observation was anchored at start_index+step*divider_run — the model saw ~32 days of FUTURE price (≈767 1h bars at lookback 32) relative to the price it traded, hugely inflating returns (e.g. supervised-logreg/gbm scoring +765%/+835% traded_return in the 2022 bear window: catches the monthly trend, ~60% win rate, big winners held / tiny losers cut). Prices/plot/reward series are now anchored on the base decision bar (aligned with the observation). ONLY this coarse-only family is affected — every other config (multi-layer 1h+1d / 1h+1d+1w, single-timeline, auto, and daily-step multi-fidelity) is byte-identical to v5 and stays comparable. Affected v<6 runs are marked status=invalid (excluded from all aggregation/xAI) and matching pending-queue items cancelled — re-run for a valid result."
+    },
     {
       "version": "5.0",
       "date": "2026-06-25",
@@ -49,6 +55,13 @@
       "beforePipelineMajor": 5,
       "cancelPendingQueue": true,
       "reason": "Trained on observations ~one warmup window behind the priced/rewarded bar (multi-timeline observation/reward desync, fixed in pipeline v5). Not comparable to v5 — re-run for a valid result."
+    },
+    {
+      "id": "fidelity-lookahead-v6",
+      "kind": "fidelityLookahead",
+      "beforePipelineMajor": 6,
+      "cancelPendingQueue": true,
+      "reason": "Traded ~32 days of FUTURE price into every decision: an hourly/minute step observing ONLY coarser layers (e.g. timeframe=1h + fidelity_set=1d) left the price series un-sliced from the observation cadence, so get_price trailed the observation by the warmup window (fidelity price/observation look-ahead, fixed in pipeline v6). Returns were massively inflated — re-run for a valid result."
     }
   ],
   "migrations": [
@@ -729,6 +742,110 @@
     }
   ],
   "papers": [
+    {
+      "id": "gort-backtest-overfitting-drl-crypto-2022",
+      "title": "Deep Reinforcement Learning for Cryptocurrency Trading: Practical Approach to Address Backtest Overfitting",
+      "url": "https://arxiv.org/abs/2209.05559",
+      "authors": "Gort, Liu, Sun, Gao, Chen, Wang",
+      "year": 2022,
+      "claim": "DRL crypto-trading agents readily OVERFIT the backtest. Framing backtest overfitting as a hypothesis test and rejecting high-overfit agents, LESS-overfitted agents earn HIGHER out-of-sample return than more-overfitted ones on crypto through the volatile May–Jun 2022 period — more training over the same history pushes an agent PAST the overfitting frontier.",
+      "approach": "Estimate each agent's probability of backtest overfitting (PBO) and keep only low-PBO agents; extra passes over fixed history add gradient steps but no new information.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "crypto DRL evaluated OOS through a volatile regime — directly BlackSwan-relevant; exact cost treatment not confirmed from the abstract"
+      },
+      "verdictNote": "The strongest support for CAPPING training passes. BlackSwan's env is a DETERMINISTIC replay of fixed history, so extra `episodes` (re-passes) add gradient steps but no new information — this predicts OOS traded_return is FLAT or DECLINES as episodes rise (in-sample keeps improving = the overfitting fingerprint), with 1–2 episodes ≈ the OOS-best. Test: sweep `episodes` and watch in-sample vs OOS divergence.",
+      "tags": [
+        "rl",
+        "crypto",
+        "backtest-overfitting",
+        "episodes",
+        "sample-efficiency",
+        "oos-discipline",
+        "supports-fewer-passes"
+      ],
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "ppo-custom",
+          "timeframe": "1h",
+          "fidelity_set": "1h+1d",
+          "use_indicators": true
+        },
+        "sweep": {
+          "episodes": [1, 2, 4, 8],
+          "walk_forward_window": [2022, 2023, 2024]
+        },
+        "seeds": 3
+      },
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "montazeri-optimal-trading-history-rl-2025",
+      "title": "Finding Optimal Trading History in Reinforcement Learning for Stock Market Trading",
+      "url": "https://arxiv.org/abs/2502.12537",
+      "authors": "Montazeri, Jumakhan, Mirzaeinia",
+      "year": 2025,
+      "claim": "There is NO fixed-best observation-history length for RL trading — the optimum depends on how inputs are structured: short windows win with un-grouped features, longer windows (up to ~12 weeks) win only when features are reorganised per company. More history is NOT monotonically better.",
+      "approach": "Sweep the observation-window length for a CNN policy under different feature layouts and locate the OOS optimum.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "equities, CNN policy; BlackSwan is single-asset with no per-company feature grouping → the paper's SHORT-window regime applies"
+      },
+      "verdictNote": "Maps to BlackSwan's `lookback_window`. Single-asset (no per-company grouping) → predicts a SHORT window is OOS-best and 64 will NOT beat 16/32 out-of-sample — a concave (peaked), not monotone, response. Test: sweep `lookback_window` across windows and check the OOS peak.",
+      "tags": [
+        "rl",
+        "observation-window",
+        "lookback",
+        "optimal-history",
+        "sample-efficiency",
+        "overfitting"
+      ],
+      "replicateConfig": {
+        "fixed": {
+          "model_name": "ppo-custom",
+          "timeframe": "1h",
+          "fidelity_set": "1h+1d",
+          "use_indicators": true
+        },
+        "sweep": {
+          "lookback_window": [16, 32, 64],
+          "walk_forward_window": [2022, 2023, 2024]
+        },
+        "seeds": 2
+      },
+      "status": "untested",
+      "source": "manual"
+    },
+    {
+      "id": "hoque-rl-finance-review-2025",
+      "title": "Reinforcement Learning in Financial Decision Making: A Systematic Review of Performance, Challenges, and Implementation Strategies",
+      "url": "https://arxiv.org/abs/2512.10913",
+      "authors": "Hoque, Ferdaus, Hassan",
+      "year": 2025,
+      "claim": "Across 167 studies, IMPLEMENTATION QUALITY and DOMAIN KNOWLEDGE outweigh algorithmic complexity; the dominant open challenges are robustness under non-stationary regimes, standardised benchmarking, and interpretability — not fancier algorithms.",
+      "approach": "Systematic review of 167 RL-in-finance papers; no single experiment.",
+      "assumptions": {
+        "fees": false,
+        "netOfCosts": false,
+        "notes": "survey / methodology, not a single trading result"
+      },
+      "verdictNote": "Meta-evidence, not a direct replicate (empty spec). Backs BlackSwan's existing discipline — OOS walk-forward, seed/window robustness, cost-realism — and the 'simpler ties/beats complex' prior: demand cross-regime robustness before crediting a complex model. Consumed as the reference behind the episodes / lookback / overfitting hypotheses.",
+      "tags": [
+        "rl",
+        "survey",
+        "methodology",
+        "domain-over-complexity",
+        "robustness",
+        "benchmarking",
+        "supports-simpler-ties"
+      ],
+      "replicateConfig": {},
+      "status": "untested",
+      "source": "manual"
+    },
     {
       "id": "no-champions-tsf-2025",
       "title": "There are no Champions in Long-Term Time Series Forecasting",

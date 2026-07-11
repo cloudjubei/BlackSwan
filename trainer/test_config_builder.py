@@ -173,6 +173,26 @@ def test_build_model_config_supervised_maps_levers():
     assert config.model_supervised.seed == 7
 
 
+def test_checkpoints_disabled_project_wide_by_default():
+    # The project master switch (SAVE_CHECKPOINTS) is off, so every model type builds with save_checkpoint=False.
+    assert config_builder.SAVE_CHECKPOINTS is False
+    for cfg in (
+        {"model_name": "ppo-custom", "seed": 0},
+        {"model_name": "supervised-gbm", "seed": 0},
+        {"model_name": "hodl"},
+        {"model_name": "momentum"},
+    ):
+        assert config_builder.build_model_config(cfg).save_checkpoint is False
+
+
+def test_save_checkpoint_can_be_re_enabled_per_run():
+    # The flag stays in code — a run may opt back in without touching the master switch.
+    config = config_builder.build_model_config(
+        {"model_name": "ppo-custom", "seed": 0, "save_checkpoint": True}
+    )
+    assert config.save_checkpoint is True
+
+
 def test_is_momentum_detects_momentum_model():
     assert config_builder.is_momentum({"model_name": "momentum"})
     assert config_builder.is_momentum({"model_type": "momentum"})

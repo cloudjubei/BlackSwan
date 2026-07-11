@@ -236,3 +236,36 @@ def test_daily_step_boundary_get_values_finite_and_no_indexerror(fidelity_set, m
     for step in (0, 1, steps - 1):
         v = np.asarray(p.get_values(step))
         assert np.all(np.isfinite(v)), f"{fidelity_set} step {step}: non-finite observation"
+
+
+@pytest.mark.parametrize("fidelity_set", ["1d"])
+def test_hourly_step_coarse_only_price_anchors_on_decision_bar(fidelity_set, monkeypatch):
+    """An HOURLY step observing ONLY coarser layers (fidelity_set=1d) — the run-cadence layer is
+    NOT among the observed layers, and neither is the base (fidelity_input=1h). None of the price/plot
+    slicing branches in the provider fire for this family, so self.prices stayed the FULL base array and
+    get_price(step) read raw row `step` while the observation is anchored at start_index + step*divider_run
+    (~767 bars ahead). That desync leaks ~32 days of FUTURE price into every decision (the crazy-return
+    look-ahead in the runs audit). Invariant: get_price(step) must be the close of the SAME decision bar
+    the observation ends on, and prices must be on the decision cadence — not the full base length."""
+    p = _build("1h", fidelity_set, monkeypatch)
+    assert p.divider_run == 1 and p.fidelity_input == "1h" and p.fidelity_run == "1h"
+    assert "1h" not in list(p.layers), f"{fidelity_set}: expected the base layer to be UNobserved"
+
+    raw_price = np.asarray(p.raw_df["price"].to_numpy(), dtype=float)
+    si, dr = p.get_start_index(), p.divider_run
+    n = p.get_timesteps()
+    assert n > 5, f"{fidelity_set}: too few steps ({n}) to be a meaningful guard"
+
+    # prices must be strided to the decision cadence, not left at the full base length.
+    assert len(p.prices) == len(raw_price[si::dr]), (
+        f"{fidelity_set}: prices not sliced to decision cadence — len {len(p.prices)} vs "
+        f"{len(raw_price[si::dr])} (full base {len(raw_price)}) — price/observation desync (look-ahead)."
+    )
+    # every traded price must be the close of the decision bar the observation ends on.
+    for step in range(0, n, max(1, n // 200)):
+        anchor = si + step * dr
+        assert p.get_price(step) == raw_price[anchor], (
+            f"[{fidelity_set}] step {step}: get_price {p.get_price(step)} != decision-bar close "
+            f"{raw_price[anchor]} at raw row {anchor} — the observation is anchored here but the trade "
+            f"fills {anchor - step} bars in the past → the model observes the future (look-ahead)."
+        )

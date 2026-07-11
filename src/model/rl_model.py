@@ -54,9 +54,12 @@ class RLModel(BaseRLModel):
             # learning_starts is paid once and the exploration schedule anneals across all episodes.
             self.rl_model.learn(total_timesteps=timesteps, progress_bar=self.rl_config.progress_bar, log_interval=1000, reset_num_timesteps=(i == 0))
 
-        path = os.path.join(self.rl_config.checkpoints_folder, self.id)
-        self.rl_model.save(path)
-        print(f"Saved RL model to {path}")
+        if self.config.save_checkpoint:
+            path = os.path.join(self.rl_config.checkpoints_folder, self.id)
+            self.rl_model.save(path)
+            print(f"Saved RL model to {path}")
+        else:
+            print("Checkpoint saving disabled (config.save_checkpoint=False) — skipping RL model save")
 
     def test(self, env: AbstractEnv, deterministic: bool = True, progress_bar: bool = True):
         obs, _ = env.reset()

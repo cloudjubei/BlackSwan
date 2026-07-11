@@ -218,7 +218,21 @@ def is_technical(cfg):
     return str(cfg.get("model_name", "")).lower() == "technical" or cfg.get("model_type") == "technical"
 
 
+# Master switch for persisting model CHECKPOINTS (the large .zip / .pt weight files). DISABLED project-wide to
+# save disk — the save code stays in every model, gated on `config.save_checkpoint`. Re-enable for the whole
+# project by flipping this to True, or per run by passing cfg["save_checkpoint"]=True. (Note: with checkpoints
+# off, `--evaluate` / checkpoint-replay have nothing to load — the xAI decision trace is unaffected.)
+SAVE_CHECKPOINTS = False
+
+
 def build_model_config(cfg):
+    """One concrete ModelConfig for ``cfg``, with the project-wide checkpoint switch applied to every path."""
+    config = _build_model_config(cfg)
+    config.save_checkpoint = bool(cfg.get("save_checkpoint", SAVE_CHECKPOINTS))
+    return config
+
+
+def _build_model_config(cfg):
     """Return one concrete ModelConfig for the lever values in ``cfg``."""
     if is_hodl(cfg):
         hodl = OmegaConf.structured(ModelConfigSearch(model_type="hodl"))

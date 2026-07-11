@@ -78,6 +78,7 @@ def build_model_config(cfg):
         reg.activation_fn = [str(cfg["activation_fn"])]
     config = get_model_combinations(OmegaConf.structured(search))[0]
     config.iterations_to_pick_best = 1
+    config.save_checkpoint = bool(cfg.get("save_checkpoint", config_builder.SAVE_CHECKPOINTS))
     return config
 
 
@@ -121,7 +122,7 @@ def build_summary(env, state, cfg, model, ran_at):
         },
     }
     checkpoint = getattr(model, "id", None)
-    if checkpoint:
+    if checkpoint and getattr(getattr(model, "config", None), "save_checkpoint", True):
         summary["artifacts"] = {"checkpoint": f"checkpoints/{checkpoint}", "best": False}
     if "seed" in cfg:
         summary["seed"] = int(cfg["seed"])

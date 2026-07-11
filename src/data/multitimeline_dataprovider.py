@@ -128,6 +128,18 @@ class MultiTimelineDataProvider(AbstractDataProvider):
                         self.raw_df_for_plotting = raw_dfs[0][self.config.lookback_window_size - 1:]
                         self.prices = prices[0][self.config.lookback_window_size - 1:]
             
+            if fidelity_run not in layers and fidelity_input not in layers:
+                # No observed layer runs at the decision cadence — an hourly/minute step observing ONLY
+                # coarser layers (e.g. timeframe=1h + fidelity_set=1d, where fidelity_run=1h and the base
+                # fidelity_input=1h are BOTH absent from layers=['1d']). None of the price/plot slicing
+                # branches above fired, so self.prices / raw_df_for_plotting stayed the FULL base array and
+                # get_price(step) read raw row `step` while the observation is anchored at
+                # start_index + step*divider_run — leaking ~start_index bars of FUTURE price into every
+                # decision (RETURN_ENGINE_AUDIT.md look-ahead). Anchor the priced/plotted/rewarded series on
+                # the base decision bar, exactly like the divider_run>1 branch does for this same case.
+                self.raw_df_for_plotting = self.raw_df.iloc[self.get_start_index()::self.divider_run]
+                self.prices = self.prices[self.get_start_index()::self.divider_run]
+
             self.signals_buy_sell = self.get_rewards_buy_sell(self.raw_df_for_plotting)
             # self.raw_df_for_plotting["signal_buy_sell"] = self.signals_buy_sell
             self.signals_buy_profitable, self.signals_buy_drawdown = self.get_rewards_buy(self.raw_df_for_plotting, buyreward_percent, buyreward_maxwait)

@@ -58,9 +58,10 @@ class RegressionModel(AbstractModel):
 
             print(f"Ep [{episode}/{episodes}], Loss: {total_loss:.4f}")
 
-            path = os.path.join(self.config.model_regression.checkpoints_folder, self.id)
-            torch.save(self.model.state_dict(), path)
-            print(f"Saved Regression model to {path}")
+            if self.config.save_checkpoint:
+                path = os.path.join(self.config.model_regression.checkpoints_folder, self.id)
+                torch.save(self.model.state_dict(), path)
+                print(f"Saved Regression model to {path}")
 
 
     def test(self, env: AbstractEnv, deterministic: bool = True):

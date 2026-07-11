@@ -148,6 +148,30 @@ def test_checkpoint_artifact_only_for_models_that_produce_one():
     assert "checkpoint" not in sup_out.get("artifacts", {})
 
 
+def test_checkpoint_artifact_omitted_when_save_checkpoint_disabled():
+    # With checkpoint saving disabled (config.save_checkpoint=False) no file is written, so the summary must
+    # NOT advertise the checkpoint artifact — else --evaluate / replay would try to load a missing file.
+    env = _two_trade_env()
+    state = _state(n_trades=2, win=50.0, total_profit=2000.0, sls=1)
+
+    class _Cfg:
+        def __init__(self, save):
+            self.save_checkpoint = save
+
+    class _RLModel:
+        def __init__(self, save):
+            self.id = "rl-123"
+            self.config = _Cfg(save)
+
+        def produces_checkpoint(self):
+            return True
+
+    off = summary_mod.build_summary(env, state, _CFG, _RLModel(False), "2026-01-01T00:00:00Z", True)
+    on = summary_mod.build_summary(env, state, _CFG, _RLModel(True), "2026-01-01T00:00:00Z", True)
+    assert "checkpoint" not in off.get("artifacts", {})
+    assert on.get("artifacts", {}).get("checkpoint") == "checkpoints/rl-123.zip"
+
+
 def test_reconstructs_round_trips_with_reasons_and_pnl():
     out, _, _ = _two_trade_summary()
     ledger = out["ledger"]

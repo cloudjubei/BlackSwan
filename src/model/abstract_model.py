@@ -183,19 +183,20 @@ class BaseDeepModel(AbstractModel):
             if best_reward < total_reward:
                 best_reward = total_reward
 
-                torch.save(
-                    obj={
-                        'episode': episode,
-                        'best_reward': best_reward,
-                        'model_state_dict': model.state_dict(),
-                        'target_model_state_dict': target_model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                        'model_args': model_args,
-                        'optimizer_args': optimizer_args
-                    },
-                    f=checkpoints_path
-                )  
-                print(f"Saved {self.id} model to {checkpoints_path}")
+                if self.config.save_checkpoint:
+                    torch.save(
+                        obj={
+                            'episode': episode,
+                            'best_reward': best_reward,
+                            'model_state_dict': model.state_dict(),
+                            'target_model_state_dict': target_model.state_dict(),
+                            'optimizer_state_dict': optimizer.state_dict(),
+                            'model_args': model_args,
+                            'optimizer_args': optimizer_args
+                        },
+                        f=checkpoints_path
+                    )
+                    print(f"Saved {self.id} model to {checkpoints_path}")
 
             # Decay epsilon
             epsilon = max(epsilon_end, epsilon * epsilon_decay)
