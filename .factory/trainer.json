@@ -622,7 +622,8 @@
         0.01
       ],
       "scope": "environment",
-      "description": "Per-trade fee fraction applied to each trade (models real cost; discourages churn). ENVIRONMENT setting — defines the market, not the model."
+      "active": false,
+      "description": "Per-trade fee fraction applied to each trade (models real cost; discourages churn). ENVIRONMENT setting — defines the market, not the model. Not currently wired into the sim — excluded from sweeps until re-enabled."
     },
     "stop_loss": {
       "type": "number",
@@ -652,13 +653,21 @@
         0.01
       ],
       "scope": "environment",
-      "description": "Trailing take-profit fraction that follows the price up (0 = off). ENVIRONMENT setting — an exit mechanic, not the model."
+      "dependsOn": {
+        "lever": "take_profit",
+        "active": true
+      },
+      "description": "Trailing take-profit fraction that follows the price up (0 = off). ENVIRONMENT setting — an exit mechanic, not the model. Only has an effect when take_profit is on, so sweeps skip it otherwise."
     },
     "no_sell_action": {
       "type": "boolean",
       "scope": "environment",
       "default": false,
-      "description": "Remove the explicit sell action — exits happen only via TP/SL. Performed well in past runs."
+      "dependsOn": {
+        "lever": "allow_shorting",
+        "active": false
+      },
+      "description": "Remove the explicit sell action — exits happen only via TP/SL. Performed well in past runs. Ignored while shorting (the 5-way action space keeps sell), so sweeps skip it when allow_shorting is on."
     },
     "position_sizing": {
       "type": "choice",
@@ -668,11 +677,13 @@
         "vol_target"
       ],
       "default": "fixed",
-      "description": "How much of the balance to deploy per entry. fixed = all-in (historical default). vol_target = scale the deployed fraction to target a constant volatility (size = vol_target / recent realized vol, clamped to [0.1, 1]) — risks less in turbulent regimes, the structural fix for 'churns many trades for ~+1%'."
+      "active": false,
+      "description": "How much of the balance to deploy per entry. fixed = all-in (historical default). vol_target = scale the deployed fraction to target a constant volatility (size = vol_target / recent realized vol, clamped to [0.1, 1]) — risks less in turbulent regimes, the structural fix for 'churns many trades for ~+1%'. Not currently wired into the sim — excluded from sweeps until re-enabled."
     },
     "vol_target": {
       "type": "number",
       "scope": "environment",
+      "active": false,
       "default": 0.02,
       "range": [
         0.005,
