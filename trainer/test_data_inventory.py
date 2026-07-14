@@ -136,3 +136,14 @@ def test_has_data_false_for_missing_timeframe(tmp_path):
 def test_has_data_false_for_unknown_symbol(tmp_path):
     _touch(tmp_path, "BTCUSDT-1m-2020-09.json")
     assert has_data("DOGEUSDT", "1m", str(tmp_path)) is False
+
+
+# --- scan_stocks_inventory ---
+
+
+def test_scan_stocks_inventory_scans_a_stocks_shaped_root(tmp_path):
+    _touch(tmp_path, "NVDA-1d-2024-6.json")
+    _touch(tmp_path, "AAPL-1d-2024-6.json")
+    _touch(tmp_path, "not-a-kline.json")
+    inv = data_inventory.scan_stocks_inventory(str(tmp_path))
+    assert inv == {"AAPL": ["1d"], "NVDA": ["1d"]}

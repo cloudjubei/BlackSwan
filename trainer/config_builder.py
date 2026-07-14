@@ -77,11 +77,6 @@ def build_data_config(cfg):
     # 1m bars per decision (observe 1m micro-structure, decide coarsely). It reads the RAW 1m source
     # directly (no derive: 1m is the source of truth; coarser layers resample at runtime).
     if fspec["fidelity_input"] == "1m":
-        if asset != _SYMBOL:
-            raise SystemExit(
-                f"{asset} has no 1-minute dataset on disk — minute data is {_SYMBOL}-only until "
-                f"altcoin klines are added (deferred to the data mine)."
-            )
         train_files = _minute_files(train_pairs, asset)
         test_files = _minute_files(test_pairs, asset)
         if not train_files or not test_files:
@@ -111,10 +106,10 @@ def build_data_config(cfg):
     # 1h base (stepped day by day, the provider's divider_run handles the cadence). It needs the derived
     # cache. The 1d base path runs off raw 1d files (single 1d, or 1d+1w resampled from 1d).
     if fspec["fidelity_input"] == "1h":
-        if asset != _SYMBOL:
+        if not _minute_files(train_pairs, asset) or not _minute_files(test_pairs, asset):
             raise SystemExit(
-                f"{asset} has no intraday dataset on disk — intraday is {_SYMBOL}-only until "
-                f"altcoin klines are added (deferred to the data mine)."
+                f"binance/ 1m klines for {asset} missing for window {wf} — the 1h base derives "
+                f"from the raw minute source."
             )
         from trainer.derive_cache import ensure_derived
 

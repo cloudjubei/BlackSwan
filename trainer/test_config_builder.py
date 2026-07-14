@@ -32,9 +32,18 @@ def test_build_data_config_1d_default_window_is_the_legacy_split(monkeypatch):
     assert test == [f"2024-{m}" for m in range(1, 13)]
 
 
-def test_build_data_config_1h_uses_window_and_stays_btc_only(monkeypatch):
+def _stub_minutes(monkeypatch, files=("f",)):
+    monkeypatch.setattr(
+        config_builder,
+        "_minute_files",
+        lambda pairs, symbol=config_builder._SYMBOL: list(files),
+    )
+
+
+def test_build_data_config_1h_uses_window_pairs(monkeypatch):
     import trainer.derive_cache as dc
 
+    _stub_minutes(monkeypatch)
     monkeypatch.setattr(
         dc,
         "ensure_derived",
@@ -52,6 +61,7 @@ def test_build_data_config_1h_uses_window_and_stays_btc_only(monkeypatch):
 def test_build_data_config_fidelity_set_stacks_layers(monkeypatch):
     import trainer.derive_cache as dc
 
+    _stub_minutes(monkeypatch)
     monkeypatch.setattr(
         dc,
         "ensure_derived",
@@ -69,6 +79,7 @@ def test_build_data_config_fidelity_set_stacks_layers(monkeypatch):
 def test_build_data_config_coarser_only_stack_at_hourly_step(monkeypatch):
     import trainer.derive_cache as dc
 
+    _stub_minutes(monkeypatch)
     monkeypatch.setattr(
         dc, "ensure_derived", lambda symbol, pairs, fidelity, cache_dir=None: ["f"]
     )
@@ -84,6 +95,7 @@ def test_build_data_config_daily_step_with_finer_layers_uses_1h_base(monkeypatch
     # (fidelity_run='1d' over fidelity_input='1h') instead of failing fast.
     import trainer.derive_cache as dc
 
+    _stub_minutes(monkeypatch)
     monkeypatch.setattr(dc, "ensure_derived", lambda symbol, pairs, fidelity, cache_dir=None: ["f"])
     cfg = config_builder.build_data_config({"timeframe": "1d", "fidelity_set": "1h+1d"})
     assert list(cfg.layers) == ["1h", "1d"]
@@ -122,9 +134,20 @@ def test_build_data_config_1m_base_with_hourly_decision_cadence(monkeypatch):
     assert list(cfg.layers) == ["1m", "1h"]
 
 
-def test_build_data_config_1m_non_btc_fails_fast():
-    with pytest.raises(SystemExit):
-        config_builder.build_data_config({"asset": "ETHUSDT", "timeframe": "1m"})
+def test_build_data_config_1m_asset_without_minute_files_fails_fast():
+    with pytest.raises(SystemExit, match="1m klines for FAKEUSDT"):
+        config_builder.build_data_config({"asset": "FAKEUSDT", "timeframe": "1m"})
+
+
+def test_build_data_config_1m_altcoin_with_minute_files_builds(monkeypatch):
+    monkeypatch.setattr(
+        config_builder,
+        "_minute_files",
+        lambda pairs, symbol=config_builder._SYMBOL: [f"{symbol}-{y}-{m}" for (y, m) in pairs],
+    )
+    cfg = config_builder.build_data_config({"asset": "ETHUSDT", "timeframe": "1m"})
+    assert cfg.id.startswith("ETHUSDT-")
+    assert list(cfg.train_data_paths[0])[0] == "ETHUSDT-2020-1"
 
 
 def test_build_data_config_1m_missing_source_fails_fast(monkeypatch):
@@ -136,6 +159,7 @@ def test_build_data_config_1m_missing_source_fails_fast(monkeypatch):
 def test_build_data_config_default_1h_is_the_1h_plus_1d_stack(monkeypatch):
     import trainer.derive_cache as dc
 
+    _stub_minutes(monkeypatch)
     monkeypatch.setattr(
         dc, "ensure_derived", lambda symbol, pairs, fidelity, cache_dir=None: ["f"]
     )
@@ -147,6 +171,7 @@ def test_build_data_config_default_1h_is_the_1h_plus_1d_stack(monkeypatch):
 def test_build_data_config_lookback_window_override(monkeypatch):
     import trainer.derive_cache as dc
 
+    _stub_minutes(monkeypatch)
     monkeypatch.setattr(
         dc, "ensure_derived", lambda symbol, pairs, fidelity, cache_dir=None: ["f"]
     )
@@ -568,9 +593,21 @@ def test_build_model_config_rl_seed_passed_through_and_none_when_absent():
     assert unseeded.model_rl.seed is None
 
 
-# --- build_data_config: intraday on a non-BTC asset is rejected (no intraday altcoin klines) ---
+# --- build_data_config: intraday needs the asset's raw 1m source on disk (1h derives from 1m) ---
 
 
-def test_build_data_config_intraday_non_btc_fails_fast():
-    with pytest.raises(SystemExit, match="no intraday dataset"):
-        config_builder.build_data_config({"timeframe": "1h", "asset": "ETHUSDT"})
+def test_build_data_config_1h_asset_without_minute_files_fails_fast():
+    with pytest.raises(SystemExit, match="1m klines for FAKEUSDT"):
+        config_builder.build_data_config({"timeframe": "1h", "asset": "FAKEUSDT"})
+
+
+def test_build_data_config_1h_altcoin_with_minute_files_derives(monkeypatch):
+    import trainer.derive_cache as dc
+
+    _stub_minutes(monkeypatch)
+    monkeypatch.setattr(
+        dc, "ensure_derived", lambda symbol, pairs, fidelity, cache_dir=None: [f"{symbol}-{fidelity}"]
+    )
+    cfg = config_builder.build_data_config({"timeframe": "1h", "asset": "ETHUSDT"})
+    assert list(cfg.train_data_paths[0]) == ["ETHUSDT-1h"]
+    assert cfg.id.startswith("ETHUSDT-")

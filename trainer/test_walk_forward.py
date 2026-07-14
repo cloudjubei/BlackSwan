@@ -50,5 +50,26 @@ def test_unknown_window_fails_fast():
         resolve_walk_forward_window({"walk_forward_window": "1999"})
 
 
+def test_2025_window_extends_the_expanding_train_through_2024():
+    train, test, meta = resolve_walk_forward_window({"walk_forward_window": "2025"})
+    assert train[0] == (2020, 1)
+    assert train[-1] == (2024, 12)
+    assert test == [(2025, m) for m in range(1, 13)]
+    assert meta["test_to"] == "2025-12"
+
+
+def test_alt_windows_train_from_2022_for_assets_whose_history_starts_there():
+    train, test, meta = resolve_walk_forward_window({"walk_forward_window": "alt-2024"})
+    assert train[0] == (2022, 1)
+    assert train[-1] == (2023, 12)
+    assert test == [(2024, m) for m in range(1, 13)]
+    assert meta["train_from"] == "2022-01"
+
+    train25, test25, _ = resolve_walk_forward_window({"walk_forward_window": "alt-2025"})
+    assert train25[0] == (2022, 1)
+    assert train25[-1] == (2024, 12)
+    assert test25 == [(2025, m) for m in range(1, 13)]
+
+
 def test_window_ids_are_the_oos_years():
-    assert walk_forward_window_ids() == ["2022", "2023", "2024"]
+    assert walk_forward_window_ids() == ["2022", "2023", "2024", "2025", "alt-2024", "alt-2025"]

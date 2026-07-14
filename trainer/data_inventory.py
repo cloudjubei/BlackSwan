@@ -1,8 +1,10 @@
 """Inventory of which (symbol, timeframe) klines are actually on disk under binance/.
 
 Used to capability-gate the trainer's ``asset`` lever: only assets whose files are
-present for the requested timeframe are runnable. Today only BTCUSDT carries 1d/1h
-data; the altcoins ship 1m only (their 1d/1h backfill is deferred to the data mine).
+present for the requested timeframe are runnable. BTCUSDT carries 1m/1h/1d; the
+altcoins carry 1m (the source of truth) plus 1d derived from it, with their 1h in
+binance/derived/. stocks/ mirrors the same monthly naming for US daily klines and
+is scanned via ``scan_stocks_inventory``.
 """
 
 import glob
@@ -22,6 +24,11 @@ def scan_inventory(root="binance"):
         symbol, timeframe = match.group(1), match.group(2)
         found.setdefault(symbol, set()).add(timeframe)
     return {symbol: sorted(timeframes) for symbol, timeframes in sorted(found.items())}
+
+
+def scan_stocks_inventory(root="stocks"):
+    """``scan_inventory`` over the stocks/ daily-kline mirror (same filename convention)."""
+    return scan_inventory(root)
 
 
 def available_assets(timeframe, root="binance"):

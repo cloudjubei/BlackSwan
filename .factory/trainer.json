@@ -10,6 +10,10 @@
     "name": "traded_return",
     "direction": "max"
   },
+  "hypothesisBenchmark": {
+    "metric": "return_vs_hold_pct",
+    "threshold": 0
+  },
   "pipelineVersion": "6.0",
   "pipelineChangelog": [
     {
@@ -378,11 +382,19 @@
     "asset": {
       "type": "choice",
       "choices": [
-        "BTCUSDT"
+        "BTCUSDT",
+        "ETHUSDT",
+        "XRPUSDT",
+        "SOLUSDT",
+        "LTCUSDT",
+        "DOTUSDT",
+        "DOGEUSDT",
+        "ADAUSDT",
+        "SHIBUSDT"
       ],
       "default": "BTCUSDT",
       "scope": "dataset",
-      "description": "Which coin to train on. Only BTCUSDT has 1d/1h data today; altcoins need backfill (the data mine). DATASET setting — managed as named datasets, not a model knob."
+      "description": "Which coin to train on. BTCUSDT has full history from 2017 (1m/1h/1d, backfilled through 2026-06); the altcoins have 1m from 2022-01 with 1h/1d derived — so they need the alt-* walk-forward windows (train from 2022), NOT the plain year windows that train from 2020. DATASET setting — managed as named datasets, not a model knob."
     },
     "timeframe": {
       "type": "choice",
@@ -413,11 +425,14 @@
       "choices": [
         "2022",
         "2023",
-        "2024"
+        "2024",
+        "2025",
+        "alt-2024",
+        "alt-2025"
       ],
       "default": "2024",
       "scope": "dataset",
-      "description": "Walk-forward evaluation window — which year to TEST on, training on every year before it (2024 = train 2020-2023 / test 2024, the historical split; 2023 = train 2020-2022 / test 2023; 2022 = train 2020-2021 / test 2022). Run all three to see whether a config is robust across different market regimes OUT-OF-SAMPLE rather than tuned to one lucky year. DATASET setting — each window is a separate dataset; read them as a distribution, never as a single number."
+      "description": "Walk-forward evaluation window — which year to TEST on, training on every year before it. Plain year ids train from 2020 (2025 = train 2020-2024 / test 2025; 2024 = train 2020-2023 / test 2024, the historical split; …). The alt-* ids train from 2022 for the altcoins whose on-disk history starts there (alt-2025 = train 2022-2024 / test 2025) — use them for any non-BTC asset. Run several windows to see whether a config is robust across market regimes OUT-OF-SAMPLE rather than tuned to one lucky year. DATASET setting — each window is a separate dataset; read them as a distribution, never as a single number."
     },
     "use_indicators": {
       "type": "boolean",
@@ -442,7 +457,8 @@
         0.9
       ],
       "appliesWhen": { "model_name": ["supervised-logreg", "supervised-gbm"] },
-      "description": "SUPERVISED baseline only: go long only when the classifier's P(up) exceeds this (0.5 = act on any edge; higher = trade only high-confidence signals, fewer trades). Ignored by RL/hodl models."
+      "probabilistic": true,
+      "description": "SUPERVISED baseline only: go long only when the classifier's P(up) exceeds this (0.5 = act on any edge; higher = trade only high-confidence signals, fewer trades). Ignored by RL/hodl models. A decision CUTOFF — an edge that lives only here is easily threshold-tuned luck, so xAI flags a run whose score spread concentrates in it and doesn't hold across datasets."
     },
     "momentum_lookback": {
       "type": "number",
