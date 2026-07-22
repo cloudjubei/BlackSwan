@@ -182,7 +182,7 @@ def test_base_rl_reward_multipliers_maps_all_combo_keys():
     )
     m = _RL(cfg)
     mults = m.get_reward_multipliers()
-    assert len(mults) == 19  # 18 combo terms + combo_direct (combo_unified's direct-return weight)
+    assert len(mults) == 20  # 19 combo terms (incl. combo_drawdown_penalty) + combo_direct
     assert mults["combo_direct"] == cfg.model_rl.reward_multiplier_combo_direct
     assert mults["combo_noaction"] == 1.0
     assert mults["combo_buy"] == 2.0

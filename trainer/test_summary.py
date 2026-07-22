@@ -392,9 +392,17 @@ def test_run_chart_marks_short_and_cover():
 
 def test_risk_metrics_are_dropped():
     out, _, _ = _two_trade_summary()
-    for key in ("sharpe", "cagr_pct", "max_drawdown_pct", "sharpe_alpha",
+    for key in ("sharpe", "cagr_pct", "sharpe_alpha",
                 "worst_window_return_pct", "windows_profitable_pct"):
         assert key not in out["metrics"]
+
+
+def test_max_drawdown_pct_is_emitted():
+    # The one risk metric kept: the worst peak-to-trough decline of the test-window equity curve, as a
+    # signed percent (<= 0). Powers the Diagnosis tab's risk lens and the combo_drawdown_penalty experiment.
+    out, _, _ = _two_trade_summary()
+    assert "max_drawdown_pct" in out["metrics"]
+    assert out["metrics"]["max_drawdown_pct"] <= 0
 
 
 def test_benchmark_is_hold_return_only():

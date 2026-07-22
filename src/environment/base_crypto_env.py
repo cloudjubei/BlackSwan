@@ -381,12 +381,18 @@ class BaseCryptoEnv(AbstractEnv):
         base = self._calculate_reward()
         turnover_penalty = self._turnover_penalty()
         noop_penalty = self._noop_penalty()
-        reward = base - turnover_penalty - noop_penalty
+        drawdown_penalty = self._drawdown_penalty()
+        reward = base - turnover_penalty - noop_penalty - drawdown_penalty
         self.total_reward += reward
         self.rewards.append(self.total_reward)
         self.rewards_history.append(reward)
         self.reward_components.append(
-            {"base": base, "turnover_penalty": -turnover_penalty, "noop_penalty": -noop_penalty}
+            {
+                "base": base,
+                "turnover_penalty": -turnover_penalty,
+                "noop_penalty": -noop_penalty,
+                "drawdown_penalty": -drawdown_penalty,
+            }
         )
         return reward
 
@@ -434,6 +440,20 @@ class BaseCryptoEnv(AbstractEnv):
             return 0.0
         weight = self.reward_multipliers.get("combo_fee_penalty", default)
         return self.transaction_fee_multiplier * weight
+
+    def _drawdown_penalty(self):
+        # combo_unified only: cost of sitting in an open position that is under water. `self.drawdowns[-1]`
+        # is the current open-position peak-to-trough return (<= 0, resets to 0 when flat), updated each step
+        # BEFORE the reward (update_drawdown runs before update_reward in step). A `weight * |drawdown|` cost
+        # pushes the agent to CUT a losing hold rather than sit in it — a lever to test whether drawdown
+        # aversion makes hold-forever (zero-trade) policies actually exit and trade. Default 0 = off, so a
+        # combo_unified run with the weight unset is byte-for-byte identical to before.
+        if self.reward_model != "combo_unified":
+            return 0.0
+        weight = self.reward_multipliers.get("combo_drawdown_penalty", 0.0)
+        if not weight or not self.drawdowns:
+            return 0.0
+        return weight * abs(self.drawdowns[-1])
 
     def step(self, action):
         # make sure action is one value

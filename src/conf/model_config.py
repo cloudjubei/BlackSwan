@@ -55,6 +55,7 @@ class ModelRLConfigSearch:
     reward_multiplier_combo_hold_drawdown: List[float] = field(default_factory=list)
     reward_multiplier_combo_fee_penalty: List[float] = field(default_factory=list)
     reward_multiplier_combo_noop_penalty: List[float] = field(default_factory=list)
+    reward_multiplier_combo_drawdown_penalty: List[float] = field(default_factory=list)
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
@@ -120,6 +121,7 @@ class ModelRLConfig:
     reward_multiplier_combo_hold_drawdown: float = 0
     reward_multiplier_combo_fee_penalty: float = 1.0
     reward_multiplier_combo_noop_penalty: float = 0.001
+    reward_multiplier_combo_drawdown_penalty: float = 0
 
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'

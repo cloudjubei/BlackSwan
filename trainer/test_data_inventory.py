@@ -147,3 +147,56 @@ def test_scan_stocks_inventory_scans_a_stocks_shaped_root(tmp_path):
     _touch(tmp_path, "not-a-kline.json")
     inv = data_inventory.scan_stocks_inventory(str(tmp_path))
     assert inv == {"AAPL": ["1d"], "NVDA": ["1d"]}
+
+
+# --- scan_coverage ---
+
+
+def test_scan_coverage_reports_range_and_count(tmp_path):
+    _touch(tmp_path, "BTCUSDT-1m-2020-9.json")
+    _touch(tmp_path, "BTCUSDT-1m-2020-10.json")
+    _touch(tmp_path, "BTCUSDT-1m-2020-11.json")
+    cov = data_inventory.scan_coverage(str(tmp_path))
+    assert cov == {
+        "BTCUSDT": {"1m": {"start": "2020-09", "end": "2020-11", "months": 3, "gaps": []}}
+    }
+
+
+def test_scan_coverage_detects_a_gap(tmp_path):
+    _touch(tmp_path, "BTCUSDT-1m-2020-1.json")
+    _touch(tmp_path, "BTCUSDT-1m-2020-3.json")  # February missing
+    assert cov_entry(tmp_path, "BTCUSDT", "1m") == {
+        "start": "2020-01",
+        "end": "2020-03",
+        "months": 2,
+        "gaps": ["2020-02"],
+    }
+
+
+def test_scan_coverage_gap_spans_a_year_boundary(tmp_path):
+    _touch(tmp_path, "BTCUSDT-1d-2020-11.json")
+    _touch(tmp_path, "BTCUSDT-1d-2021-2.json")
+    assert cov_entry(tmp_path, "BTCUSDT", "1d")["gaps"] == ["2020-12", "2021-01"]
+
+
+def test_scan_coverage_groups_timeframes_and_symbols(tmp_path):
+    _touch(tmp_path, "BTCUSDT-1m-2020-1.json")
+    _touch(tmp_path, "BTCUSDT-1d-2020-1.json")
+    _touch(tmp_path, "ETHUSDT-1m-2022-1.json")
+    cov = data_inventory.scan_coverage(str(tmp_path))
+    assert set(cov.keys()) == {"BTCUSDT", "ETHUSDT"}
+    assert set(cov["BTCUSDT"].keys()) == {"1d", "1m"}
+
+
+def test_scan_coverage_empty_dir(tmp_path):
+    assert data_inventory.scan_coverage(str(tmp_path)) == {}
+
+
+def test_scan_coverage_ignores_non_kline_files(tmp_path):
+    _touch(tmp_path, "README.json")
+    _touch(tmp_path, "BTCUSDT-1h-bad.json")
+    assert data_inventory.scan_coverage(str(tmp_path)) == {}
+
+
+def cov_entry(tmp_path, symbol, tf):
+    return data_inventory.scan_coverage(str(tmp_path))[symbol][tf]

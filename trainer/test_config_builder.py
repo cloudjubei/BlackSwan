@@ -393,16 +393,20 @@ def test_build_model_config_shared_lstm_ignored_for_non_recurrent_model():
 
 
 def test_build_model_config_maps_penalty_multipliers():
-    config = config_builder.build_model_config({"combo_noop_penalty": 0.02, "combo_fee_penalty": 2.5})
+    config = config_builder.build_model_config(
+        {"combo_noop_penalty": 0.02, "combo_fee_penalty": 2.5, "combo_drawdown_penalty": 3.0}
+    )
     assert config.model_rl.reward_multiplier_combo_noop_penalty == 0.02
     assert config.model_rl.reward_multiplier_combo_fee_penalty == 2.5
+    assert config.model_rl.reward_multiplier_combo_drawdown_penalty == 3.0
 
 
 def test_build_model_config_penalty_multipliers_default():
-    # combo_unified defaults BOTH penalties OFF (0) so a bare run ≡ the old combo_all (see build_model_config).
+    # combo_unified defaults the penalties OFF (0) so a bare run ≡ the old combo_all (see build_model_config).
     config = config_builder.build_model_config({})
     assert config.model_rl.reward_multiplier_combo_noop_penalty == 0.0
     assert config.model_rl.reward_multiplier_combo_fee_penalty == 0.0
+    assert config.model_rl.reward_multiplier_combo_drawdown_penalty == 0.0
 
 
 def test_require_data_present_checks_the_selected_window(monkeypatch):

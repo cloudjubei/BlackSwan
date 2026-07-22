@@ -124,15 +124,37 @@ def test_update_reward_records_additive_components_summing_to_the_reward():
     e._calculate_reward = lambda: 5.0
     e._turnover_penalty = lambda: 0.5
     e._noop_penalty = lambda: 0.2
+    e._drawdown_penalty = lambda: 0.1
     e.total_reward = 0.0
     e.rewards = []
     e.rewards_history = []
     e.reward_components = []
     reward = e.update_reward()
-    assert abs(reward - (5.0 - 0.5 - 0.2)) < 1e-9
+    assert abs(reward - (5.0 - 0.5 - 0.2 - 0.1)) < 1e-9
     comp = e.reward_components[-1]
-    assert comp == {"base": 5.0, "turnover_penalty": -0.5, "noop_penalty": -0.2}
+    assert comp == {"base": 5.0, "turnover_penalty": -0.5, "noop_penalty": -0.2, "drawdown_penalty": -0.1}
     assert abs(sum(comp.values()) - reward) < 1e-9  # components are additive contributions
+
+
+def test_drawdown_penalty_scales_with_open_drawdown_under_combo_unified():
+    e = BaseCryptoEnv.__new__(BaseCryptoEnv)
+    e.reward_model = "combo_unified"
+    e.reward_multipliers = {"combo_drawdown_penalty": 2.0}
+    e.drawdowns = [-0.15]
+    assert e._drawdown_penalty() == pytest.approx(2.0 * 0.15)
+
+
+def test_drawdown_penalty_off_by_default_and_for_other_rewards():
+    e = BaseCryptoEnv.__new__(BaseCryptoEnv)
+    # combo_unified with the weight absent/0 => byte-for-byte unchanged (no penalty)
+    e.reward_model = "combo_unified"
+    e.reward_multipliers = {}
+    e.drawdowns = [-0.15]
+    assert e._drawdown_penalty() == 0.0
+    # a non-unified reward never applies the penalty even with a weight set
+    e.reward_model = "combo_all"
+    e.reward_multipliers = {"combo_drawdown_penalty": 2.0}
+    assert e._drawdown_penalty() == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -551,6 +573,7 @@ def test_update_reward_subtracts_penalties_and_tracks_totals():
     e._calculate_reward = lambda: 1.0
     e._turnover_penalty = lambda: 0.2
     e._noop_penalty = lambda: 0.1
+    e._drawdown_penalty = lambda: 0.0
     e.total_reward = 5.0
     e.rewards = []
     e.rewards_history = []

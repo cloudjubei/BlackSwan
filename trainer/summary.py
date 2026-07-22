@@ -451,6 +451,25 @@ def _oos_stats(equity):
     }
 
 
+def _max_drawdown_pct(equity):
+    """Worst peak-to-trough decline of the test-window equity curve, as a signed percent (<= 0, 0 when the
+    curve never dips below a prior peak). The one risk metric surfaced — the Diagnosis tab's risk lens and the
+    yardstick for the combo_drawdown_penalty experiment. Empty (skippable via metrics.update) when too short."""
+    eq = [_finite(x) for x in equity]
+    if len(eq) < 2:
+        return {}
+    peak = eq[0]
+    mdd = 0.0
+    for x in eq:
+        if x > peak:
+            peak = x
+        if peak > 0:
+            dd = x / peak - 1.0
+            if dd < mdd:
+                mdd = dd
+    return {"max_drawdown_pct": _finite(mdd * 100)}
+
+
 def build_summary(env, state, cfg, model, ran_at, is_rl):
     lookback = _lookback(env, cfg)
     fidelity = resolve_fidelity(cfg)[1]["fidelity_run"]
@@ -485,6 +504,7 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         "realized_cost_bps": _finite(fees_paid / initial * 10000) if initial else 0.0,
     }
     metrics.update(_oos_stats(equity))
+    metrics.update(_max_drawdown_pct(equity))
     benchmark = _benchmark(env, lookback)
     if benchmark:
         metrics["hold_return_pct"] = benchmark["hold_return_pct"]

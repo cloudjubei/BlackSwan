@@ -5,6 +5,8 @@
   "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
   "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
   "benchmarkDevice": ".venv/bin/python -m trainer.bench_device --summary-out {summaryOut}",
+  "dataCatalog": ".venv/bin/python -m trainer.data_cli catalog --out {summaryOut}",
+  "mineData": ".venv/bin/python -m trainer.data_cli mine --request {configPath} --out {summaryOut}",
   "maxThreadsPerRun": 2,
   "objective": {
     "name": "traded_return",
@@ -211,6 +213,18 @@
         "reward_model": ["combo_unified"]
       },
       "description": "Weight on the per-trade turnover penalty (penalty = transaction_fee × this) that discourages over-trading/churn. 0 = off (the default). The old combo_all_fee was this turned on (1.0)."
+    },
+    "combo_drawdown_penalty": {
+      "type": "number",
+      "default": 0,
+      "range": [
+        0,
+        100
+      ],
+      "appliesWhen": {
+        "reward_model": ["combo_unified"]
+      },
+      "description": "Weight on a per-step drawdown penalty (penalty = this × |current open-position drawdown|) that makes holding a losing position costly, pushing the agent to CUT rather than sit in it. 0 = off (the default, so a combo_unified run is unchanged). An experiment lever: does drawdown aversion make hold-forever / zero-trade policies actually exit and trade? (Prior attempts suggest it may just silence trading rather than help — treat as a falsifiable test.)"
     },
     "combo_sell": {
       "type": "number",

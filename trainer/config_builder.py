@@ -329,6 +329,7 @@ def _build_model_config(cfg):
     # combo_unified defaults the two penalties OFF (0) so a bare combo_unified run ≡ the old combo_all.
     rl.reward_multiplier_combo_fee_penalty = [float(cfg.get("combo_fee_penalty", 0))]
     rl.reward_multiplier_combo_noop_penalty = [float(cfg.get("combo_noop_penalty", 0))]
+    rl.reward_multiplier_combo_drawdown_penalty = [float(cfg.get("combo_drawdown_penalty", 0))]
     # combo_unified exposes the remaining combo weights as levers. Only override the baked model_rl value
     # when the run actually carries the key, so the existing reward models are unchanged: a migrated
     # combo_all run sets combo_wrongaction=0 (combo_unified then adds nothing), while a migrated combo_all2
