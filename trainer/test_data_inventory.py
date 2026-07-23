@@ -200,3 +200,39 @@ def test_scan_coverage_ignores_non_kline_files(tmp_path):
 
 def cov_entry(tmp_path, symbol, tf):
     return data_inventory.scan_coverage(str(tmp_path))[symbol][tf]
+
+
+# --- scan_series_coverage (point-in-time release series, not OHLCV klines) ---
+
+
+def _write_series(root, name, obs):
+    import json
+
+    with open(os.path.join(root, name + ".json"), "w") as f:
+        json.dump(obs, f)
+
+
+def test_scan_series_coverage_summarizes_a_release_series(tmp_path):
+    _write_series(tmp_path, "UNRATE", [
+        {"refPeriod": "2024-01", "releaseDate": "2024-02-02", "value": 3.7},
+        {"refPeriod": "2024-02", "releaseDate": "2024-03-08", "value": 3.9},
+    ])
+    cov = data_inventory.scan_series_coverage(str(tmp_path))
+    assert cov == {"UNRATE": {"release": {"start": "2024-02", "end": "2024-03", "months": 2, "gaps": []}}}
+
+
+def test_scan_series_coverage_empty_dir(tmp_path):
+    assert data_inventory.scan_series_coverage(str(tmp_path)) == {}
+
+
+def test_scan_series_coverage_skips_empty_and_non_list_files(tmp_path):
+    _write_series(tmp_path, "EMPTY", [])
+    _write_series(tmp_path, "OBJ", {"not": "a list"})
+    (tmp_path / "README.txt").write_text("x")
+    assert data_inventory.scan_series_coverage(str(tmp_path)) == {}
+
+
+def test_scan_series_coverage_sorts_names(tmp_path):
+    _write_series(tmp_path, "ZZZ", [{"releaseDate": "2024-01-01"}])
+    _write_series(tmp_path, "AAA", [{"releaseDate": "2024-01-01"}])
+    assert list(data_inventory.scan_series_coverage(str(tmp_path)).keys()) == ["AAA", "ZZZ"]

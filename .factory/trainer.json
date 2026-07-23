@@ -4,6 +4,8 @@
   "description": "BlackSwan trains reinforcement-learning agents to trade a SINGLE crypto asset (BTCUSDT) on the spot market, long-only by default, under realistic 0.1% per-trade fees. Each run trains on historical klines and is tested OUT-OF-SAMPLE (walk-forward windows 2022/2023/2024, expanding train); the agent observes multi-timeframe OHLCV (e.g. stacked 1h+1d layers) plus optional technical indicators. The objective is traded_return = total post-fee return gated by trade frequency (trade often AND well — a near-hold run scores ~0). In the strong presets the agent has NO explicit sell action (no_sell_action): it only times entries and exits are forced by take-profit/stop-loss/trailing-stop — so 'many buys, few sells' is by design, not a bug. 'Good' = a setup that trades often and profitably AND beats buy-and-hold (positive return_vs_hold_pct) net of fees, stable across seeds and walk-forward windows.",
   "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
   "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
+  "evaluate": ".venv/bin/python -m trainer.run --evaluate --config-json {configPath} --summary-out {summaryOut}",
+  "keepCheckpointKey": "save_checkpoint",
   "benchmarkDevice": ".venv/bin/python -m trainer.bench_device --summary-out {summaryOut}",
   "dataCatalog": ".venv/bin/python -m trainer.data_cli catalog --out {summaryOut}",
   "mineData": ".venv/bin/python -m trainer.data_cli mine --request {configPath} --out {summaryOut}",
@@ -442,11 +444,15 @@
         "2024",
         "2025",
         "alt-2024",
-        "alt-2025"
+        "alt-2025",
+        "oos-2024",
+        "oos-2025",
+        "alt-oos-2024",
+        "alt-oos-2025"
       ],
       "default": "2024",
       "scope": "dataset",
-      "description": "Walk-forward evaluation window — which year to TEST on, training on every year before it. Plain year ids train from 2020 (2025 = train 2020-2024 / test 2025; 2024 = train 2020-2023 / test 2024, the historical split; …). The alt-* ids train from 2022 for the altcoins whose on-disk history starts there (alt-2025 = train 2022-2024 / test 2025) — use them for any non-BTC asset. Run several windows to see whether a config is robust across market regimes OUT-OF-SAMPLE rather than tuned to one lucky year. DATASET setting — each window is a separate dataset; read them as a distribution, never as a single number."
+      "description": "Walk-forward evaluation window — which year to TEST on, training on every year before it. Plain year ids train from 2020 (2025 = train 2020-2024 / test 2025; 2024 = train 2020-2023 / test 2024, the historical split; …). The alt-* ids train from 2022 for the altcoins whose on-disk history starts there (alt-2025 = train 2022-2024 / test 2025) — use them for any non-BTC asset. The oos-* ids test the FULL out-of-sample span from the cutoff through the latest data on disk (oos-2024 = train 2020-2023 / test 2024→latest) — use them to evaluate on ALL data after the training cutoff, not just one year. Run several windows to see whether a config is robust across market regimes OUT-OF-SAMPLE rather than tuned to one lucky year. DATASET setting — each window is a separate dataset; read them as a distribution, never as a single number."
     },
     "use_indicators": {
       "type": "boolean",

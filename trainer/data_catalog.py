@@ -19,10 +19,15 @@ CRYPTO = "crypto"
 STOCKS = "stocks"
 COMMODITIES = "commodities"
 FX = "fx"
+ETFS = "etfs"                  # sector/thematic ETFs — tradeable + used as asset-linkage proxies
+MACRO = "macro"                # US macro-economic series (point-in-time)
+FUNDAMENTALS = "fundamentals"  # company fundamentals (point-in-time)
 
 # Source ids -> which miner fetches the instrument.
 BINANCE = "binance"      # data.binance.vision monthly archives (scripts.backfill_klines)
 YFINANCE = "yfinance"    # yfinance daily bars (scripts.backfill_market / backfill_stocks)
+FRED = "fred"            # FRED/ALFRED point-in-time vintages (scripts.backfill_macro)
+EDGAR = "edgar"          # SEC EDGAR companyfacts, filing-date stamped (scripts.backfill_fundamentals)
 
 
 @dataclass(frozen=True)
@@ -62,6 +67,20 @@ def _commodity(symbol, label, source_symbol, tier, settle):
 
 def _fx(symbol, label, source_symbol, tier):
     return Instrument(symbol, label, FX, YFINANCE, source_symbol, "fx", ("1d",), tier, _FX_CLOSE)
+
+
+def _etf(symbol, label, tier):
+    return Instrument(symbol, label, ETFS, YFINANCE, symbol, "etfs", ("1d",), tier, _EQUITY_CLOSE)
+
+
+def _macro(series_id, label, tier, publish_time):
+    # Macro/fundamentals are RELEASE series, not klines — one file per series, timeframe "release". The
+    # bar-close is the actual publish wall-clock (the point-in-time anchor the leakage-guard fusion uses).
+    return Instrument(series_id, label, MACRO, FRED, series_id, "macro", ("release",), tier, "America/New_York " + publish_time)
+
+
+def _fundamental(ticker, label, tier):
+    return Instrument(ticker, label, FUNDAMENTALS, EDGAR, ticker, "fundamentals", ("release",), tier, "America/New_York (filing date)")
 
 
 # Top-5 crypto (tiers 1-5) plus the remaining coins already on disk (tiers 6-9), so nothing acquired is
@@ -114,14 +133,67 @@ _FX = [
     _fx("USDCAD", "US Dollar / Canadian Dollar", "USDCAD=X", 5),
 ]
 
+# US macro starter set (FRED series ids). ISM/PMI intentionally omitted (removed from FRED for licensing).
+# Publish wall-clock per series: 08:30 ET data drops, 14:00 FOMC, 16:15 H.15 rates (see pit_fusion).
+_MACRO = [
+    _macro("UNRATE", "Unemployment rate", 1, "08:30"),
+    _macro("PAYEMS", "Nonfarm payrolls", 2, "08:30"),
+    _macro("CPIAUCNS", "CPI (NSA)", 3, "08:30"),
+    _macro("CPIAUCSL", "CPI (SA)", 4, "08:30"),
+    _macro("PCEPILFE", "Core PCE price index", 5, "08:30"),
+    _macro("ICSA", "Initial jobless claims", 6, "08:30"),
+    _macro("RSAFS", "Advance retail sales", 7, "08:30"),
+    _macro("GDPC1", "Real GDP", 8, "08:30"),
+    _macro("DFEDTARU", "Fed funds target (upper)", 9, "14:00"),
+    _macro("DFF", "Fed funds effective", 10, "16:00"),
+    _macro("DGS10", "10Y Treasury yield", 11, "16:15"),
+    _macro("T10Y2Y", "10Y-2Y yield spread", 12, "16:15"),
+    _macro("DFII10", "10Y real yield (TIPS)", 13, "16:15"),
+]
+
+# Company fundamentals (point-in-time via EDGAR) for the catalogued US stocks. Symbols are the tickers —
+# they intentionally mirror the stocks class (fundamentals augment a stock), so lookups/mining scope by class.
+_FUNDAMENTALS = [
+    _fundamental("NVDA", "NVIDIA fundamentals", 1),
+    _fundamental("MSFT", "Microsoft fundamentals", 2),
+    _fundamental("AAPL", "Apple fundamentals", 3),
+    _fundamental("GOOGL", "Alphabet fundamentals", 4),
+    _fundamental("AMZN", "Amazon fundamentals", 5),
+    _fundamental("META", "Meta Platforms fundamentals", 6),
+    _fundamental("AVGO", "Broadcom fundamentals", 7),
+    _fundamental("TSLA", "Tesla fundamentals", 8),
+    _fundamental("JPM", "JPMorgan Chase fundamentals", 9),
+    _fundamental("WMT", "Walmart fundamentals", 10),
+]
+
+# Sector/thematic ETFs — tradeable in their own right AND the mineable proxies the linkage graph points
+# at (semiconductors, lithium, energy, financials, airlines, gold miners). yfinance daily, equity close.
+_ETFS = [
+    _etf("SOXX", "iShares Semiconductor ETF", 1),
+    _etf("SMH", "VanEck Semiconductor ETF", 2),
+    _etf("LIT", "Global X Lithium & Battery ETF", 3),
+    _etf("XLE", "Energy Select Sector SPDR", 4),
+    _etf("XLF", "Financial Select Sector SPDR", 5),
+    _etf("JETS", "US Global Jets ETF", 6),
+    _etf("GDX", "VanEck Gold Miners ETF", 7),
+]
+
 _CLASSES = [
     (CRYPTO, "Crypto", "binance", _CRYPTO),
     (STOCKS, "US Stocks", "stocks", _STOCKS),
     (COMMODITIES, "Commodities", "commodities", _COMMODITIES),
     (FX, "FX", "fx", _FX),
+    (ETFS, "ETFs", "etfs", _ETFS),
+    (MACRO, "US Macro", "macro", _MACRO),
+    (FUNDAMENTALS, "Fundamentals", "fundamentals", _FUNDAMENTALS),
 ]
 
-_BY_SYMBOL = {inst.symbol: inst for _, _, _, insts in _CLASSES for inst in insts}
+# First-writer-wins so a bare symbol resolves to its PRICE instrument (stocks precede fundamentals), while
+# a class-scoped lookup reaches the fundamentals/macro one.
+_BY_SYMBOL = {}
+for _, _, _, _insts in _CLASSES:
+    for _inst in _insts:
+        _BY_SYMBOL.setdefault(_inst.symbol, _inst)
 
 
 def _instrument_dict(inst: Instrument) -> dict:
@@ -143,8 +215,15 @@ def instruments() -> List[Instrument]:
     return [inst for _, _, _, insts in _CLASSES for inst in insts]
 
 
-def instrument(symbol: str) -> Optional[Instrument]:
-    """The instrument for a local ``symbol``, or ``None`` if it isn't catalogued."""
+def instrument(symbol: str, asset_class: Optional[str] = None) -> Optional[Instrument]:
+    """The instrument for a local ``symbol``, or ``None`` if it isn't catalogued. When ``asset_class`` is
+    given, resolve WITHIN that class (so a fundamentals ``AAPL`` is reachable distinctly from the stock
+    ``AAPL``); otherwise a bare symbol resolves to its price instrument (first-writer-wins)."""
+    if asset_class is not None:
+        for inst in instruments():
+            if inst.symbol == symbol and inst.asset_class == asset_class:
+                return inst
+        return None
     return _BY_SYMBOL.get(symbol)
 
 

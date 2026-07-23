@@ -89,12 +89,21 @@ def test_mine_one_dispatches_yfinance_with_local_and_source_symbol(monkeypatch):
 
 def test_mine_one_with_no_intervals_mines_nothing(monkeypatch):
     # A narrowed-to-empty interval set (an all-unsupported request) must stay a no-op, not fall back to
-    # mining every native timeframe.
+    # mining every native timeframe. This holds for EVERY source, not just Binance.
     called = []
     monkeypatch.setattr(cli, "backfill_series", lambda *a, **k: called.append(a) or {"written": [], "skipped": 0, "errors": [], "gaps": []})
     res = cli.mine_one(data_catalog.instrument("BTCUSDT"), [], (2026, 1))
     assert called == []
     assert res["written"] == 0
+
+
+def test_mine_one_empty_intervals_is_a_noop_for_yfinance_and_fred(monkeypatch):
+    yf, fred = [], []
+    monkeypatch.setattr(cli, "backfill_yf_symbol", lambda *a, **k: yf.append(a) or {"written": [(2025, 1)], "skipped": 0, "errors": [], "gaps": []})
+    monkeypatch.setattr(cli, "backfill_series_macro", lambda *a, **k: fred.append(a) or {"written": 1, "observations": 5, "errors": []})
+    assert cli.mine_one(data_catalog.instrument("GOLD"), [], (2025, 1))["written"] == 0
+    assert cli.mine_one(data_catalog.instrument("UNRATE"), [], (2025, 1))["written"] == 0
+    assert yf == [] and fred == []
 
 
 def test_mine_one_dispatches_binance_per_interval_and_derives_for_altcoins(monkeypatch):
@@ -123,12 +132,78 @@ def test_mine_one_dispatches_binance_per_interval_and_derives_for_altcoins(monke
 # --- main: the two subcommands write JSON summaries ---
 
 
+def test_plan_mine_scopes_symbols_to_a_class_for_colliding_tickers():
+    # A fundamentals AAPL (colliding with the stock AAPL) is reachable by scoping the class.
+    targets, unknown = cli.plan_mine({"symbols": ["AAPL"], "class": "fundamentals"})
+    assert targets[0][0].asset_class == "fundamentals"
+    assert unknown == []
+    # Without the class, a bare AAPL is the stock price.
+    targets2, _ = cli.plan_mine({"symbols": ["AAPL"]})
+    assert targets2[0][0].asset_class == "stocks"
+
+
+def test_plan_mine_by_macro_class():
+    targets, _ = cli.plan_mine({"class": "macro"})
+    assert "UNRATE" in [t[0].symbol for t in targets]
+
+
+def test_mine_one_dispatches_fred_for_macro(monkeypatch):
+    seen = {}
+
+    def fake_macro(series_id, out_dir, dry_run=False):
+        seen["args"] = (series_id, out_dir)
+        return {"symbol": series_id, "written": 1, "observations": 100, "errors": []}
+
+    monkeypatch.setattr(cli, "backfill_series_macro", fake_macro)
+    result = cli.mine_one(data_catalog.instrument("UNRATE"), ["release"], (2026, 1))
+    assert seen["args"] == ("UNRATE", "macro")
+    assert result["source"] == data_catalog.FRED
+    assert result["written"] == 1
+    assert result["observations"] == 100
+
+
+def test_mine_one_dispatches_edgar_for_fundamentals(monkeypatch):
+    seen = {}
+
+    def fake_edgar(ticker, out_dir, dry_run=False):
+        seen["args"] = (ticker, out_dir)
+        return {"symbol": ticker, "written": 1, "observations": 50, "errors": []}
+
+    monkeypatch.setattr(cli, "backfill_ticker_fundamentals", fake_edgar)
+    result = cli.mine_one(data_catalog.instrument("AAPL", "fundamentals"), ["release"], (2026, 1))
+    assert seen["args"] == ("AAPL", "fundamentals")
+    assert result["source"] == data_catalog.EDGAR
+    assert result["written"] == 1
+
+
+def test_build_full_catalog_uses_series_coverage_for_macro(tmp_path):
+    macro = tmp_path / "macro"
+    macro.mkdir()
+    (macro / "UNRATE.json").write_text(
+        json.dumps([{"refPeriod": "2024-01", "releaseDate": "2024-02-02", "value": 3.7}])
+    )
+    cat = cli.build_full_catalog(str(tmp_path))
+    unrate = next(i for c in cat for i in c["instruments"] if i["symbol"] == "UNRATE")
+    assert unrate["onDisk"]["release"]["months"] == 1
+
+
 def test_main_catalog_writes_the_catalog_summary(tmp_path, monkeypatch):
     out = tmp_path / "cat.json"
     monkeypatch.chdir(tmp_path)  # empty root => everything off-disk
     assert cli.main(["catalog", "--out", str(out)]) == 0
     data = json.loads(out.read_text())
-    assert [c["id"] for c in data["assetClasses"]] == ["crypto", "stocks", "commodities", "fx"]
+    assert [c["id"] for c in data["assetClasses"]] == [
+        "crypto",
+        "stocks",
+        "commodities",
+        "fx",
+        "etfs",
+        "macro",
+        "fundamentals",
+    ]
+    # The catalog emit also carries the asset-linkage graph.
+    assert "edges" in data["linkage"]
+    assert data["linkage"]["edges"]
 
 
 def test_main_mine_reads_request_and_writes_result(tmp_path, monkeypatch):

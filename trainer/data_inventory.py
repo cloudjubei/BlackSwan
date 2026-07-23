@@ -8,6 +8,7 @@ is scanned via ``scan_stocks_inventory``.
 """
 
 import glob
+import json
 import os
 import re
 
@@ -70,6 +71,33 @@ def scan_inventory(root="binance"):
 def scan_stocks_inventory(root="stocks"):
     """``scan_inventory`` over the stocks/ daily-kline mirror (same filename convention)."""
     return scan_inventory(root)
+
+
+def scan_series_coverage(root="macro"):
+    """Coverage of point-in-time RELEASE series (macro/fundamentals), where each ``{name}.json`` is a list
+    of observations stamped with a ``releaseDate``. Returns ``name -> {'release': {start, end, months,
+    gaps}}`` — the same shape as ``scan_coverage`` so the catalog + viewer treat it uniformly; ``months``
+    is the observation count, ``start``/``end`` are the ``YYYY-MM`` of the first/last release, and there
+    are no month ``gaps`` for an irregular release series."""
+    coverage = {}
+    for path in glob.glob(os.path.join(root, "*.json")):
+        name = os.path.basename(path)[:-5]
+        try:
+            with open(path) as handle:
+                observations = json.load(handle)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(observations, list) or not observations:
+            continue
+        dates = sorted(
+            o["releaseDate"] for o in observations if isinstance(o, dict) and o.get("releaseDate")
+        )
+        if not dates:
+            continue
+        coverage[name] = {
+            "release": {"start": dates[0][:7], "end": dates[-1][:7], "months": len(observations), "gaps": []}
+        }
+    return dict(sorted(coverage.items()))
 
 
 def available_assets(timeframe, root="binance"):

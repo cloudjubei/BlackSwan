@@ -71,5 +71,29 @@ def test_alt_windows_train_from_2022_for_assets_whose_history_starts_there():
     assert test25 == [(2025, m) for m in range(1, 13)]
 
 
-def test_window_ids_are_the_oos_years():
-    assert walk_forward_window_ids() == ["2022", "2023", "2024", "2025", "alt-2024", "alt-2025"]
+def test_window_ids_include_the_fixed_and_open_ended_windows():
+    ids = walk_forward_window_ids()
+    for wid in ["2022", "2023", "2024", "2025", "alt-2024", "alt-2025"]:
+        assert wid in ids
+    for wid in ["oos-2024", "oos-2025", "alt-oos-2024", "alt-oos-2025"]:
+        assert wid in ids
+
+
+def test_open_ended_window_tests_from_cutoff_through_a_far_cap():
+    # An oos-* window tests from the training cutoff to a far-future cap; config_builder's file-existence
+    # filter truncates it to the latest data on disk, so the run tests ALL data after the cutoff.
+    train, test, meta = resolve_walk_forward_window({"walk_forward_window": "oos-2024"})
+    assert train[0] == (2020, 1)
+    assert train[-1] == (2023, 12)
+    assert test[0] == (2024, 1)
+    assert test[-1][0] >= 2035  # runs to the far cap
+    assert meta["test_from"] == "2024-01"
+    assert meta["test_to"] == "latest"
+
+
+def test_alt_open_ended_window_trains_from_2022():
+    train, test, _ = resolve_walk_forward_window({"walk_forward_window": "alt-oos-2025"})
+    assert train[0] == (2022, 1)
+    assert train[-1] == (2024, 12)
+    assert test[0] == (2025, 1)
+    assert test[-1][0] >= 2035

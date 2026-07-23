@@ -11,16 +11,28 @@ testable; consumers (config_builder, summary) resolve paths and metrics from the
 
 DEFAULT_WALK_FORWARD_WINDOW = "2024"
 
-# id -> (first_train_year, test_year); train is the expanding window first .. test_year - 1. Plain
-# year ids train from 2020 (the full BTC history); the alt-* ids train from 2022 for assets whose
-# on-disk history starts there (the altcoin 1m backfill begins 2022-01).
+# A far-future cap for OPEN-ENDED (oos-*) windows: test runs from the cutoff to this year, and
+# config_builder's file-existence filter truncates it to the latest month actually on disk — so an
+# open window tests ALL data after the training cutoff without the resolver touching the filesystem.
+_OPEN_TEST_CAP = 2035
+
+# id -> (first_train_year, first_test_year, last_test_year); train is the expanding window
+# first_train .. first_test-1. Fixed windows test a single year (first_test == last_test); open-ended
+# oos-* windows test first_test .. _OPEN_TEST_CAP (truncated to disk). Plain ids train from 2020 (the
+# full BTC history); alt-* ids train from 2022 for assets whose on-disk history starts there (the
+# altcoin 1m backfill begins 2022-01).
 _WINDOWS = {
-    "2022": (2020, 2022),
-    "2023": (2020, 2023),
-    "2024": (2020, 2024),
-    "2025": (2020, 2025),
-    "alt-2024": (2022, 2024),
-    "alt-2025": (2022, 2025),
+    "2022": (2020, 2022, 2022),
+    "2023": (2020, 2023, 2023),
+    "2024": (2020, 2024, 2024),
+    "2025": (2020, 2025, 2025),
+    "alt-2024": (2022, 2024, 2024),
+    "alt-2025": (2022, 2025, 2025),
+    # Open-ended: test the full out-of-sample span from the cutoff through the latest data on disk.
+    "oos-2024": (2020, 2024, _OPEN_TEST_CAP),
+    "oos-2025": (2020, 2025, _OPEN_TEST_CAP),
+    "alt-oos-2024": (2022, 2024, _OPEN_TEST_CAP),
+    "alt-oos-2025": (2022, 2025, _OPEN_TEST_CAP),
 }
 
 
@@ -47,14 +59,15 @@ def resolve_walk_forward_window(cfg=None):
         raise SystemExit(
             f"unknown walk_forward_window {window!r} — choices: {walk_forward_window_ids()}"
         )
-    first_train_year, test_year = _WINDOWS[window]
-    train_pairs = _months(first_train_year, test_year - 1)
-    test_pairs = _months(test_year, test_year)
+    first_train_year, first_test_year, last_test_year = _WINDOWS[window]
+    open_ended = last_test_year >= _OPEN_TEST_CAP
+    train_pairs = _months(first_train_year, first_test_year - 1)
+    test_pairs = _months(first_test_year, last_test_year)
     meta = {
         "walk_forward_window": window,
         "train_from": f"{first_train_year}-01",
-        "train_to": f"{test_year - 1}-12",
-        "test_from": f"{test_year}-01",
-        "test_to": f"{test_year}-12",
+        "train_to": f"{first_test_year - 1}-12",
+        "test_from": f"{first_test_year}-01",
+        "test_to": "latest" if open_ended else f"{last_test_year}-12",
     }
     return train_pairs, test_pairs, meta

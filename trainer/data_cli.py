@@ -20,42 +20,60 @@ import json
 import os
 import sys
 
+from scripts.backfill_fundamentals import backfill_ticker_fundamentals
 from scripts.backfill_klines import backfill_series, derive_altcoin_months, latest_complete_month
+from scripts.backfill_macro import backfill_series_macro
 from scripts.backfill_market import backfill_yf_symbol
 from scripts.backfill_stocks import START_MONTH
-from trainer import data_catalog, data_inventory
+from trainer import data_catalog, data_inventory, data_linkage
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _BTC = "BTCUSDT"
+# Directories holding point-in-time RELEASE series (not OHLCV klines) — scanned differently for coverage.
+_SERIES_DIRECTORIES = {"macro", "fundamentals"}
 
 
 def build_full_catalog(root="."):
-    """The catalog menu joined with the on-disk coverage under ``root`` (one scan per class directory)."""
-    coverage_by_directory = {
-        cls["directory"]: data_inventory.scan_coverage(os.path.join(root, cls["directory"]))
-        for cls in data_catalog.catalog()
-    }
+    """The catalog menu joined with the on-disk coverage under ``root``. Price classes scan kline months;
+    the point-in-time release classes (macro/fundamentals) scan their single-file series."""
+    coverage_by_directory = {}
+    for cls in data_catalog.catalog():
+        directory = cls["directory"]
+        path = os.path.join(root, directory)
+        coverage_by_directory[directory] = (
+            data_inventory.scan_series_coverage(path)
+            if directory in _SERIES_DIRECTORIES
+            else data_inventory.scan_coverage(path)
+        )
     return data_catalog.build_catalog(coverage_by_directory)
 
 
 def plan_mine(request):
     """Resolve a mine ``request`` into ``([(instrument, intervals)], unknown_symbols)``.
 
-    ``intervals`` default to the instrument's own and are always filtered to what it supports, so a
-    request for an unsupported timeframe is quietly narrowed rather than mining a 404."""
+    ``symbols`` are resolved within the requested ``class`` when one is given (so a fundamentals ticker
+    that collides with a stock ticker is reachable). ``intervals`` default to the instrument's own and are
+    always filtered to what it supports, so a request for an unsupported timeframe is quietly narrowed."""
     requested_intervals = request.get("intervals")
     symbols = request.get("symbols")
+    asset_class = request.get("class")
     if symbols:
+        pool = [
+            inst for inst in data_catalog.instruments() if asset_class is None or inst.asset_class == asset_class
+        ]
+        by_symbol = {}
+        for inst in pool:
+            by_symbol.setdefault(inst.symbol, inst)
         chosen, unknown = [], []
         for symbol in symbols:
-            inst = data_catalog.instrument(symbol)
+            inst = by_symbol.get(symbol)
             (chosen if inst else unknown).append(inst if inst else symbol)
         instruments = chosen
-    elif request.get("class"):
-        instruments = [inst for inst in data_catalog.instruments() if inst.asset_class == request["class"]]
+    elif asset_class:
+        instruments = [inst for inst in data_catalog.instruments() if inst.asset_class == asset_class]
         # An unknown/misspelled class matches nothing — surface it as unknown so the mine reports a
         # failure instead of looking like a successful empty download.
-        unknown = [] if instruments else [request["class"]]
+        unknown = [] if instruments else [asset_class]
     else:
         return [], []
     targets = []
@@ -66,8 +84,28 @@ def plan_mine(request):
     return targets, unknown
 
 
+def _series_result(inst, summary):
+    return {
+        "symbol": inst.symbol,
+        "source": inst.source,
+        "written": summary["written"],
+        "skipped": 0,
+        "errors": summary["errors"],
+        "gaps": [],
+        "observations": summary.get("observations", 0),
+    }
+
+
 def mine_one(inst, intervals, through, dry_run=False):
     """Mine one instrument, dispatching by source. Returns a normalised per-symbol result dict."""
+    # A narrowed-to-empty interval set (an all-unsupported request that plan_mine quietly narrowed) is a
+    # genuine no-op for EVERY source — not just Binance — so the same request shape behaves consistently.
+    if not intervals:
+        return {"symbol": inst.symbol, "source": inst.source, "written": 0, "skipped": 0, "errors": [], "gaps": []}
+    if inst.source == data_catalog.FRED:
+        return _series_result(inst, backfill_series_macro(inst.source_symbol, inst.directory, dry_run=dry_run))
+    if inst.source == data_catalog.EDGAR:
+        return _series_result(inst, backfill_ticker_fundamentals(inst.source_symbol, inst.directory, dry_run=dry_run))
     if inst.source == data_catalog.BINANCE:
         is_btc = inst.symbol == _BTC
         # Only BTC has native 1h/1d archives; altcoins are archived at 1m only and derive 1h/1d, so an
@@ -114,7 +152,7 @@ def _write_json(path, payload):
 
 
 def _run_catalog(args):
-    _write_json(args.out, {"assetClasses": build_full_catalog(".")})
+    _write_json(args.out, {"assetClasses": build_full_catalog("."), "linkage": data_linkage.linkage()})
     return 0
 
 
