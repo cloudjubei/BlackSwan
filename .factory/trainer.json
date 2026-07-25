@@ -18,6 +18,12 @@
     "metric": "return_vs_hold_pct",
     "threshold": 0
   },
+  "diagnostics": {
+    "splitAxis": { "levers": ["walk_forward_window"], "kind": "walk_forward" },
+    "degenerateWhen": [{ "metric": "n_trades", "op": "==", "value": 0 }],
+    "confoundMetrics": ["hold_return_pct"],
+    "riskMetrics": ["oos_sharpe", "max_drawdown_pct"]
+  },
   "pipelineVersion": "6.0",
   "pipelineChangelog": [
     {
