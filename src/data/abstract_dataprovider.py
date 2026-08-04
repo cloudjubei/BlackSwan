@@ -11,6 +11,7 @@ from src.data.data_utils import plot_indicator
 from src.util.plot import plot_timeseries
 from src.data import indicators as _indicators
 from src.data import feature_cache
+from trainer.context import context_columns, load_series_observations, resolve_context
 
 class AbstractDataProvider(ABC):
     def __init__(self, config: DataConfig):
@@ -164,6 +165,9 @@ class AbstractDataProvider(ABC):
             "use_indicators": getattr(self.config, "use_indicators", False),
             "obs_squash": getattr(self.config, "obs_squash", "none"),
         }
+        _ctx = self._context_cache_key()
+        if _ctx:
+            params["context"] = _ctx
 
         def _build():
             dfs = [pd.read_json(path) for path in paths]
@@ -311,6 +315,8 @@ class AbstractDataProvider(ABC):
             result_df = result_df.drop(columns=['indicators'])
         result_df = result_df.drop(columns=['asset_volume_quote', 'trades_number', 'asset_volume_taker_base', 'asset_volume_taker_quote']) # raw cols dropped; taker_buy_ratio (above) retains the order-flow signal
 
+        result_df = self._add_context_columns(result_df, timestamps)
+
         for col in result_df.keys():
             if col == 'timestamp_close' or col == 'timestamp':
                 result_df[col] = pd.to_numeric(result_df[col]).astype(int) / 1000000000 # weird df formatting
@@ -346,6 +352,9 @@ class AbstractDataProvider(ABC):
             "use_indicators": getattr(self.config, "use_indicators", False),
             "obs_squash": getattr(self.config, "obs_squash", "none"),
         }
+        _ctx = self._context_cache_key()
+        if _ctx:
+            params["context"] = _ctx
 
         def _build():
             frames = [pd.read_json(path) for path in paths]
@@ -457,6 +466,8 @@ class AbstractDataProvider(ABC):
             result_df['timestamp_new'] = pd.to_numeric(result_df['timestamp']).astype(int) / 1000000000
             result_df['timestamp_close_new'] = pd.to_numeric(result_df['timestamp_close']).astype(int) / 1000000000
 
+        result_df = self._add_context_columns(result_df, timestamps)
+
         result_df = result_df.drop(columns=columns_to_drop).fillna(0).replace([np.inf, -np.inf], 0).reset_index(drop=True)
         result_df = self._squash_observation_features(result_df)
 
@@ -475,17 +486,39 @@ class AbstractDataProvider(ABC):
             result_df[cols] = np.tanh(result_df[cols])
         return result_df
 
+    def _add_context_columns(self, result_df, timestamps):
+        """Fuse the run's GLOBAL context panel (mined macro series) onto the bar clock as raw-level
+        columns, leakage-safe (each value visible only from its release instant, forward-filled). A no-op
+        when the `context` config is 'none' (the default), so non-context runs are byte-identical."""
+        panel = getattr(self.config, "context", "none")
+        if not panel or panel == "none":
+            return result_df
+        _, specs = resolve_context({"context_set": panel})
+        for name, values in context_columns(timestamps, specs, load_series_observations).items():
+            result_df[name] = values
+        return result_df
+
+    def _context_cache_key(self):
+        """The context panel for feature-cache keying, or None when 'none' — so non-context runs keep
+        their EXISTING cache keys (no mass rebuild) while each context panel gets a distinct one."""
+        panel = getattr(self.config, "context", "none")
+        return panel if panel and panel != "none" else None
+
     def process_fidelity(self, df, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run, multiplier_input_to_run, timestamp, columns = ["timestamp","timestamp_close","price","price_open","price_high","price_low","volume","asset_volume_quote","trades_number","asset_volume_taker_base"]):
         # Coarse-layer resampling is the dominant provider-build cost (~97% of a multi-year train build:
         # a per-bar pandas-slice loop). It is a pure function of the input frame's CONTENT + the resample
         # params + the feature config, so cache it keyed on a hash of those — every other seed/algo run on
         # the same window reuses it. The frame hash makes the key independent of the source-file path.
         frame_fp = hashlib.sha256(pd.util.hash_pandas_object(df, index=True).values.tobytes()).hexdigest()
-        key_src = repr((
+        _key_parts = [
             frame_fp, layer, fidelity_offset, multiplier_input, fidelity_run, multiplier_run,
             multiplier_input_to_run, timestamp, list(columns),
             getattr(self.config, "use_indicators", False), getattr(self.config, "obs_squash", "none"),
-        ))
+        ]
+        _ctx = self._context_cache_key()
+        if _ctx:
+            _key_parts.append(("context", _ctx))
+        key_src = repr(tuple(_key_parts))
         key = "fid_" + hashlib.sha256(key_src.encode()).hexdigest()[:28]
         return feature_cache.load_or_build_key(
             key,

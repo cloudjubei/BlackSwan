@@ -39,15 +39,45 @@ def test_extract_macro_observations_multiple_ordered():
     assert [o["releaseDate"] for o in obs] == ["2024-02-02", "2024-03-08"]
 
 
-# --- observations_url includes the point-in-time output type ---
+# --- extract_macro_observations: daily non-revised rates (output_type=1, stamped as-of) ---
 
 
-def test_observations_url_requests_initial_release_vintages():
+def test_extract_asof_daily_rate_stamps_release_at_reference_plus_publish_lag():
+    # DFF (daily effective fed funds) is NEVER revised but exceeds the output_type=4 vintage cap, so it is
+    # fetched as standard observations and stamped leak-safe: its value for day D is published the NEXT day.
+    payload = {"observations": [{"date": "2024-03-15", "realtime_start": "2026-07-26", "value": "5.33"}]}
+    obs = bm.extract_macro_observations(payload, "DFF")
+    assert obs == [{"refPeriod": "2024-03-15", "releaseDate": "2024-03-16", "value": 5.33, "vintage": "2024-03-16"}]
+
+
+def test_extract_asof_same_day_rate_uses_the_reference_date():
+    # H.15 yields (DGS10/DFII10/T10Y2Y) print same-day after the close (pit_fusion places the intraday time).
+    payload = {"observations": [{"date": "2024-03-15", "realtime_start": "2026-07-26", "value": "4.29"}]}
+    obs = bm.extract_macro_observations(payload, "DGS10")
+    assert obs[0]["releaseDate"] == "2024-03-15"
+
+
+# --- observations_url is category-aware (vintage cap vs non-revised daily rate) ---
+
+
+def test_observations_url_vintage_series_requests_initial_release_full_history():
+    # Revised series -> initial-release vintages across ALL history (the default realtime window is TODAY,
+    # which has no vintages and 400s — the bug this fixes).
     url = bm.observations_url("UNRATE", "KEY123")
     assert "series_id=UNRATE" in url
     assert "api_key=KEY123" in url
     assert "file_type=json" in url
     assert "output_type=4" in url  # initial release only — NOT the latest-revised series (a silent leak)
+    assert "realtime_start=1776-07-04" in url
+    assert "realtime_end=9999-12-31" in url
+
+
+def test_observations_url_daily_rate_uses_standard_observations():
+    # Daily market rates blow the output_type=4 vintage cap; they are not revised, so standard observations
+    # (output_type=1) stamped as-of are equally leak-safe.
+    url = bm.observations_url("DFF", "KEY123")
+    assert "output_type=1" in url
+    assert "output_type=4" not in url
 
 
 # --- backfill_series_macro requires an API key ---

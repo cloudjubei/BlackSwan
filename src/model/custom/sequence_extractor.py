@@ -100,6 +100,10 @@ class SequenceFeaturesExtractor(BaseFeaturesExtractor):
         self.per_bar = obs_dim // lookback
         self.encoder = encoder
         self.pool = pool
+        # Last forward's attention weights (detached, CPU) for the decision-trace xAI heatmap (A6). 'attn'
+        # attends over the lookback axis -> [B, lookback, lookback]; 'itransformer' across variates ->
+        # [B, per_bar, per_bar]; 'tcn' has no attention so it stays None. Off the graph — never affects training.
+        self.last_attn = None
 
         if encoder == "attn":
             self.in_proj = nn.Linear(self.per_bar, d_model)
@@ -139,7 +143,10 @@ class SequenceFeaturesExtractor(BaseFeaturesExtractor):
         x = self._to_sequence(observations)
         if self.encoder == "attn":
             h = self.in_proj(x) + self.pos
-            attended, _ = self.attn(h, h, h)
+            need = not self.training  # capture is eval-only (the trace replay); training pays no cpu() sync
+            attended, w = self.attn(h, h, h, need_weights=need, average_attn_weights=True)
+            if need:
+                self.last_attn = w.detach().cpu()
             h = self.norm1(h + attended)
             h = self.norm2(h + self.ffn(h))
             return self.head(self._pool(h))
@@ -147,7 +154,10 @@ class SequenceFeaturesExtractor(BaseFeaturesExtractor):
             # Invert to [B, per_bar, lookback] (variates as tokens), embed each variate's series, attend
             # ACROSS variates, then pool over the variate axis.
             v = self.in_proj(x.transpose(1, 2))  # [B, per_bar, d_model]
-            attended, _ = self.attn(v, v, v)
+            need = not self.training  # capture is eval-only (the trace replay); training pays no cpu() sync
+            attended, w = self.attn(v, v, v, need_weights=need, average_attn_weights=True)
+            if need:
+                self.last_attn = w.detach().cpu()
             h = self.norm1(v + attended)
             h = self.norm2(h + self.ffn(h))
             return self.head(self._pool(h))

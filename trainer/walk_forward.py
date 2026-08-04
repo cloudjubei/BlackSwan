@@ -26,8 +26,19 @@ _WINDOWS = {
     "2023": (2020, 2023, 2023),
     "2024": (2020, 2024, 2024),
     "2025": (2020, 2025, 2025),
+    "2026": (2020, 2026, 2026),
     "alt-2024": (2022, 2024, 2024),
     "alt-2025": (2022, 2025, 2025),
+    "alt-2026": (2022, 2026, 2026),
+    # stk-* train from 2018 — a DEEPER expanding window than the plain 2020 start, for assets whose on-disk
+    # history reaches that far (stocks from 2018-01, BTC from 2017-08). windows_supported gates by each
+    # asset's data range, so a 2020/2022-start asset simply never offers them.
+    "stk-2022": (2018, 2022, 2022),
+    "stk-2023": (2018, 2023, 2023),
+    "stk-2024": (2018, 2024, 2024),
+    "stk-2025": (2018, 2025, 2025),
+    "stk-2026": (2018, 2026, 2026),
+    "stk-oos-2024": (2018, 2024, _OPEN_TEST_CAP),
     # Open-ended: test the full out-of-sample span from the cutoff through the latest data on disk.
     "oos-2024": (2020, 2024, _OPEN_TEST_CAP),
     "oos-2025": (2020, 2025, _OPEN_TEST_CAP),
@@ -43,6 +54,23 @@ def _months(year_lo, year_hi):
 def walk_forward_window_ids():
     """The selectable window ids, full-history windows first, then the alt-* short-history ones."""
     return list(_WINDOWS.keys())
+
+
+def windows_supported(start, end):
+    """The window ids an asset can run given its on-disk data RANGE (``start``/``end`` = "YYYY-MM" of the
+    asset's finest-timeframe coverage). A window is runnable when training can begin at/after the data
+    start AND testing begins at/before the data end — so an altcoin (2022→) gets only the alt-* windows, a
+    deep-history asset gets all, and an asset whose data ends early can't run a later test year. Pure — the
+    inventory-driven per-asset capability the viewer renders on the asset card."""
+    if not start or not end:
+        return []
+    out = []
+    for wid, (first_train_year, first_test_year, _last) in _WINDOWS.items():
+        train_from = f"{first_train_year:04d}-01"
+        test_from = f"{first_test_year:04d}-01"
+        if train_from >= start and test_from <= end:
+            out.append(wid)
+    return out
 
 
 def resolve_walk_forward_window(cfg=None):

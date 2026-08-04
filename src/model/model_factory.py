@@ -955,8 +955,12 @@ def create_rl_model(config: ModelConfig, env: AbstractEnv, device: str):
                     )
         
     if rl_model is not None:
-        if config.model_rl.checkpoint_to_load is not None:
-            path = os.path.join(config.model_rl.checkpoints_folder, config.model_rl.checkpoint_to_load)
+        # Load a parent checkpoint for EITHER a checkpoint_to_load run (eval-replay; is_pretrained then skips
+        # training) OR a continue_from run (extra-train; is_pretrained stays False so RLModel.train keeps
+        # training the loaded weights — set_env + reset_num_timesteps=False — on the new dataset).
+        ckpt = config.model_rl.checkpoint_to_load or config.model_rl.continue_from
+        if ckpt is not None:
+            path = os.path.join(config.model_rl.checkpoints_folder, ckpt)
             rl_model = rl_model.load(path)
             
         rl_model.set_logger(Logger(

@@ -28,14 +28,14 @@ alignment math differs (get_price(step) == prices[step + start_index], no divide
 combos assert their own alignment: the traded price is the close at the decision row and get_values' window
 ENDS on that same row.
 
-KNOWN, SEPARATE DEFECT (deliberately NOT folded into I2): a combo whose observed stack contains a MIDDLE
-layer (an observed layer that is neither the base nor the coarsest observed layer) currently leaks FUTURE
-bars into the observation, because _compute_values' `index = (offset - mapping)/multiplier` omits the
-per-layer warmup trim that the coarser layer forces on the middle layer's resample frame. Combos with a
-sub-step observed layer (finer than the run cadence) resample to zero substreams and get_values raises.
-I2 is asserted only on the families where the observation is currently look-ahead-safe; I1/I3/I5 still guard
-every combo. test_middle_layer_observation_lookahead_is_flagged pins that separate defect so it stays
-visible and self-checks if the provider's observation indexing is later fixed.
+MIDDLE-LAYER FIX (now folded into I2): a combo whose observed stack contains a MIDDLE layer (an observed
+layer that is neither the base nor the coarsest observed layer) previously leaked FUTURE bars into the
+observation, because _compute_values' `index = (offset - mapping)/multiplier` omitted the per-layer warmup
+trim the coarser layer forces on the middle layer's resample frame. That trim is now subtracted via
+MultiTimelineDataProvider._layer_trim(), so middle layers observe the most-recent CLOSED bar and I2 asserts
+on them. The ONLY combos still excluded from I2 are sub-step observed layers (finer than the run cadence):
+they resample to zero substreams (multiplier_run==0) and get_values raises — a process_fidelity limitation,
+not an index bug. I1/I3/I5 still guard every combo.
 
 Data-gated: 1m-base combos skip without the BTCUSDT 1m source; 1w combos widen to a 12-month window (the
 weekly warmup is multiplier(1w)*lookback ~ 224 days); the two 1m+1w combos (~527k base rows, ~10080 weekly
@@ -109,24 +109,20 @@ def _is_slow(spec):
 
 
 def _observation_is_lookahead_safe(spec):
-    """The MULTI observation (get_values) is currently look-ahead-safe iff every observed layer is either
-    the base (read from the raw frame at the exact decision offset) or the coarsest observed layer (whose
-    resample frame carries no extra warmup trim). A MIDDLE observed layer (neither base nor coarsest) is
-    trimmed by the coarser layer's larger warmup, but _compute_values' index arithmetic omits that trim and
-    reads a FUTURE row — the separate defect pinned by test_middle_layer_observation_lookahead_is_flagged.
-    A sub-step observed layer (finer than the run cadence) resamples to zero substreams (multiplier_run==0)
-    and get_values raises. Both are excluded from the I2 assertion; I1/I3/I5 still guard them."""
+    """The MULTI observation (get_values) is look-ahead-safe iff no observed layer is a SUB-STEP layer
+    (finer than the run cadence): such a layer resamples to zero substreams (multiplier_run==0) and
+    get_values raises — its fix needs process_fidelity, not the index arithmetic. Every other observed layer
+    — base (read from the raw frame at the exact decision offset), MIDDLE, or coarsest — is look-ahead-safe
+    now that _layer_trim() subtracts each resampled layer's per-layer warmup trim from the row index
+    (previously a middle layer read a FUTURE row). The base layer is skipped (raw-frame read, always safe)."""
     layers = spec["layers"]
     base = spec["fidelity_input"]
-    coarsest = layers[-1]
     divider_run = _period_ratio(base, spec["fidelity_run"])
     for layer in layers:
         if layer == base:
             continue
-        if layer != coarsest:
-            return False  # middle layer -> future-row observation leak
         if _period_ratio(base, layer) < divider_run:
-            return False  # sub-step layer -> multiplier_run==0, get_values raises
+            return False  # sub-step layer -> multiplier_run==0, get_values raises (needs process_fidelity)
     return True
 
 
@@ -247,6 +243,11 @@ def test_multi_provider_trades_the_decision_bar_it_observes(timeframe, fidelity_
     assert checks > 0, f"{_ID((timeframe, fidelity_set))}: no layer/step was actually checked for look-ahead"
 
 
+# NOTE: the former test_middle_layer_observation_lookahead_is_flagged (which PINNED the middle-layer future-row
+# leak as a KNOWN defect) has been removed: _layer_trim() fixes the leak, so the clean-middle combos are now
+# folded into _observation_is_lookahead_safe above and asserted by I2 in the parametrized guard.
+
+
 @pytest.mark.parametrize("timeframe,fidelity_set", _SINGLE, ids=[_ID(c) for c in _SINGLE])
 def test_single_provider_trades_the_decision_bar_it_observes(timeframe, fidelity_set, monkeypatch):
     """SINGLE provider (fidelity_set == timeframe in {1h,1d,1m}): get_price(step) == prices[step +
@@ -282,28 +283,3 @@ def test_single_provider_trades_the_decision_bar_it_observes(timeframe, fidelity
             f"{_ID((timeframe, fidelity_set))} step {step}: get_values window does not end on the decision "
             f"row {offset} that get_price trades — observation/price desync."
         )
-
-
-def test_middle_layer_observation_lookahead_is_flagged(monkeypatch):
-    """PINS a KNOWN, SEPARATE defect: for a stack with a MIDDLE observed layer (neither base nor coarsest),
-    get_values reads a FUTURE resample row because _compute_values' index arithmetic omits the per-layer
-    warmup trim the coarser layer forces. 1h@1d+1w observes ['1d','1w'] over an (unobserved) 1h base, so
-    '1d' is a middle layer: at step 0 its observed bar closes ~141 days AFTER the decision bar.
-
-    This is intentionally NOT folded into the I2 assertion above (those combos are excluded from _i2_safe);
-    it lives here as an explicit, self-checking flag. If get_values' middle-layer indexing is fixed this
-    test XFAILS-turned-FAIL: that is the signal to fold the middle-layer combos back into the look-ahead
-    guard and assert I2 on them."""
-    p = _build("1h", "1d+1w", list(range(1, 13)), monkeypatch)
-    assert list(p.layers) == ["1d", "1w"] and p.fidelity_input == "1h"
-    raw = p.raw_df
-    raw_ts = _ts_col(raw)
-    offset = p.get_start_index()  # step 0 decision bar
-    decision = pd.to_datetime(raw[raw_ts].iloc[offset])
-    middle = list(p.layers).index("1d")
-    observed = _observed_close(p, raw, raw_ts, offset, middle, "1d")
-    assert observed is not None and observed > decision + pd.Timedelta(days=30), (
-        "GOOD NEWS if this fails: the middle-layer observation look-ahead appears FIXED "
-        f"(observed 1d close {observed} <= decision {decision}). Move the middle-layer / coarse-only "
-        "combos into _observation_is_lookahead_safe and assert I2 on them."
-    )

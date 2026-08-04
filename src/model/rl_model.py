@@ -47,12 +47,38 @@ class RLModel(BaseRLModel):
 
     def train(self, env: AbstractEnv):
         timesteps = env.get_timesteps()
-        
+
+        # A continue_from run extra-trains a LOADED parent checkpoint on a NEW dataset: bind the new env to
+        # the loaded model and NEVER reset the step counter (keep the parent's timesteps + anneal schedules).
+        continuing = self.rl_config.continue_from is not None
+        if continuing:
+            self.rl_model.set_env(env)
+
+        # A6: optionally snapshot a RETAINED checkpoint every N timesteps (for mid-training decision traces)
+        # — only when a snapshot_interval is set AND checkpoints are kept (a snapshot must persist). The SAME
+        # callback rides every episode so its thresholds accumulate across the whole run. None otherwise, so
+        # the default learn() call (callback=None) is byte-identical.
+        snapshot_interval = getattr(self.rl_config, "snapshot_interval", None)
+        callback = None
+        if snapshot_interval and self.config.save_checkpoint:
+            from src.model.custom.snapshot_callback import SnapshotCheckpointCallback
+            callback = SnapshotCheckpointCallback(
+                interval=snapshot_interval,
+                save_fn=self.rl_model.save,
+                base_id=self.id,
+                folder=self.rl_config.checkpoints_folder,
+                max_snapshots=getattr(self.rl_config, "snapshot_cap", None),
+            )
+
         for i in range(0, self.rl_config.episodes):
             print(f"TRAINING EPISODE {i+1}/{self.rl_config.episodes}")
             # Only the first episode resets the step counter; later episodes continue it so
-            # learning_starts is paid once and the exploration schedule anneals across all episodes.
-            self.rl_model.learn(total_timesteps=timesteps, progress_bar=self.rl_config.progress_bar, log_interval=1000, reset_num_timesteps=(i == 0))
+            # learning_starts is paid once and the exploration schedule anneals across all episodes. A
+            # continued run never resets — it keeps climbing from the loaded checkpoint's progress.
+            self.rl_model.learn(total_timesteps=timesteps, progress_bar=self.rl_config.progress_bar, log_interval=1000, reset_num_timesteps=(i == 0 and not continuing), callback=callback)
+
+        # Retained mid-training snapshots (empty unless the callback ran) — run.py traces each afterwards.
+        self.snapshots = callback.snapshots if callback else []
 
         if self.config.save_checkpoint:
             path = os.path.join(self.rl_config.checkpoints_folder, self.id)

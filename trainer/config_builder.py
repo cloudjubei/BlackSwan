@@ -20,6 +20,7 @@ from src.conf.model_config import ModelConfig, ModelConfigSearch, ModelSupervise
 from src.model.model_factory import get_model_combinations
 from src.model.rl_model import is_recurrent_model_name
 from trainer.fidelity import resolve_fidelity
+from trainer.projection import resolve_projection
 from trainer.walk_forward import resolve_walk_forward_window
 
 _SYMBOL = "BTCUSDT"
@@ -29,15 +30,25 @@ _TRAIN_PAIRS = [(y, m) for y in range(2020, 2024) for m in range(1, 13)]
 _TEST_PAIRS = [(2024, m) for m in range(1, 13)]
 
 
+def _asset_directory(symbol):
+    """The on-disk data directory for a tradeable asset, resolved from the catalog (crypto -> binance,
+    US equities -> stocks); defaults to binance for an uncatalogued symbol."""
+    from trainer import data_catalog
+
+    inst = data_catalog.instrument(symbol)
+    return inst.directory if inst else "binance"
+
+
 def _daily_files(pairs, symbol=_SYMBOL):
-    files = [f"binance/{symbol}-1d-{y}-{m}.json" for (y, m) in pairs]
+    directory = _asset_directory(symbol)
+    files = [f"{directory}/{symbol}-1d-{y}-{m}.json" for (y, m) in pairs]
     return [f for f in files if os.path.exists(f)]
 
 
 def _minute_files(pairs, symbol=_SYMBOL):
     # The canonical 1m source klines (NOT derived — 1m IS the source of truth; coarser layers resample
     # from it at runtime in the provider). Used by the 1m-base path.
-    files = [f"binance/{symbol}-1m-{y}-{m}.json" for (y, m) in pairs]
+    files = [f"{_asset_directory(symbol)}/{symbol}-1m-{y}-{m}.json" for (y, m) in pairs]
     return [f for f in files if os.path.exists(f)]
 
 
@@ -63,9 +74,12 @@ def _parse_net_arch(value):
 
 def build_data_config(cfg):
     asset = str(cfg.get("asset", _SYMBOL))
-    # The technical baseline reads curated indicator columns (rsi10, ...) by name, so enable them even when
-    # the user left use_indicators off — otherwise the column lookup would fail at run time.
-    use_indicators = bool(cfg.get("use_indicators", False)) or is_technical(cfg)
+    # Projection = the per-asset data-exposure ladder (minimal/standard/with_indicators). It resolves to
+    # the low-level feature knobs (type + use_indicators). The technical baseline additionally forces the
+    # curated indicator columns on (it reads rsi10, ... by name), regardless of the chosen rung.
+    _, projection = resolve_projection(cfg, asset)
+    data_type = projection["type"]
+    use_indicators = projection["use_indicators"] or is_technical(cfg)
     train_pairs, test_pairs, window = resolve_walk_forward_window(cfg)
     wf = window["walk_forward_window"]
     fset_id, fspec = resolve_fidelity(cfg)
@@ -90,10 +104,11 @@ def build_data_config(cfg):
                 train_data_paths=[train_files],
                 test_data_paths=[test_files],
                 lookback_window_size=int(cfg.get("lookback_window") or lookback),
-                type=str(cfg.get("data_type", "only_price_percent")),
+                type=data_type,
                 use_indicators=use_indicators,
                 timestamp="day_of_week",
                 obs_squash=str(cfg.get("obs_squash", "none")),
+                context=str(cfg.get("context_set", "none")),
                 fidelity_input="1m",
                 fidelity_run=fidelity_run,
                 layers=layers,
@@ -119,10 +134,11 @@ def build_data_config(cfg):
                 train_data_paths=[ensure_derived(asset, train_pairs, "1h")],
                 test_data_paths=[ensure_derived(asset, test_pairs, "1h")],
                 lookback_window_size=int(cfg.get("lookback_window") or lookback),
-                type=str(cfg.get("data_type", "only_price_percent")),
+                type=data_type,
                 use_indicators=use_indicators,
                 timestamp="day_of_week",
                 obs_squash=str(cfg.get("obs_squash", "none")),
+                context=str(cfg.get("context_set", "none")),
                 fidelity_input="1h",
                 fidelity_run=fidelity_run,
                 layers=layers,
@@ -137,10 +153,11 @@ def build_data_config(cfg):
             train_data_paths=[_daily_files(train_pairs, asset)],
             test_data_paths=[_daily_files(test_pairs, asset)],
             lookback_window_size=lookback,
-            type=str(cfg.get("data_type", "only_price_percent")),
+            type=data_type,
             use_indicators=use_indicators,
             timestamp="none",
             obs_squash=str(cfg.get("obs_squash", "none")),
+            context=str(cfg.get("context_set", "none")),
             fidelity_input="1d",
             fidelity_run="1d",
             layers=layers,
@@ -346,6 +363,16 @@ def _build_model_config(cfg):
     rl.seed = int(cfg["seed"]) if cfg.get("seed") is not None else None
     if cfg.get("checkpoint_to_load"):
         rl.checkpoint_to_load = str(cfg["checkpoint_to_load"])
+    # continue_from LOADS a parent checkpoint but KEEPS training (extra-train on a new dataset) — unlike
+    # checkpoint_to_load, which loads-and-evaluates (is_pretrained skips training). See RLModel.train.
+    if cfg.get("continue_from"):
+        rl.continue_from = str(cfg["continue_from"])
+    # A6: periodic mid-training snapshot checkpoints (in SB3 timesteps). Absent -> None (no callback).
+    if cfg.get("snapshot_interval") is not None:
+        rl.snapshot_interval = int(cfg["snapshot_interval"])
+    # A6: cap the retained mid-training snapshots (ring-buffer, delete superseded .zip). Absent -> None (unbounded).
+    if cfg.get("snapshot_cap") is not None:
+        rl.snapshot_cap = int(cfg["snapshot_cap"])
     if "lstm_hidden_size" in cfg:
         rl.lstm_hidden_size = [int(cfg["lstm_hidden_size"])]
     if "shared_lstm" in cfg:

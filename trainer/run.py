@@ -169,6 +169,23 @@ def _write(path, payload):
         json.dump(payload, f)
 
 
+def _trace_checkpoint(cfg, checkpoint_ref, cheap=True):
+    """Load a saved checkpoint, re-test it on the test window (NO training — is_pretrained skips it), and
+    return its decision trace. A FRESH env each call (test/replay consumes the env). ``cheap`` skips the
+    expensive saliency/latent/attention replays so N mid-training snapshot traces stay affordable.
+    Best-effort: ``None`` when no trace is produced. Reuses the same load→test→trace path as --evaluate."""
+    sub = dict(cfg)
+    sub["checkpoint_to_load"] = checkpoint_ref
+    if cheap:
+        sub["decision_trace_attribution"] = False
+        sub["decision_trace_latent"] = False
+        sub["decision_trace_attention"] = False
+    env_test, _state, model, is_rl, _secs = _run_one(sub)
+    out = {}
+    decision_trace.attach_decision_trace(out, env_test, model, sub, None, is_rl)
+    return out.get("artifacts", {}).get("decisionTrace")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="trainer.run")
     parser.add_argument("--config-json")
@@ -220,6 +237,20 @@ def main(argv=None):
         except Exception as exc:
             print(f"decision-trace skipped: {exc}")
 
+        # A6: mid-training snapshots — a decision trace per retained checkpoint (RLModel.train records them
+        # when snapshot_interval is set), streamed to a JSONL sidecar with a lightweight index on the
+        # summary. Best-effort; each snapshot re-tests a loaded checkpoint (cheap trace) with a fresh env.
+        snapshots = getattr(model, "snapshots", None)
+        if snapshots and not args.evaluate:
+            model_id = getattr(model, "id", None)
+            sidecar = f"checkpoints/{model_id}.snapshots.jsonl" if model_id else f"{args.summary_out}.snapshots.jsonl"
+            try:
+                decision_trace.write_snapshot_traces(
+                    out, snapshots, lambda ref: _trace_checkpoint(cfg, ref, cheap=True), sidecar
+                )
+            except Exception as exc:
+                print(f"snapshot traces skipped: {exc}")
+
     if args.evaluate:
         out["evaluation"] = {"checkpoint": str(cfg.get("checkpoint_to_load") or ""), "episodes": 0}
 
@@ -233,7 +264,7 @@ def main(argv=None):
 
     _write(args.summary_out, out)
     print(
-        f"objective(traded_return)={out['objective']:.4f} status={out['health']['status']} -> {args.summary_out}"
+        f"objective(total_return_pct)={out['objective']:.4f} status={out['health']['status']} -> {args.summary_out}"
     )
     return 0
 

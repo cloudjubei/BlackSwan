@@ -135,3 +135,85 @@ def test_global_context_2d_mlp_input_should_work():
     out = m(th.randn(4, 8))
     assert tuple(out.shape) == (4, 8)
     assert th.isfinite(out).all()
+
+
+# --- attention weight capture (A6) ------------------------------------------
+# Each block computes an attention weight matrix then discards it. For the decision-trace xAI heatmap it
+# must be STASHED on the module after forward — detached + on CPU (a live-graph tensor would leak / interfere
+# with training). Capture is EVAL-ONLY (the decision-trace replay runs in eval mode): a training-mode forward
+# skips the stash so no per-gradient-step device->host .cpu() sync is paid. last_attn is None until the first
+# eval forward; output is unchanged in either mode.
+
+
+def _assert_detached_finite(t):
+    assert t is not None
+    assert th.isfinite(t).all()
+    assert t.requires_grad is False and t.grad_fn is None
+
+
+def test_last_attn_is_none_before_forward():
+    assert SelfAttention(4).last_attn is None
+    assert ScaledDotProductAttention(8).last_attn is None
+    assert MultiHeadAttention(8, num_heads=2).last_attn is None
+    assert AdditiveAttention(8).last_attn is None
+    assert GlobalContextAttention(8).last_attn is None
+
+
+def test_self_attention_stashes_last_attn():
+    m = SelfAttention(6).eval()
+    out = m(th.randn(2, 6))
+    assert tuple(out.shape) == (2, 6)
+    _assert_detached_finite(m.last_attn)
+    assert tuple(m.last_attn.shape) == (2, 6, 6)  # (batch, seq==in_dim, seq)
+
+
+def test_scaled_dot_product_stashes_last_attn():
+    m = ScaledDotProductAttention(8).eval()
+    out = m(th.randn(2, 3, 8))
+    assert tuple(out.shape) == (2, 3, 8)
+    _assert_detached_finite(m.last_attn)
+    assert tuple(m.last_attn.shape) == (2, 3, 3)  # (batch, seq, seq)
+
+
+def test_multihead_stashes_head_averaged_last_attn():
+    m = MultiHeadAttention(8, num_heads=2).eval()
+    out = m(th.randn(3, 4, 8))  # (seq, batch, dim), batch_first=False
+    assert tuple(out.shape) == (3, 4, 8)
+    _assert_detached_finite(m.last_attn)
+    assert tuple(m.last_attn.shape) == (4, 3, 3)  # head-averaged (batch, q_seq, k_seq)
+
+
+def test_additive_attention_stashes_last_attn():
+    m = AdditiveAttention(8).eval()
+    out = m(th.randn(2, 8))
+    assert tuple(out.shape) == (2, 8)
+    _assert_detached_finite(m.last_attn)
+    assert m.last_attn.shape[-1] == 1  # (batch, seq, 1)
+
+
+def test_global_context_stashes_last_attn():
+    m = GlobalContextAttention(8).eval()
+    out = m(th.randn(4, 8))  # 2-D MLP input -> single-step sequence
+    assert tuple(out.shape) == (4, 8)
+    _assert_detached_finite(m.last_attn)
+    assert tuple(m.last_attn.shape) == (4, 1, 1)
+
+
+def test_training_mode_forward_skips_the_stash_but_output_is_unchanged():
+    # In train() mode the capture is skipped (perf: no per-step .cpu() sync); the forward OUTPUT is identical.
+    for m in (
+        SelfAttention(6),
+        ScaledDotProductAttention(8),
+        MultiHeadAttention(8, num_heads=2),
+        AdditiveAttention(8),
+        GlobalContextAttention(8),
+    ):
+        m.train()
+        x = th.randn(2, 8) if not isinstance(m, SelfAttention) else th.randn(2, 6)
+        if isinstance(m, (ScaledDotProductAttention,)):
+            x = th.randn(2, 3, 8)
+        elif isinstance(m, MultiHeadAttention):
+            x = th.randn(3, 4, 8)
+        out = m(x)
+        assert th.isfinite(out).all()
+        assert m.last_attn is None  # skipped during training

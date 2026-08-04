@@ -15,6 +15,9 @@ from trainer.sharpe import (
     expected_max_sharpe,
     deflated_sharpe_ratio,
     min_track_record_length,
+    psr_from_stats,
+    dsr_from_stats,
+    min_track_record_length_from_stats,
 )
 
 # A deterministic positive-drift return series (no RNG) used across the PSR/DSR tests.
@@ -129,3 +132,40 @@ def test_mintrl_infinite_when_sr_not_above_benchmark():
 def test_mintrl_finite_and_positive_for_positive_sr():
     n = min_track_record_length(POS, sr_benchmark=0.0, target_prob=0.95)
     assert math.isfinite(n) and n > 0
+
+
+# --- stats-input variants (A4.3): PSR/DSR/minTRL from a precomputed (sharpe,skew,kurtosis,n) bundle ---------
+# These are the entry points the modeltrainer engine's TS Deflated-Sharpe port mirrors — it feeds the per-run
+# oos_sharpe/oos_ret_skew/oos_ret_kurt/oos_n_obs it already stores, never a raw return array. Golden values
+# below are the cross-language pin for that port.
+
+def test_psr_from_stats_matches_the_array_form():
+    s = sharpe_stats(POS)
+    for bench in (0.0, 0.3):
+        assert psr_from_stats(s["sharpe"], s["skew"], s["kurtosis"], s["n_obs"], sr_benchmark=bench) == pytest.approx(
+            probabilistic_sharpe_ratio(POS, sr_benchmark=bench), rel=1e-12)
+
+
+def test_dsr_from_stats_matches_the_array_form():
+    s = sharpe_stats(POS)
+    assert dsr_from_stats(
+        s["sharpe"], s["skew"], s["kurtosis"], s["n_obs"], n_trials=100, trial_sr_std=0.5
+    ) == pytest.approx(deflated_sharpe_ratio(POS, n_trials=100, trial_sr_std=0.5), rel=1e-12)
+
+
+def test_mintrl_from_stats_matches_the_array_form():
+    s = sharpe_stats(POS)
+    assert min_track_record_length_from_stats(
+        s["sharpe"], s["skew"], s["kurtosis"], s["n_obs"]
+    ) == pytest.approx(min_track_record_length(POS), rel=1e-12)
+    assert min_track_record_length_from_stats(0.0, 0.0, 3.0, 60) == math.inf  # SR not above benchmark
+    assert psr_from_stats(0.5, 0.0, 3.0, 1) == 0.0  # n<2 undefined
+
+
+def test_psr_from_stats_golden_vectors():
+    # Exact closed-form pins (kurtosis NON-excess; PSR denom = 1 - g3·SR + (g4-1)/4·SR²). The engine's TS port
+    # MUST reproduce these to 1e-9 — a drift in either language fails. Regenerate from this module if the
+    # formula ever legitimately changes.
+    assert psr_from_stats(0.0, 0.0, 3.0, 100) == pytest.approx(0.5, abs=1e-12)  # SR=benchmark ⇒ Phi(0)
+    assert psr_from_stats(0.1, 0.0, 3.0, 101) == pytest.approx(0.8407413278013518, rel=1e-9)  # normal moments
+    assert psr_from_stats(0.15, -0.5, 4.0, 200, sr_benchmark=0.05) == pytest.approx(0.911495153669269, rel=1e-9)

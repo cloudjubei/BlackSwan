@@ -243,6 +243,18 @@ class MultiTimelineDataProvider(AbstractDataProvider):
             rows = np.concatenate([pad, rows], axis=0)
         return rows
 
+    def _layer_trim(self, i: int) -> int:
+        # Base-bar offset at which observed layer i's RESAMPLED frame begins. The base layer reads the
+        # un-trimmed raw frame (trim 0); every coarser layer's substreams start `fidelity_offset` base bars
+        # in (process_fidelity `pos_from`), a MIDDLE layer carrying the coarser layer's larger warmup. The
+        # row index into that frame must subtract this trim or it reads trim/multiplier rows into the FUTURE
+        # (the middle-layer look-ahead leak): fidelity_offset here == the per-layer value passed at build.
+        # White-box unit fixtures build via __new__ and hand-wire untrimmed frames (no fidelity_input): trim 0.
+        fidelity_input = getattr(self, "fidelity_input", None)
+        if fidelity_input is None or self.layers[i] == fidelity_input:
+            return 0
+        return self.fidelity_offset - self.multipliers[i] * self.config.lookback_window_size
+
     def _precompute_values(self):
         """Hoist the per-step pandas out of the observation path. Convert the decision-bar timestamps and
         every fidelity substream to numpy ONCE, then precompute the per-(layer, step) substream mapping +
@@ -261,7 +273,7 @@ class MultiTimelineDataProvider(AbstractDataProvider):
             for step in range(self.steps):
                 offset = step * self.divider_run + start
                 mapping = self.get_current_mapping(self.raw_df, offset, self.layers[i], self.fidelity_run)
-                index = int((offset - mapping) / self.multipliers[i])
+                index = int((offset - mapping - self._layer_trim(i)) / self.multipliers[i])
                 top = index if self.multipliers[i] <= self.divider_run else index - 1
                 maps.append(mapping)
                 tops.append(top)
@@ -292,7 +304,7 @@ class MultiTimelineDataProvider(AbstractDataProvider):
         else:
             offset = step * self.divider_run + self.get_start_index()
             sub = self.get_current_mapping(self.raw_df, offset, self.layers[i], self.fidelity_run)
-            index = int((offset - sub) / self.multipliers[i])
+            index = int((offset - sub - self._layer_trim(i)) / self.multipliers[i])
             top = index if self.multipliers[i] <= self.divider_run else index - 1
         df = dfs[sub]
         row = min(max(int(top), 0), df.shape[0] - 1)
@@ -333,7 +345,7 @@ class MultiTimelineDataProvider(AbstractDataProvider):
                 mapping = self.get_current_mapping(self.raw_df, offset, self.layers[i], self.fidelity_run)
                 df = self.fidelity_dfs[i][mapping]
 
-                index = int((offset - mapping)/self.multipliers[i])
+                index = int((offset - mapping - self._layer_trim(i))/self.multipliers[i])
                 # Look-ahead guard (RETURN_ENGINE_AUDIT.md): the bar at `index` BEGINS at this step's
                 # bar. The run-fidelity layer's bar IS the decision bar — it closes now, so observing it
                 # is the standard decide-at-close assumption (top == index). A COARSER layer's current bar

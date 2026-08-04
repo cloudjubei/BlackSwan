@@ -75,8 +75,8 @@ def _time_device(model_name, device, budget, warmup, prov, env_cfg):
     from src.environment.env_factory import create_environment
     from src.model.model_factory import create_model
 
-    cfg = {"asset": "BTCUSDT", "timeframe": "1h", "data_type": "only_price_percent",
-           "use_indicators": True, "model_name": model_name, "device": device,
+    cfg = {"asset": "BTCUSDT", "timeframe": "1h", "projection": "with_indicators",
+           "model_name": model_name, "device": device,
            "learning_starts": 200, "episodes": 1}
     env = create_environment(env_cfg, prov, device)
     model = create_model(config_builder.build_model_config(cfg), env, device)
@@ -137,7 +137,7 @@ def main(argv=None):
 
     data_cfg = config_builder.build_data_config({"asset": "BTCUSDT", "timeframe": "1h",
                                                  "walk_forward_window": window,
-                                                 "data_type": "only_price_percent", "use_indicators": True})
+                                                 "projection": "with_indicators"})
     env_cfg = config_builder.build_env_config({"timeframe": "1h"})
     prov = create_provider(data_cfg, data_cfg.test_data_paths, data_cfg.fidelity_input_test,
                            data_cfg.fidelity_run_test, data_cfg.layers_test,

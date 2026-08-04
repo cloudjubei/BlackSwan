@@ -367,7 +367,7 @@ def test_main_writes_summary_and_prints_objective(tmp_path, monkeypatch, capsys)
     rc = run_mod.main(["--config-json", str(cfg_path), "--summary-out", out_path])
     assert rc == 0
     printed = capsys.readouterr().out
-    assert "objective(traded_return)=0.4242" in printed
+    assert "objective(total_return_pct)=0.4242" in printed
     assert "status=ok" in printed
     assert out_path in printed
 
@@ -381,3 +381,73 @@ def test_main_passes_is_rl_through_to_summary(tmp_path, monkeypatch):
     run_mod.main(["--config-json", str(cfg_path), "--summary-out", out_path])
     # _run_one's is_rl flag flows into build_summary unchanged.
     assert captured["is_rl"] is True
+
+
+# --- A6: mid-training snapshot traces ----------------------------------------
+
+
+def test_trace_checkpoint_loads_snapshot_and_returns_its_trace(monkeypatch):
+    captured = {}
+
+    def fake_run_one(cfg):
+        captured["cfg"] = dict(cfg)
+        return object(), object(), object(), True, 1.0
+
+    def fake_attach(out, env_test, model, cfg, summary_out, is_rl):
+        out.setdefault("artifacts", {})["decisionTrace"] = {
+            "steps": [{"step": 0, "action": "hold"}],
+            "actionCounts": {"hold": 1},
+            "totalSteps": 1,
+        }
+
+    monkeypatch.setattr(run_mod, "_run_one", fake_run_one)
+    monkeypatch.setattr(run_mod.decision_trace, "attach_decision_trace", fake_attach)
+    cfg = {"model_name": "dqn"}
+    trace = run_mod._trace_checkpoint(cfg, "m.step100", cheap=True)
+    assert trace["totalSteps"] == 1
+    # loaded via checkpoint_to_load; cheap disables the expensive replays
+    assert captured["cfg"]["checkpoint_to_load"] == "m.step100"
+    assert captured["cfg"]["decision_trace_attribution"] is False
+    assert captured["cfg"]["decision_trace_attention"] is False
+    assert captured["cfg"]["decision_trace_latent"] is False
+    assert cfg == {"model_name": "dqn"}  # original cfg not mutated
+
+
+def test_trace_checkpoint_returns_none_when_no_trace(monkeypatch):
+    monkeypatch.setattr(run_mod, "_run_one", lambda cfg: (object(), object(), object(), True, 1.0))
+    monkeypatch.setattr(run_mod.decision_trace, "attach_decision_trace", lambda *a, **k: None)
+    assert run_mod._trace_checkpoint({"model_name": "dqn"}, "m.step100") is None
+
+
+def test_main_writes_snapshot_traces_from_model_snapshots(tmp_path, monkeypatch):
+    class _M:
+        id = "runid"
+        snapshots = [{"step": 100, "path": "checkpoints/runid.step100"}]
+
+        def produces_checkpoint(self):
+            return True
+
+    monkeypatch.setattr(run_mod, "_run_one", lambda cfg: (object(), object(), _M(), True, 1.0))
+    monkeypatch.setattr(
+        run_mod.summary_mod,
+        "build_summary",
+        lambda *a, **k: {"objective": 0.5, "health": {"status": "ok"}, "artifacts": {}},
+    )
+    monkeypatch.setattr(run_mod.decision_trace, "attach_decision_trace", lambda *a, **k: None)
+    monkeypatch.setattr(
+        run_mod,
+        "_trace_checkpoint",
+        lambda cfg, ref, cheap=True: {"steps": [{"step": 0, "action": "hold"}], "actionCounts": {"hold": 1}, "totalSteps": 1},
+    )
+    monkeypatch.chdir(tmp_path)  # real chdir FIRST, then neutralise main()'s chdir-to-repo-root
+    monkeypatch.setattr(run_mod.os, "chdir", lambda *a, **k: None)
+    (tmp_path / "checkpoints").mkdir()
+    cfg_path = tmp_path / "cfg.json"
+    cfg_path.write_text(json.dumps({"model_name": "dqn"}))
+    out_path = str(tmp_path / "s.json")
+    assert run_mod.main(["--config-json", str(cfg_path), "--summary-out", out_path]) == 0
+    out = json.loads((tmp_path / "s.json").read_text())
+    idx = out["artifacts"]["snapshotTraces"]
+    assert [e["step"] for e in idx] == [100]
+    assert idx[0]["traceFile"] == "checkpoints/runid.snapshots.jsonl"
+    assert (tmp_path / "checkpoints" / "runid.snapshots.jsonl").exists()

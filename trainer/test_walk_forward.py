@@ -4,7 +4,26 @@ from trainer.walk_forward import (
     DEFAULT_WALK_FORWARD_WINDOW,
     resolve_walk_forward_window,
     walk_forward_window_ids,
+    windows_supported,
 )
+
+
+def test_2026_windows_exist_now_that_2026_data_is_on_disk():
+    ids = walk_forward_window_ids()
+    assert "2026" in ids and "alt-2026" in ids
+
+
+def test_windows_supported_is_derived_from_the_asset_data_range():
+    # An altcoin (2022-01 →) supports the alt-* windows but NOT the plain ones that train from 2020.
+    alt = windows_supported("2022-01", "2026-06")
+    assert "alt-2024" in alt
+    assert "2024" not in alt
+    # A deep-history asset (2017 →) supports everything, incl. the new 2026 window.
+    full = windows_supported("2017-08", "2026-06")
+    assert {"2024", "2026", "alt-2024"} <= set(full)
+    # An asset whose data ends mid-2023 can't run a 2024 test window.
+    short = windows_supported("2018-01", "2023-06")
+    assert "2023" in short and "2024" not in short
 
 
 def test_default_window_reproduces_the_legacy_2020_2023_vs_2024_split():
@@ -69,6 +88,21 @@ def test_alt_windows_train_from_2022_for_assets_whose_history_starts_there():
     assert train25[0] == (2022, 1)
     assert train25[-1] == (2024, 12)
     assert test25 == [(2025, m) for m in range(1, 13)]
+
+
+def test_stk_windows_train_from_2018_for_deep_history_assets():
+    # stk-* windows train from 2018 — deeper than the plain windows' 2020 start — for assets whose data
+    # reaches back that far (stocks from 2018-01, BTC from 2017-08). The gate is DATA RANGE, not asset class.
+    train, test, meta = resolve_walk_forward_window({"walk_forward_window": "stk-2024"})
+    assert train[0] == (2018, 1)
+    assert train[-1] == (2023, 12)
+    assert test == [(2024, m) for m in range(1, 13)]
+    assert meta["train_from"] == "2018-01"
+
+    # windows_supported gates by on-disk range: a 2018-start asset gets stk-*, a 2022-start altcoin does not.
+    deep = windows_supported("2018-01", "2026-06")
+    assert "stk-2024" in deep
+    assert "stk-2024" not in windows_supported("2022-01", "2026-06")  # altcoin can't train from 2018
 
 
 def test_window_ids_include_the_fixed_and_open_ended_windows():

@@ -18,6 +18,7 @@ failure degrades to "no enrichment" rather than failing the run — a missing tr
 """
 
 import json
+import os
 
 import numpy as np
 
@@ -33,6 +34,10 @@ _COMPACT_MAX_STEPS = summary_mod._MAX_SERIES_POINTS
 # Gradient saliency is bounded to this many executed (non-forced) decisions so attribution stays a
 # small constant cost (~one backprop each) regardless of how long the test window is.
 _ATTRIBUTION_MAX_SAMPLES = 256
+# The attention-heatmap aggregate (opt-in, `decision_trace_attention`) degrades to None when either axis of
+# a captured attention matrix exceeds this — so the embedded grid stays small (≤ this² cells), bounding the
+# inline summary size the way the saliency sample budget bounds attribution cost.
+_MAX_ATTN_DIM = 64
 # Riemann-sum steps for Integrated Gradients (opt-in, `decision_trace_ig`). More steps = a tighter
 # completeness approximation at linear extra cost (one backprop each); 32 is the common default.
 _IG_STEPS = 32
@@ -706,6 +711,230 @@ def _write_full_trace(steps, model, summary_out):
         return None
 
 
+def write_snapshot_traces(summary, snapshots, trace_fn, sidecar_path):
+    """Generate a decision trace for each mid-training snapshot (via the injected ``trace_fn(checkpointRef)``)
+    and STREAM them to a JSONL sidecar — one ``{step, trace}`` per line, so only one trace is ever held in
+    RAM at a time (A6 memory safety). Attaches a lightweight index on
+    ``summary['artifacts']['snapshotTraces']``: ``[{step, checkpointRef, traceFile, keyMetrics}]``.
+    Best-effort per snapshot (a failed load is skipped, never fatal); no-op (no key) for empty snapshots."""
+    if not snapshots:
+        return
+    # If the sidecar can't be opened, emit nothing — an index whose entries point at a file that was never
+    # written is worse than no index, and there's no point generating (expensive) traces we can't persist.
+    try:
+        handle = open(sidecar_path, "w")
+    except Exception:
+        return
+    index = []
+    try:
+        for snap in snapshots:
+            step = snap.get("step")
+            ref = os.path.basename(str(snap.get("path", "")))
+            try:
+                trace = trace_fn(ref)
+            except Exception:
+                trace = None
+            if not trace:
+                continue
+            handle.write(json.dumps({"step": step, "trace": trace}) + "\n")
+            index.append(
+                {
+                    "step": step,
+                    "checkpointRef": ref,
+                    "traceFile": sidecar_path,
+                    "keyMetrics": {
+                        "actionCounts": trace.get("actionCounts", {}),
+                        "totalSteps": trace.get("totalSteps"),
+                    },
+                }
+            )
+    finally:
+        handle.close()
+    if index:
+        summary.setdefault("artifacts", {})["snapshotTraces"] = index
+    else:
+        try:
+            os.remove(sidecar_path)  # every snapshot failed — never leave an empty, unreferenced sidecar
+        except OSError:
+            pass
+
+
+def _collect_attention_matrices(model):
+    """Every policy submodule that stashed a ``last_attn`` this forward, as ``(label, tensor)`` — the
+    attention weight matrices the custom blocks / sequence extractor compute (see src/model/custom). A
+    recipe may wire zero, one, or many attention blocks, so this enumerates ALL of them. Best-effort:
+    ``[]`` on a non-introspectable model or any error."""
+    try:
+        rl_model = getattr(model, "rl_model", None)
+        policy = getattr(rl_model, "policy", None) if rl_model is not None else None
+        if policy is None or not hasattr(policy, "modules"):
+            return []
+        out = []
+        for i, module in enumerate(policy.modules()):
+            last_attn = getattr(module, "last_attn", None)
+            if last_attn is not None:
+                out.append((f"{type(module).__name__}[{i}]", last_attn))
+        return out
+    except Exception:
+        return []
+
+
+def _square_2d(tensor):
+    """Reduce a captured attention tensor to a 2-D [rows, cols] grid: mean over a leading batch axis, then
+    require a real matrix (both dims > 1). ``None`` for degenerate shapes (e.g. AdditiveAttention's
+    [batch, seq, 1] or GlobalContextAttention's [batch, 1, 1]), which carry no usable heatmap."""
+    try:
+        arr = np.asarray(tensor.detach().cpu().numpy() if hasattr(tensor, "detach") else tensor, dtype=float)
+    except Exception:
+        return None
+    if arr.ndim == 3:
+        arr = arr.mean(axis=0)
+    if arr.ndim != 2 or arr.shape[0] < 2 or arr.shape[1] < 2:
+        return None
+    return arr
+
+
+def _attention_matrix(env, model):
+    """Aggregate the policy's captured attention weights over the deterministic test rollout into ONE
+    mean [rows, cols] matrix (domain-oblivious: query positions × key positions). Its own bounded replay
+    (mirrors ``_latent_map``), best-effort. ``None`` when the model exposes no usable attention, or the
+    matrix exceeds ``_MAX_ATTN_DIM`` (degrade rather than emit a huge inline grid)."""
+    rl_model = getattr(model, "rl_model", None)
+    if rl_model is None or not hasattr(rl_model, "predict"):
+        return None
+    recurrent = is_recurrent_model_name(getattr(getattr(model, "rl_config", None), "model_name", None))
+    try:
+        obs, _ = env.reset()
+    except Exception:
+        return None
+    lstm_states = None
+    episode_starts = np.ones((1,), dtype=bool)
+    acc = None
+    count = 0
+    budget = _ATTRIBUTION_MAX_SAMPLES
+    try:
+        while True:
+            if recurrent:
+                action, lstm_states = rl_model.predict(
+                    obs, state=lstm_states, episode_start=episode_starts, deterministic=True
+                )
+            else:
+                action, _ = rl_model.predict(obs, deterministic=True)
+            if budget > 0:
+                grid = None
+                for _, tensor in _collect_attention_matrices(model):
+                    grid = _square_2d(tensor)
+                    if grid is not None:
+                        break
+                if grid is not None:
+                    if grid.shape[0] > _MAX_ATTN_DIM or grid.shape[1] > _MAX_ATTN_DIM:
+                        return None  # degrade: too large to embed as an aggregate grid
+                    if acc is None:
+                        acc = grid
+                        count = 1
+                        budget -= 1
+                    elif grid.shape == acc.shape:
+                        acc = acc + grid
+                        count += 1
+                        budget -= 1
+            obs, _, done, _, _ = env.step(action)
+            episode_starts = np.array([bool(done)])
+            if done or budget <= 0:
+                break
+    except Exception:
+        return None
+    if acc is None or count == 0:
+        return None
+    mean = acc / count
+    rows, cols = mean.shape
+    return {
+        "rows": [f"q{i}" for i in range(rows)],
+        "cols": [f"k{j}" for j in range(cols)],
+        "grid": [[summary_mod._finite(mean[i, j]) for j in range(cols)] for i in range(rows)],
+        "method": "attention-weights",
+    }
+
+
+def _attn_sidecar_path(model, summary_out):
+    """Where the per-step attention JSONL lives — next to the checkpoint (survives the run) or beside the
+    summary. Mirrors ``_write_full_trace``'s scheme. ``None`` when there's nowhere durable to write it."""
+    checkpoint_id = getattr(model, "id", None)
+    produces = getattr(model, "produces_checkpoint", lambda: False)
+    if produces() and checkpoint_id:
+        return f"checkpoints/{checkpoint_id}.attn.jsonl"
+    if summary_out:
+        return f"{summary_out}.attn.jsonl"
+    return None
+
+
+def write_per_step_attention(env, model, sidecar_path, cfg=None):
+    """Stream ONE per-step attention matrix per line to a JSONL sidecar (never inline, never >1 matrix in
+    RAM) — the temporal companion to the run-aggregate ``_attention_matrix``. Each line is
+    ``{step, rows, cols, grid}`` for a step whose policy exposes a usable ``[<=cap, <=cap]`` matrix; a step
+    whose grid exceeds ``_MAX_ATTN_DIM`` is skipped (degraded, not truncated), and the whole pass is bounded
+    to ``_ATTRIBUTION_MAX_SAMPLES`` steps so the sidecar can't grow unbounded. Best-effort: returns the
+    written path, or ``None`` (no attention / unwritable / nothing written — an empty sidecar is removed)."""
+    rl_model = getattr(model, "rl_model", None)
+    if rl_model is None or not hasattr(rl_model, "predict"):
+        return None
+    try:
+        handle = open(sidecar_path, "w")
+    except Exception:
+        return None
+    recurrent = is_recurrent_model_name(getattr(getattr(model, "rl_config", None), "model_name", None))
+    written = 0
+    try:
+        obs, _ = env.reset()
+        lstm_states = None
+        episode_starts = np.ones((1,), dtype=bool)
+        step_idx = 0
+        budget = _ATTRIBUTION_MAX_SAMPLES
+        while True:
+            if recurrent:
+                action, lstm_states = rl_model.predict(
+                    obs, state=lstm_states, episode_start=episode_starts, deterministic=True
+                )
+            else:
+                action, _ = rl_model.predict(obs, deterministic=True)
+            if budget > 0:
+                grid = None
+                for _, tensor in _collect_attention_matrices(model):
+                    grid = _square_2d(tensor)
+                    if grid is not None:
+                        break
+                if grid is not None and grid.shape[0] <= _MAX_ATTN_DIM and grid.shape[1] <= _MAX_ATTN_DIM:
+                    rows, cols = grid.shape
+                    handle.write(
+                        json.dumps(
+                            {
+                                "step": step_idx,
+                                "rows": [f"q{i}" for i in range(rows)],
+                                "cols": [f"k{j}" for j in range(cols)],
+                                "grid": [[summary_mod._finite(grid[i, j]) for j in range(cols)] for i in range(rows)],
+                            }
+                        )
+                        + "\n"
+                    )
+                    written += 1
+                    budget -= 1
+            obs, _, done, _, _ = env.step(action)
+            episode_starts = np.array([bool(done)])
+            step_idx += 1
+            if done or budget <= 0:
+                break
+    except Exception:
+        pass  # a partial sidecar is fine — `written` decides whether we keep it
+    finally:
+        handle.close()
+    if written == 0:
+        try:
+            os.remove(sidecar_path)  # never leave an empty sidecar / a bogus artifact reference
+        except OSError:
+            pass
+        return None
+    return sidecar_path
+
+
 def attach_decision_trace(summary, env, model, cfg, summary_out, is_rl):
     """Build the decision trace and attach it to ``summary['artifacts']``. Best-effort and additive: a
     missing/empty trace leaves the summary untouched. Resets ``env`` when it replays, so the summary must
@@ -751,6 +980,23 @@ def attach_decision_trace(summary, env, model, cfg, summary_out, is_rl):
             latent_map = None
         if latent_map:
             trace["latentMap"] = latent_map
+    if is_rl and cfg.get("decision_trace_attention", False):
+        try:
+            attention_matrix = _attention_matrix(env, model)
+        except Exception:
+            attention_matrix = None
+        if attention_matrix:
+            trace["attentionMatrix"] = attention_matrix
+    # Per-step attention is a separate, opt-in SIDECAR (never inline — per-step grids over a rollout are
+    # unbounded) referenced by `attentionMatrixFile`; distinct flag from the inline aggregate above.
+    if is_rl and cfg.get("decision_trace_attention_per_step", False):
+        try:
+            attn_path = _attn_sidecar_path(model, summary_out)
+            written = write_per_step_attention(env, model, attn_path, cfg) if attn_path else None
+        except Exception:
+            written = None
+        if written:
+            trace["attentionMatrixFile"] = written
     artifacts["decisionTrace"] = trace
     if trace_file:
         artifacts["decisionTraceFile"] = trace_file

@@ -116,7 +116,7 @@ def _observed_close(p, raw, raw_ts, offset, i, layer):
     get_values' own offset/mapping/index/top arithmetic. Returns None when no bar has closed yet
     (top < 0 -> the zero-pad sentinel, nothing observed)."""
     mapping = p.get_current_mapping(raw, offset, layer, p.fidelity_run)
-    index = int((offset - mapping) / p.multipliers[i])
+    index = int((offset - mapping - p._layer_trim(i)) / p.multipliers[i])
     top = index if p.multipliers[i] <= p.divider_run else index - 1
     if top < 0:
         return None
@@ -269,3 +269,48 @@ def test_hourly_step_coarse_only_price_anchors_on_decision_bar(fidelity_set, mon
             f"{raw_price[anchor]} at raw row {anchor} — the observation is anchored here but the trade "
             f"fills {anchor - step} bars in the past → the model observes the future (look-ahead)."
         )
+
+
+def _pairs_for(train_months):
+    def _f(cfg=None):
+        return [(2020, m) for m in train_months], [(2020, 12)], {"walk_forward_window": "tiny"}
+    return _f
+
+
+def _build_months(timeframe, fidelity_set, train_months, monkeypatch):
+    fn = _pairs_for(train_months)
+    monkeypatch.setattr(wf, "resolve_walk_forward_window", fn)
+    monkeypatch.setattr(cb, "resolve_walk_forward_window", fn)
+    dc = cb.build_data_config({"timeframe": timeframe, "fidelity_set": fidelity_set})
+    return create_provider(
+        dc, dc.train_data_paths, dc.fidelity_input, dc.fidelity_run, list(dc.layers),
+        dc.buyreward_maxwait, dc.buyreward_percent,
+    )
+
+
+@pytest.mark.parametrize(
+    "timeframe,fidelity_set", [("1h", "1d+1w"), ("1h", "1h+1d+1w"), ("1d", "1h+1d+1w")]
+)
+def test_observation_is_time_prefix_causal(timeframe, fidelity_set, monkeypatch):
+    """GOLD-STANDARD, implementation-agnostic look-ahead detector (never re-derives get_values' arithmetic):
+    an observation at decision step t must be a pure function of data <= its decision bar. So a provider
+    built on a strict TIME-PREFIX of the data (fewer trailing months) must yield BYTE-IDENTICAL
+    get_values(step) for every step whose decision bar lies inside the prefix — adding future months cannot
+    change a causal observation. A MIDDLE-layer future-row leak makes the full-data provider observe bars the
+    prefix lacks (it clamps to a different row), so its early-step observations differ -> RED. This is the
+    guard the per-arithmetic oracle can't be (the oracle shares the bug); it stays green only if no future
+    bar can enter any layer's observation. Middle-layer combos: '1d' is a middle layer over a 1h base."""
+    long_p = _build_months(timeframe, fidelity_set, list(range(1, 13)), monkeypatch)
+    short_p = _build_months(timeframe, fidelity_set, list(range(1, 9)), monkeypatch)
+    n = short_p.get_timesteps()
+    assert n > 8, f"{timeframe}@{fidelity_set}: too few steps ({n}) in the prefix provider"
+    compared = 0
+    for step in range(n - 3):  # leave a margin: the prefix's last bars sit at its data edge (clamped)
+        a = np.asarray(long_p.get_values(step))
+        b = np.asarray(short_p.get_values(step))
+        assert np.array_equal(a, b), (
+            f"[{timeframe}@{fidelity_set}] step {step}: the observation CHANGED when future months were "
+            f"added — a future bar leaked into the observation (look-ahead). shapes {a.shape}/{b.shape}"
+        )
+        compared += 1
+    assert compared > 5, f"{timeframe}@{fidelity_set}: only {compared} steps compared"

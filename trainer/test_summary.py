@@ -107,6 +107,14 @@ def _two_trade_summary():
     return summary_mod.build_summary(env, state, _CFG, _FakeModel(), "2026-01-01T00:00:00Z", True), env, state
 
 
+def test_baseline_metric_is_the_do_nothing_traded_return_floor():
+    # The exploration autopilot's basin threshold reads metrics.baseline as the trivial reference a region
+    # must beat. For the traded_return objective a do-nothing / buy-and-hold agent earns 0 (the trade gate
+    # zeroes it), so the honest baseline is 0.0 — tightening the basin gate to "profitable trading".
+    out, _, _ = _two_trade_summary()
+    assert out["metrics"]["baseline"] == 0.0
+
+
 def test_realized_cost_bps_from_env_fees():
     env = _FakeEnv(
         net_worths=[100000, 101000],
@@ -451,6 +459,110 @@ def test_trade_gate_is_quadratic():
 def test_trade_gate_quadratically_gates_a_low_trade_run():
     out = _build({"timeframe": "1d", "lookback_window_size": 0}, n_trades=10)
     assert out["metrics"]["trade_gate"] == pytest.approx((10 / summary_mod.MIN_TRADES_FOR_FULL_CREDIT) ** 2)
+
+
+def test_objective_is_the_honest_total_return_pct_not_the_gated_traded_return():
+    # The objective is now the raw post-fee portfolio return (== metrics.total_return_pct), NOT the magic-20
+    # trade-gated traded_return. Trade FREQUENCY is enforced by the trades_per_day scorecard gate instead, so
+    # the objective no longer suppresses a low-trade run's real return. traded_return stays as a diagnostic.
+    out, _, _ = _two_trade_summary()  # n_trades=2 -> trade_gate=0.01, so traded_return is 100x below the return
+    assert out["objective"] == pytest.approx(out["metrics"]["total_return_pct"])
+    assert out["objective"] != pytest.approx(out["metrics"]["traded_return"])
+
+
+# --- trades_per_day: a step-frequency-invariant trade rate for the scorecard's liveness gate ---
+
+
+def test_trades_per_day_is_trades_over_test_days_at_daily_step():
+    # 1d step: one decision bar == one calendar day, so trades/day = n_trades / oos_n_obs (test bars).
+    out, _, _ = _two_trade_summary()
+    m = out["metrics"]
+    assert m["trades_per_day"] == pytest.approx(m["n_trades"] / m["oos_n_obs"])
+
+
+def test_trades_per_day_scales_with_step_frequency():
+    # The SAME equity curve stepped hourly spans 1/24 the calendar days, so the daily trade rate is 24×
+    # the daily-step rate — the rate is normalised by cadence, not just by bar count.
+    state = _state(n_trades=2, win=50.0, total_profit=2000.0, sls=1)
+    daily = summary_mod.build_summary(_two_trade_env(), state, {"timeframe": "1d", "lookback_window_size": 0}, _FakeModel(), "t", True)
+    hourly = summary_mod.build_summary(_two_trade_env(), state, {"timeframe": "1h", "lookback_window_size": 0}, _FakeModel(), "t", True)
+    assert hourly["metrics"]["trades_per_day"] == pytest.approx(daily["metrics"]["trades_per_day"] * 24)
+
+
+# --- _signal_expectancy: the Case-1 position-blind signal lens (forward-return edge per buy/sell) ---
+
+
+def test_signal_expectancy_scores_a_good_long_entry():
+    # A long entry at step 0; price rises over the horizon -> positive forward edge, 100% hit rate.
+    trades = [{"entry_step": 0, "exit_step": 5, "side": "long", "reason": "open"}]
+    prices = [100, 101, 102, 103, 104, 105]  # H=2: fwd at step 0 = 102/100 - 1 = +2%
+    sig = summary_mod._signal_expectancy(trades, prices, 2)
+    assert sig["signal_count"] == 1
+    assert sig["signal_expectancy"] == pytest.approx(2.0)
+    assert sig["signal_hit_rate"] == 100.0
+    assert sig["signal_horizon"] == 2
+
+
+def test_signal_expectancy_penalises_a_bad_long_entry():
+    # Long entry, price FALLS over the horizon -> negative edge, 0% hit.
+    trades = [{"entry_step": 0, "exit_step": 5, "side": "long", "reason": "open"}]
+    prices = [100, 99, 98, 97, 96, 95]
+    sig = summary_mod._signal_expectancy(trades, prices, 2)
+    assert sig["signal_expectancy"] < 0
+    assert sig["signal_hit_rate"] == 0.0
+
+
+def test_signal_expectancy_credits_a_well_timed_agent_exit():
+    # Long entry@0 (price rises after = good) + an AGENT sell@2 after which price falls (good exit = +edge).
+    trades = [{"entry_step": 0, "exit_step": 2, "side": "long", "reason": "sell"}]
+    prices = [100, 105, 110, 108, 106, 104]  # H=2: entry fwd +10%; exit@2 fwd=106/110-1<0 -> exit edge = -(neg) > 0
+    sig = summary_mod._signal_expectancy(trades, prices, 2)
+    assert sig["signal_count"] == 2
+    assert sig["signal_hit_rate"] == 100.0
+
+
+def test_signal_expectancy_excludes_forced_tpsl_exits():
+    # A stop-loss exit is a FORCED close, not the agent's directional signal — only the entry is scored.
+    trades = [{"entry_step": 0, "exit_step": 2, "side": "long", "reason": "sl"}]
+    prices = [100, 101, 102, 103, 104, 105]
+    assert summary_mod._signal_expectancy(trades, prices, 2)["signal_count"] == 1
+
+
+def test_signal_expectancy_coverage_is_agent_signals_over_bars():
+    # Entry(open) + agent sell = 2 agent signals over 6 bars -> coverage 2/6; the entry alone is scorable at H=2.
+    trades = [{"entry_step": 0, "exit_step": 1, "side": "long", "reason": "sell"}]
+    sig = summary_mod._signal_expectancy(trades, [100, 102, 104, 106, 108, 110], 2)
+    assert sig["signal_coverage"] == pytest.approx(2 / 6)
+
+
+def test_signal_expectancy_empty_without_scorable_signals():
+    assert summary_mod._signal_expectancy([], [100, 101, 102], 1) == {}
+    # A signal too close to the end (no H bars ahead) can't be scored -> {}.
+    assert summary_mod._signal_expectancy([{"entry_step": 5, "exit_step": 5, "side": "long", "reason": "open"}], [100, 101], 2) == {}
+
+
+def test_build_summary_emits_the_signal_lens_for_a_trading_run():
+    out, _, _ = _two_trade_summary()
+    m = out["metrics"]
+    for k in ("signal_expectancy", "signal_hit_rate", "signal_coverage", "signal_count", "signal_horizon"):
+        assert k in m
+
+
+def test_trades_per_day_zero_when_no_test_bars():
+    # A too-short equity curve has no OOS bars — the rate must be 0.0, never a divide-by-zero blow-up.
+    class _Prov:
+        prices = None
+
+        def get_price(self, i):
+            return [100.0][i]
+
+    env = types.SimpleNamespace(
+        net_worths=[100000], actions=[1], actions_made=[True], forced_actions=[0],
+        tpsls=[0], tpsl_kinds=[None], fees=[], initial_net_worth=100000.0,
+        initial_balance=100000.0, data_provider=_Prov(),
+    )
+    out = summary_mod.build_summary(env, _state(n_trades=1), _CFG, _FakeModel(), "t", True)
+    assert out["metrics"]["trades_per_day"] == 0.0
 
 
 # --- _finite: only finite ints/floats pass; NaN/inf/non-numeric fall back to the default ---
@@ -843,3 +955,47 @@ def test_run_chart_counts_authoritative_while_markers_dedup_on_grid():
     assert chart["counts"]["buy_attempt"] == 2
     drawn = [m for m in chart["markers"] if m["type"] == "buy_attempt"]
     assert len(drawn) == 1
+
+
+# --- _capture_stats: beta + up/down capture (A4.3 honesty guardrail inputs) --------------------------
+# The engine's beta/up-vs-down-capture gate (kill the closet-long) reads these per-run scalars. Market = raw
+# price return per step, model = equity return per step, classified by the SIGN of the market return.
+
+def test_capture_stats_up_down_and_beta_on_a_known_series():
+    # prices: +10% (up bar) then -10% (down bar); model equity: +5% then -4%.
+    out = summary_mod._capture_stats([100.0, 105.0, 100.8], [100.0, 110.0, 99.0])
+    assert out["up_capture"] == pytest.approx(0.5)  # +0.05 / +0.10
+    assert out["down_capture"] == pytest.approx(0.4)  # -0.04 / -0.10  (<1 ⇒ defensive in the bear)
+    assert out["beta"] == pytest.approx(0.45)  # cov(model,market) / var(market) over the two steps
+
+
+def test_capture_stats_empty_when_degenerate():
+    assert summary_mod._capture_stats([100.0, 100.0], [100.0, 110.0]) == {}  # < 3 aligned points
+    assert summary_mod._capture_stats([100.0, 105.0], [100.0, 110.0, 99.0]) == {}  # misaligned lengths
+    assert summary_mod._capture_stats([100.0] * 4, [100.0, 110.0, 99.0, 120.0]) == {}  # flat equity = do-nothing
+    assert summary_mod._capture_stats([100.0, 101.0, 102.0], [100.0, 100.0, 100.0]) == {}  # no market variance
+
+
+def test_capture_stats_emits_only_the_reachable_side():
+    # Two UP bars only ⇒ up_capture present; down_capture absent (no down bar to divide by), beta absent (no
+    # market variance). A partial emission is still safe to metrics.update().
+    out = summary_mod._capture_stats([100.0, 105.0, 110.0], [100.0, 110.0, 121.0])
+    assert "up_capture" in out
+    assert "down_capture" not in out
+
+
+def test_build_summary_emits_capture_metrics_for_a_trading_run():
+    out, _, _ = _two_trade_summary()
+    m = out["metrics"]
+    assert "up_capture" in m and "down_capture" in m and "beta" in m
+    assert all(math.isfinite(m[k]) for k in ("up_capture", "down_capture", "beta"))
+
+
+def test_build_summary_omits_capture_metrics_for_a_do_nothing_run():
+    # Flat equity + no trades ⇒ the capture helper returns {} so the engine's capture gate SKIPS the run
+    # rather than reading a non-participating agent as maximally 'defensive' (down_capture 0).
+    out = _build(
+        _CFG, net_worths=[100000] * 6, actions=[0] * 6, prices=[100, 110, 105, 120, 115, 130], n_trades=0
+    )
+    for key in ("up_capture", "down_capture", "beta"):
+        assert key not in out["metrics"]

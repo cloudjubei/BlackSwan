@@ -25,7 +25,10 @@ class DataConfig:
     # SB3 does not clip. "none" = leave as-is (historical); "clip" = clip features to [-1,1]; "tanh" =
     # tanh-squash. Applied to the final feature frame in process_df_simple.
     obs_squash: str = "none"
-   
+    # Global context panel id (see trainer.context CONTEXT_PANELS): macro series fused onto the bar clock
+    # as raw-level observation columns. "none" = no context channels (byte-identical to pre-context runs).
+    context: str = "none"
+
 data_2017_to_2023vs2024_only_price_percent = DataConfig(
     id= "data_2020_to_2023vs2024_only_price_percent",
     type="only_price_percent",

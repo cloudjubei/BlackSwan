@@ -33,9 +33,21 @@ _BTC = "BTCUSDT"
 _SERIES_DIRECTORIES = {"macro", "fundamentals"}
 
 
+def _asset_data_range(on_disk):
+    """(start, end) as ``YYYY-MM`` spanning ALL timeframes of an instrument's on-disk coverage (the widest
+    range, so a coin whose 1d is derived still counts its 1m span); (None, None) when nothing is on disk."""
+    starts = [tf["start"] for tf in (on_disk or {}).values() if tf.get("start")]
+    ends = [tf["end"] for tf in (on_disk or {}).values() if tf.get("end")]
+    return (min(starts) if starts else None, max(ends) if ends else None)
+
+
 def build_full_catalog(root="."):
     """The catalog menu joined with the on-disk coverage under ``root``. Price classes scan kline months;
-    the point-in-time release classes (macro/fundamentals) scan their single-file series."""
+    the point-in-time release classes (macro/fundamentals) scan their single-file series. Each PRICE
+    instrument also gains ``supportedWindows`` — the walk-forward windows its data range can actually run
+    (inventory-driven, so an altcoin shows only alt-*, a deep-history asset shows all)."""
+    from trainer.walk_forward import windows_supported
+
     coverage_by_directory = {}
     for cls in data_catalog.catalog():
         directory = cls["directory"]
@@ -45,7 +57,14 @@ def build_full_catalog(root="."):
             if directory in _SERIES_DIRECTORIES
             else data_inventory.scan_coverage(path)
         )
-    return data_catalog.build_catalog(coverage_by_directory)
+    full = data_catalog.build_catalog(coverage_by_directory)
+    for cls in full:
+        if cls["directory"] in _SERIES_DIRECTORIES:
+            continue
+        for inst in cls["instruments"]:
+            start, end = _asset_data_range(inst.get("onDisk", {}))
+            inst["supportedWindows"] = windows_supported(start, end)
+    return full
 
 
 def plan_mine(request):

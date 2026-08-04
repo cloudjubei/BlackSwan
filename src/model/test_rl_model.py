@@ -29,9 +29,9 @@ class _FakeSB3:
         self.saved_path = None
         self.predict_calls = []
 
-    def learn(self, total_timesteps, progress_bar, log_interval, reset_num_timesteps):
+    def learn(self, total_timesteps, progress_bar, log_interval, reset_num_timesteps, callback=None):
         self.learn_calls.append(
-            dict(total_timesteps=total_timesteps, reset_num_timesteps=reset_num_timesteps)
+            dict(total_timesteps=total_timesteps, reset_num_timesteps=reset_num_timesteps, callback=callback)
         )
 
     def save(self, path):
@@ -96,6 +96,40 @@ def test_train_saves_to_checkpoints_folder_joined_with_id(tmp_path):
     m = _rl_model(sb3, episodes=1, progress_bar=False, checkpoints_folder=str(tmp_path))
     m.train(_FakeEnv(5))
     assert sb3.saved_path == os.path.join(str(tmp_path), "rl-test-id")
+
+
+def test_train_passes_snapshot_callback_when_interval_set():
+    # A6: snapshot_interval + save_checkpoint -> learn() gets a SnapshotCheckpointCallback and the model
+    # exposes its (accumulated) snapshots list for run.py to trace afterwards.
+    from src.model.custom.snapshot_callback import SnapshotCheckpointCallback
+
+    sb3 = _FakeSB3()
+    m = _rl_model(sb3, episodes=2, progress_bar=False, checkpoints_folder="cp", snapshot_interval=100)
+    m.train(_FakeEnv(5))
+    callbacks = [c["callback"] for c in sb3.learn_calls]
+    assert all(isinstance(cb, SnapshotCheckpointCallback) for cb in callbacks)
+    # the SAME callback instance across episodes, so thresholds accumulate over the whole run.
+    assert callbacks[0] is callbacks[1]
+    assert callbacks[0].interval == 100
+    assert m.snapshots is callbacks[0].snapshots
+
+
+def test_train_passes_no_callback_and_empty_snapshots_by_default():
+    sb3 = _FakeSB3()
+    m = _rl_model(sb3, episodes=1, progress_bar=False, checkpoints_folder="cp")
+    m.train(_FakeEnv(5))
+    assert sb3.learn_calls[0]["callback"] is None
+    assert m.snapshots == []
+
+
+def test_train_skips_snapshot_callback_when_checkpoints_disabled():
+    # No kept checkpoint -> a snapshot can't persist, so no callback even if an interval is set.
+    sb3 = _FakeSB3()
+    m = _rl_model(sb3, episodes=1, progress_bar=False, checkpoints_folder="cp", snapshot_interval=100)
+    m.config.save_checkpoint = False
+    m.train(_FakeEnv(5))
+    assert sb3.learn_calls[0]["callback"] is None
+    assert m.snapshots == []
 
 
 # --- test() control flow ---------------------------------------------------

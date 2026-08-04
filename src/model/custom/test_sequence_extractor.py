@@ -44,6 +44,49 @@ def test_rejects_unknown_encoder():
         SequenceFeaturesExtractor(_space(10), lookback=2, encoder="nope")
 
 
+# --- attention weight capture (A6) ------------------------------------------
+# The attention encoders discard self.attn's weights; capture them (detached, CPU) for the decision-trace
+# heatmap. 'attn' attends over the LOOKBACK (time) axis -> [B, lookback, lookback]; 'itransformer' attends
+# ACROSS variates -> [B, per_bar, per_bar]. 'tcn' has no attention, so last_attn stays None.
+
+
+def test_attn_encoder_stashes_time_attention():
+    lookback, per_bar = 8, 5
+    ext = SequenceFeaturesExtractor(_space(lookback * per_bar), lookback=lookback, encoder="attn", features_dim=64).eval()
+    out = ext(th.zeros(4, lookback * per_bar, dtype=th.float32))
+    assert out.shape == (4, 64)
+    assert ext.last_attn is not None
+    assert tuple(ext.last_attn.shape) == (4, lookback, lookback)
+    assert th.isfinite(ext.last_attn).all()
+    assert ext.last_attn.requires_grad is False and ext.last_attn.grad_fn is None
+
+
+def test_itransformer_encoder_stashes_variate_attention():
+    lookback, per_bar = 8, 5
+    ext = SequenceFeaturesExtractor(_space(lookback * per_bar), lookback=lookback, encoder="itransformer", features_dim=64).eval()
+    out = ext(th.zeros(4, lookback * per_bar, dtype=th.float32))
+    assert out.shape == (4, 64)
+    assert ext.last_attn is not None
+    assert tuple(ext.last_attn.shape) == (4, per_bar, per_bar)
+    assert th.isfinite(ext.last_attn).all()
+    assert ext.last_attn.requires_grad is False and ext.last_attn.grad_fn is None
+
+
+def test_attn_encoder_skips_stash_in_training_mode():
+    # Capture is eval-only (no per-gradient-step .cpu() sync during training); output stays finite.
+    lookback, per_bar = 8, 5
+    ext = SequenceFeaturesExtractor(_space(lookback * per_bar), lookback=lookback, encoder="attn", features_dim=64).train()
+    out = ext(th.zeros(4, lookback * per_bar, dtype=th.float32))
+    assert out.shape == (4, 64)
+    assert ext.last_attn is None
+
+
+def test_tcn_encoder_has_no_attention():
+    ext = SequenceFeaturesExtractor(_space(10), lookback=2, encoder="tcn").eval()
+    ext(th.zeros(4, 10, dtype=th.float32))
+    assert ext.last_attn is None
+
+
 class _Provider:
     """Minimal single-bar provider to stand up a real env for the build smoke (lookback 1)."""
 

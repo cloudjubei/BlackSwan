@@ -358,6 +358,107 @@ def test_build_data_config_non_technical_keeps_use_indicators_off(monkeypatch):
     assert cfg.use_indicators is False
 
 
+def test_build_data_config_default_projection_is_standard(monkeypatch):
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config({"timeframe": "1d"})
+    assert cfg.type == "only_price_percent"
+    assert cfg.use_indicators is False
+
+
+def test_build_data_config_projection_minimal_is_the_single_own_return(monkeypatch):
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config({"timeframe": "1d", "projection": "minimal"})
+    assert cfg.type == "solo_price_percent"
+    assert cfg.use_indicators is False
+
+
+def test_build_data_config_projection_with_indicators_enables_curated(monkeypatch):
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config({"timeframe": "1d", "projection": "with_indicators"})
+    assert cfg.type == "only_price_percent"
+    assert cfg.use_indicators is True
+
+
+def test_build_data_config_technical_forces_indicators_even_at_minimal(monkeypatch):
+    # The technical override still wins for use_indicators (it reads indicator columns by name), but the
+    # projection still governs the own-price feature set (type).
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config(
+        {"timeframe": "1d", "projection": "minimal", "model_name": "technical"}
+    )
+    assert cfg.use_indicators is True
+    assert cfg.type == "solo_price_percent"
+
+
+def test_build_data_config_per_asset_projection_overrides_scalar(monkeypatch):
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config(
+        {
+            "timeframe": "1d",
+            "asset": "ETHUSDT",
+            "projection": "with_indicators",
+            "projections": {"ETHUSDT": "minimal"},
+        }
+    )
+    assert cfg.type == "solo_price_percent"
+    assert cfg.use_indicators is False
+
+
+def test_asset_directory_resolves_from_catalog():
+    assert config_builder._asset_directory("BTCUSDT") == "binance"
+    assert config_builder._asset_directory("AAPL") == "stocks"
+    assert config_builder._asset_directory("UNKNOWN_XYZ") == "binance"
+
+
+def test_build_data_config_stock_asset_uses_the_stocks_directory():
+    # A stock (1d-only, US equity) resolves its data paths to stocks/, not binance/.
+    import glob
+
+    if not glob.glob("stocks/AAPL-1d-*.json"):
+        import pytest
+
+        pytest.skip("needs AAPL daily files on disk")
+    cfg = config_builder.build_data_config({"timeframe": "1d", "asset": "AAPL", "walk_forward_window": "2024"})
+    paths = list(cfg.train_data_paths[0]) + list(cfg.test_data_paths[0])
+    assert paths and all(p.startswith("stocks/AAPL-1d") for p in paths)
+
+
+def test_build_data_config_default_context_is_none(monkeypatch):
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config({"timeframe": "1d"})
+    assert cfg.context == "none"
+
+
+def test_build_data_config_context_set_is_carried_onto_the_data_config(monkeypatch):
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config({"timeframe": "1d", "context_set": "rates"})
+    assert cfg.context == "rates"
+
+
+def test_build_model_config_continue_from_loads_a_parent_but_keeps_training():
+    # continue_from = extra-train: the parent checkpoint is loaded, but it is NOT checkpoint_to_load, so
+    # is_pretrained stays False and RLModel.train keeps training the loaded weights on the new dataset.
+    config = config_builder.build_model_config({"model_name": "reppo-custom", "continue_from": "ckpt-parent-123"})
+    assert config.model_rl.continue_from == "ckpt-parent-123"
+    assert config.model_rl.checkpoint_to_load is None
+
+
+def test_build_model_config_snapshot_interval_maps_and_defaults_none():
+    # A6 mid-training checkpoint traces: snapshot_interval (in SB3 timesteps) drives the periodic-snapshot
+    # callback. Absent -> None so the default training path is byte-identical (no callback).
+    with_interval = config_builder.build_model_config({"model_name": "dqn", "snapshot_interval": 500})
+    assert with_interval.model_rl.snapshot_interval == 500
+    default = config_builder.build_model_config({"model_name": "dqn"})
+    assert default.model_rl.snapshot_interval is None
+
+
+def test_build_model_config_snapshot_cap_maps_and_defaults_none():
+    # A6: snapshot_cap ring-buffers retained snapshots. Absent -> None (unbounded, byte-identical default).
+    capped = config_builder.build_model_config({"model_name": "dqn", "snapshot_cap": 3})
+    assert capped.model_rl.snapshot_cap == 3
+    assert config_builder.build_model_config({"model_name": "dqn"}).model_rl.snapshot_cap is None
+
+
 def test_build_model_config_lstm_levers_default_to_separate_256():
     # Byte-compat default: a reppo-custom run without the new levers keeps SB3's separate-LSTM,
     # hidden-size-256 topology (what the policy used before these levers existed).

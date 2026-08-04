@@ -48,6 +48,13 @@ def test_etfs_via_yfinance_are_the_linkage_proxies():
     assert all(i["source"] == YFINANCE and i["intervals"] == ["1d"] for i in etfs)
 
 
+def test_broad_market_proxies_are_catalogued():
+    # SPY (equities) + UUP (dollar) are the keyless macro-risk context proxies (with GOLD) — tradeable ETFs.
+    by_sym = {i["symbol"]: i for i in _class(ETFS)["instruments"]}
+    assert by_sym["SPY"]["sourceSymbol"] == "SPY"
+    assert by_sym["UUP"]["sourceSymbol"] == "UUP"
+
+
 def test_each_asset_class_carries_a_label_and_directory():
     for cls in data_catalog.catalog():
         assert cls["label"]

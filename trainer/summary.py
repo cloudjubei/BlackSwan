@@ -183,6 +183,43 @@ def _signal_noise(env, lookback):
     }
 
 
+def _signal_expectancy(trades, prices, horizon):
+    """Case-1 SIGNAL lens — score each AGENT buy/sell by the realised forward return over ``horizon`` bars,
+    INDEPENDENT of position and P&L. Where the Case-2 metrics (traded_return, equity) measure a POSITION
+    MANAGER, this asks the position-blind 'does every signal stand on its own?' question the B2 signal
+    emitter would optimise: a long entry bets price RISES over the next H bars (edge = +forward return), a
+    long exit bets it FALLS (edge = -forward return); shorts mirror. Forced TP/SL/trailing exits are NOT
+    agent signals and are excluded. Returns {} when nothing is scorable (no trades / window too short)."""
+    n = len(prices)
+    if n < 2 or horizon < 1 or not trades:
+        return {}
+    edges = []
+    agent_signals = 0
+    for t in trades:
+        long = t.get("side") == "long"
+        ei = int(t["entry_step"])
+        agent_signals += 1  # every reconstructed entry is an agent open
+        if ei + horizon < n and prices[ei] > 0:
+            fwd = prices[ei + horizon] / prices[ei] - 1.0
+            edges.append(fwd if long else -fwd)
+        if t.get("reason") in ("sell", "cover"):  # agent's OWN close, not a forced tp/sl/trailing/open
+            xi = int(t["exit_step"])
+            agent_signals += 1
+            if xi + horizon < n and prices[xi] > 0:
+                fwd = prices[xi + horizon] / prices[xi] - 1.0
+                edges.append(-fwd if long else fwd)
+    if not edges:
+        return {}
+    wins = sum(1 for e in edges if e > 0)
+    return {
+        "signal_expectancy": _finite(sum(edges) / len(edges) * 100),  # mean forward edge per signal, percent
+        "signal_hit_rate": _finite(100.0 * wins / len(edges)),
+        "signal_coverage": _finite(agent_signals / n),
+        "signal_count": len(edges),
+        "signal_horizon": int(horizon),
+    }
+
+
 def _benchmark(env, lookback):
     """Buy-and-hold control over the same live window — a display yardstick, NOT a reward target.
 
@@ -418,6 +455,22 @@ def _trade_gate(n_trades, min_trades):
     return min(1.0, (n_trades / min_trades) ** 2)
 
 
+# Calendar days one DECISION bar spans, keyed by the step timeframe — for time-normalising the trade count.
+_BAR_DAYS = {"1m": 1.0 / 1440, "1h": 1.0 / 24, "1d": 1.0, "1w": 7.0}
+
+
+def _bar_days(timeframe):
+    return _BAR_DAYS.get(str(timeframe or "1d").lower(), 1.0)
+
+
+def _trades_per_day(n_trades, n_bars, timeframe):
+    """Round-trip trades per calendar DAY over the test window — a step-frequency-invariant trade rate.
+    The scorecard's liveness gate reads this instead of raw ``n_trades`` (which is confounded by both the
+    window length AND the step cadence). 0.0 when there are no test bars (never a divide-by-zero)."""
+    days = n_bars * _bar_days(timeframe)
+    return _finite(n_trades / days) if days > 0 else 0.0
+
+
 def _health(env, state, is_rl, lookback):
     flags = []
     n_trades = _finite(state[17]) if len(state) > 17 else 0
@@ -470,6 +523,44 @@ def _max_drawdown_pct(equity):
     return {"max_drawdown_pct": _finite(mdd * 100)}
 
 
+def _capture_stats(equity, prices):
+    """Beta + up/down capture of the model vs the market — the A4.3 honesty gate's "not a closet-long" inputs.
+    Market return = raw price change per step; model return = equity change per step; each step classified by
+    the SIGN of its market return. up_capture / down_capture = the model's summed return over up / down market
+    bars divided by the market's summed return there (down_capture < 1 = defensive in the bear; a closet-long
+    sits near 1 both ways). beta = cov(model, market) / var(market). Empty (skippable via metrics.update, so
+    the engine's capture gate SKIPS rather than reading a non-participating run as maximally 'defensive') when
+    the two series don't align, are too short, the model never participated (flat equity), or the market has no
+    variance; each side is omitted independently when its regime never occurred."""
+    eq = [_finite(x) for x in equity]
+    px = [_finite(x) for x in prices]
+    if len(eq) != len(px) or len(px) < 3:
+        return {}
+    if max(eq) - min(eq) <= 0.0:  # flat equity = the model never participated — a do-nothing run, not defensive
+        return {}
+    mkt, mdl = [], []
+    for i in range(1, len(px)):
+        if px[i - 1] > 0 and eq[i - 1] > 0:
+            mkt.append(px[i] / px[i - 1] - 1.0)
+            mdl.append(eq[i] / eq[i - 1] - 1.0)
+    if len(mkt) < 2:
+        return {}
+    out = {}
+    up_k = sum(k for k in mkt if k > 0)
+    if up_k > 0:
+        out["up_capture"] = _finite(sum(m for m, k in zip(mdl, mkt) if k > 0) / up_k)
+    down_k = sum(k for k in mkt if k < 0)
+    if down_k < 0:
+        out["down_capture"] = _finite(sum(m for m, k in zip(mdl, mkt) if k < 0) / down_k)
+    mean_k = sum(mkt) / len(mkt)
+    var_k = sum((k - mean_k) ** 2 for k in mkt) / len(mkt)
+    if var_k > 0:
+        mean_m = sum(mdl) / len(mdl)
+        cov = sum((mdl[i] - mean_m) * (mkt[i] - mean_k) for i in range(len(mkt))) / len(mkt)
+        out["beta"] = _finite(cov / var_k)
+    return out
+
+
 def build_summary(env, state, cfg, model, ran_at, is_rl):
     lookback = _lookback(env, cfg)
     fidelity = resolve_fidelity(cfg)[1]["fidelity_run"]
@@ -494,7 +585,14 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     # over the run as basis points of the stake is the honest "how much did fees cost" figure.
     fees_paid = sum(_finite(f) for f in getattr(env, "fees", []))
     metrics = {
+        # Diagnostic only (no longer the objective): the old trade-gated return = total_return_pct × the
+        # quadratic trade_gate. Kept so a run's gating is still visible; the scorecard's trades_per_day gate
+        # now carries the "trade often enough" constraint instead.
         "traded_return": traded_return,
+        # The trivial-baseline reference (in objective units = total_return_pct) the exploration autopilot's
+        # basin gate must be beaten by: a do-nothing agent earns 0 total_return_pct, so a region only qualifies
+        # as a basin when it returns PROFITABLY above this floor.
+        "baseline": 0.0,
         "total_return_pct": total_return * 100,
         "win_pct": _finite(state[7]) if len(state) > 7 else 0.0,
         "n_trades": n_trades,
@@ -505,6 +603,14 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     }
     metrics.update(_oos_stats(equity))
     metrics.update(_max_drawdown_pct(equity))
+    metrics.update(_capture_stats(equity, prices))
+    # Time-normalised trade liveness (the scorecard's trades_per_day gate) — over the test bars (oos_n_obs
+    # when available, else the equity length), scaled by the step cadence so 1d and 1h runs are comparable.
+    n_bars_oos = metrics.get("oos_n_obs", max(len(equity) - 1, 0))
+    metrics["trades_per_day"] = _trades_per_day(n_trades, n_bars_oos, cfg.get("timeframe"))
+    # Case-1 signal lens (position-blind forward-return edge per buy/sell) — a SECOND read alongside the
+    # Case-2 position-manager metrics; {} for non-trading runs, so it never adds noise to a do-nothing run.
+    metrics.update(_signal_expectancy(trades, prices, int(cfg.get("signal_horizon", 5))))
     benchmark = _benchmark(env, lookback)
     if benchmark:
         metrics["hold_return_pct"] = benchmark["hold_return_pct"]
@@ -528,7 +634,10 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     stored_cfg["fidelity_set"] = resolve_fidelity(cfg)[0]
 
     summary = {
-        "objective": traded_return,
+        # The objective is the HONEST post-fee portfolio return (== metrics.total_return_pct), not the
+        # magic-20 trade-gated traded_return — trade frequency is a scorecard GATE (trades_per_day) now, so
+        # the objective no longer suppresses a real return. traded_return is kept as a diagnostic metric.
+        "objective": metrics["total_return_pct"],
         "metrics": metrics,
         "health": _health(env, state, is_rl, lookback),
         "config": stored_cfg,
@@ -573,4 +682,8 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
     if "seed" in cfg:
         summary["seed"] = int(cfg["seed"])
         summary["provenance"]["seed"] = int(cfg["seed"])
+    # Extra-train lineage: a continued run records the parent checkpoint it was seeded from, so the viewer
+    # can render the parent → continued chain and judge it on the standardised test sets (not the parent).
+    if cfg.get("continue_from"):
+        summary["provenance"]["continuedFrom"] = str(cfg["continue_from"])
     return summary

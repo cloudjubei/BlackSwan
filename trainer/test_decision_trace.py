@@ -1,4 +1,5 @@
 import json
+import os
 import types
 
 import numpy as np
@@ -715,3 +716,238 @@ def test_attach_decision_trace_full_sidecar(tmp_path, monkeypatch):
     rel = summary["artifacts"]["decisionTraceFile"]
     assert rel == "checkpoints/fakeid.traces.jsonl"
     assert len((tmp_path / rel).read_text().strip().splitlines()) == 2
+
+
+# --- attention matrices (A6) -------------------------------------------------
+# The attention weight matrices captured by the model's attention blocks (see src/model/custom) are
+# collected and aggregated over the rollout into a single trace.attentionMatrix, gated + best-effort.
+
+
+class _StashOnly(torch.nn.Module):
+    """A submodule that merely holds a pre-set attention matrix (no forward needed)."""
+
+    def __init__(self, mat):
+        super().__init__()
+        self.last_attn = mat
+
+
+class _AttnStash(torch.nn.Module):
+    """Stashes a per-forward [1, n, n] attention matrix whose value == the forward count, so the rollout
+    MEAN over K forwards is exactly (1+2+…+K)/K in every cell — a deterministic aggregation oracle."""
+
+    def __init__(self, obs_dim, out_dim, n):
+        super().__init__()
+        self.linear = torch.nn.Linear(obs_dim, out_dim)
+        self._n = n
+        self._call = 0
+        self.last_attn = None
+
+    def forward(self, x):
+        self._call += 1
+        self.last_attn = torch.full((1, self._n, self._n), float(self._call))
+        return self.linear(x)
+
+
+class _AttnPolicy(torch.nn.Module):
+    def __init__(self, obs_dim, out_dim, n):
+        super().__init__()
+        self.q_net = _AttnStash(obs_dim, out_dim, n)
+
+    def obs_to_tensor(self, obs):
+        return torch.as_tensor(np.asarray(obs, dtype=np.float32)).reshape(1, -1), False
+
+
+def test_collect_attention_matrices_enumerates_stashed_modules():
+    policy = torch.nn.Module()
+    policy.a = _StashOnly(torch.ones(1, 3, 3))
+    policy.b = _StashOnly(torch.zeros(1, 2, 2))
+    policy.plain = torch.nn.Linear(2, 2)
+    model = types.SimpleNamespace(rl_model=types.SimpleNamespace(policy=policy))
+    mats = dt._collect_attention_matrices(model)
+    assert len(mats) == 2
+    assert len({lab for lab, _ in mats}) == 2  # distinct labels
+    assert sorted(tuple(t.shape) for _, t in mats) == [(1, 2, 2), (1, 3, 3)]
+
+
+def test_collect_attention_matrices_empty_for_non_introspectable():
+    assert dt._collect_attention_matrices(types.SimpleNamespace()) == []
+    policy = torch.nn.Module()
+    policy.plain = torch.nn.Linear(2, 2)
+    model = types.SimpleNamespace(rl_model=types.SimpleNamespace(policy=policy))
+    assert dt._collect_attention_matrices(model) == []
+
+
+def test_attention_matrix_aggregates_rollout_mean():
+    env = _ReplayEnv([[0.0, 0.0, 0.0]] * 4)  # 4 steps -> 4 forwards
+    am = dt._attention_matrix(env, _Model(_AttnPolicy(3, 2, 3)))
+    assert am is not None
+    assert am["method"] == "attention-weights"
+    assert am["rows"] == ["q0", "q1", "q2"]
+    assert am["cols"] == ["k0", "k1", "k2"]
+    grid = am["grid"]
+    assert len(grid) == 3 and all(len(r) == 3 for r in grid)
+    # forwards stash 1,2,3,4 -> mean 2.5 in every cell
+    assert all(abs(c - 2.5) < 1e-6 for row in grid for c in row)
+
+
+def test_attention_matrix_degrades_when_dims_exceed_cap():
+    env = _ReplayEnv([[0.0, 0.0, 0.0]] * 2)
+    am = dt._attention_matrix(env, _Model(_AttnPolicy(3, 2, dt._MAX_ATTN_DIM + 1)))
+    assert am is None
+
+
+def test_attention_matrix_none_without_attention():
+    env = _ReplayEnv([[1.0, 0.0, 0.0, 0.0]])
+    assert dt._attention_matrix(env, _Model(_QPolicy(_q_net(_W, _B)))) is None
+
+
+def test_attach_decision_trace_emits_attention_matrix_when_enabled():
+    env = _ReplayEnv([[0.0, 0.0, 0.0]] * 4)
+    summary = {}
+    dt.attach_decision_trace(
+        summary, env, _Model(_AttnPolicy(3, 2, 3)), {"decision_trace_attention": True}, None, True
+    )
+    am = summary["artifacts"]["decisionTrace"].get("attentionMatrix")
+    assert am is not None and am["method"] == "attention-weights"
+    assert len(am["grid"]) == 3 and len(am["grid"][0]) == 3
+
+
+def test_attach_decision_trace_omits_attention_matrix_by_default():
+    env = _ReplayEnv([[0.0, 0.0, 0.0]] * 4)
+    summary = {}
+    dt.attach_decision_trace(summary, env, _Model(_AttnPolicy(3, 2, 3)), {}, None, True)
+    assert "attentionMatrix" not in summary["artifacts"]["decisionTrace"]
+
+
+# --- per-step attention sidecar (A6) -----------------------------------------
+# write_per_step_attention streams ONE attention matrix per rollout step to a JSONL sidecar (never inline,
+# never >1 matrix in RAM) — the temporal companion to the run-aggregate _attention_matrix.
+
+
+def test_write_per_step_attention_streams_one_line_per_step(tmp_path):
+    env = _ReplayEnv([[0.0, 0.0, 0.0]] * 3)  # 3 steps -> 3 forwards
+    path = str(tmp_path / "m.attn.jsonl")
+    out = dt.write_per_step_attention(env, _Model(_AttnPolicy(3, 2, 3)), path)
+    assert out == path
+    lines = (tmp_path / "m.attn.jsonl").read_text().strip().splitlines()
+    assert len(lines) == 3
+    first = json.loads(lines[0])
+    assert first["step"] == 0
+    assert first["rows"] == ["q0", "q1", "q2"] and first["cols"] == ["k0", "k1", "k2"]
+    assert len(first["grid"]) == 3 and len(first["grid"][0]) == 3
+    # PER-STEP, not a mean: the forward count (1,2,3) is the cell value at each step
+    assert json.loads(lines[0])["grid"][0][0] == 1.0
+    assert json.loads(lines[2])["grid"][0][0] == 3.0
+
+
+def test_write_per_step_attention_none_without_attention(tmp_path):
+    env = _ReplayEnv([[1.0, 0.0, 0.0, 0.0]])
+    path = str(tmp_path / "m.attn.jsonl")
+    assert dt.write_per_step_attention(env, _Model(_QPolicy(_q_net(_W, _B))), path) is None
+    assert not (tmp_path / "m.attn.jsonl").exists()  # empty sidecar removed
+
+
+def test_write_per_step_attention_degrades_oversized_grids(tmp_path):
+    env = _ReplayEnv([[0.0, 0.0, 0.0]] * 2)
+    path = str(tmp_path / "m.attn.jsonl")
+    # every step's grid exceeds _MAX_ATTN_DIM -> nothing usable -> None, no sidecar left
+    assert dt.write_per_step_attention(env, _Model(_AttnPolicy(3, 2, dt._MAX_ATTN_DIM + 1)), path) is None
+    assert not (tmp_path / "m.attn.jsonl").exists()
+
+
+def test_attach_decision_trace_writes_per_step_attention_sidecar_when_enabled(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "checkpoints").mkdir()
+    env = _ReplayEnv([[0.0, 0.0, 0.0]] * 3)
+    summary = {}
+    dt.attach_decision_trace(
+        summary, env, _Model(_AttnPolicy(3, 2, 3)), {"decision_trace_attention_per_step": True}, None, True
+    )
+    ref = summary["artifacts"]["decisionTrace"].get("attentionMatrixFile")
+    assert ref == "checkpoints/fakeid.attn.jsonl"
+    assert (tmp_path / ref).exists()
+    # the per-step flag never sets the INLINE aggregate matrix (distinct concerns)
+    assert "attentionMatrix" not in summary["artifacts"]["decisionTrace"]
+
+
+def test_attach_decision_trace_omits_per_step_attention_by_default():
+    env = _ReplayEnv([[0.0, 0.0, 0.0]] * 3)
+    summary = {}
+    dt.attach_decision_trace(summary, env, _Model(_AttnPolicy(3, 2, 3)), {}, None, True)
+    assert "attentionMatrixFile" not in summary["artifacts"]["decisionTrace"]
+
+
+# --- snapshot traces (A6 mid-training) ---------------------------------------
+# write_snapshot_traces streams a per-snapshot decision trace (from an injected trace_fn) to a JSONL
+# sidecar and attaches a lightweight index on the summary — never holding multiple full traces in RAM.
+
+
+def _fake_trace(step_action="hold"):
+    return {"steps": [{"step": 0, "action": step_action}], "actionCounts": {step_action: 1}, "totalSteps": 1}
+
+
+def test_write_snapshot_traces_streams_jsonl_and_indexes(tmp_path):
+    snapshots = [{"step": 100, "path": "checkpoints/m.step100"}, {"step": 200, "path": "checkpoints/m.step200"}]
+    sidecar = str(tmp_path / "m.snapshots.jsonl")
+    summary = {}
+    dt.write_snapshot_traces(summary, snapshots, lambda ref: _fake_trace(), sidecar)
+    lines = (tmp_path / "m.snapshots.jsonl").read_text().strip().splitlines()
+    assert len(lines) == 2
+    assert json.loads(lines[0])["step"] == 100
+    assert json.loads(lines[0])["trace"]["totalSteps"] == 1
+    idx = summary["artifacts"]["snapshotTraces"]
+    assert [e["step"] for e in idx] == [100, 200]
+    assert idx[0]["checkpointRef"] == "m.step100"  # basename, folder stripped
+    assert idx[0]["traceFile"] == sidecar
+    assert idx[0]["keyMetrics"] == {"actionCounts": {"hold": 1}, "totalSteps": 1}
+
+
+def test_write_snapshot_traces_no_snapshots_is_noop():
+    summary = {}
+    dt.write_snapshot_traces(summary, [], lambda ref: _fake_trace(), "unused.jsonl")
+    assert "snapshotTraces" not in summary.get("artifacts", {})
+
+
+def test_write_snapshot_traces_skips_a_failed_snapshot(tmp_path):
+    snapshots = [{"step": 100, "path": "m.step100"}, {"step": 200, "path": "m.step200"}]
+
+    def trace_fn(ref):
+        if "step200" in ref:
+            raise RuntimeError("load failed")
+        return _fake_trace()
+
+    summary = {}
+    dt.write_snapshot_traces(summary, snapshots, trace_fn, str(tmp_path / "m.snapshots.jsonl"))
+    idx = summary["artifacts"]["snapshotTraces"]
+    assert [e["step"] for e in idx] == [100]  # the failed 200 is skipped, not fatal
+
+
+def test_write_snapshot_traces_removes_the_sidecar_when_every_snapshot_fails(tmp_path):
+    # Non-empty snapshots but every trace_fn fails → no index, and the created-but-empty sidecar is
+    # cleaned up (never leave a 0-byte, unreferenced JSONL behind — mirrors write_per_step_attention).
+    snapshots = [{"step": 100, "path": "m.step100"}, {"step": 200, "path": "m.step200"}]
+
+    def trace_fn(ref):
+        raise RuntimeError("load failed")
+
+    summary = {}
+    sidecar = str(tmp_path / "m.snapshots.jsonl")
+    dt.write_snapshot_traces(summary, snapshots, trace_fn, sidecar)
+    assert "snapshotTraces" not in summary.get("artifacts", {})
+    assert not os.path.exists(sidecar)  # empty sidecar removed, not left as orphaned clutter
+
+
+def test_write_snapshot_traces_bails_when_the_sidecar_is_unwritable(tmp_path):
+    # If the sidecar can't be opened, emit NO index (its entries would point at a file that never existed)
+    # AND don't burn the expensive per-snapshot trace work.
+    calls = []
+
+    def trace_fn(ref):
+        calls.append(ref)
+        return _fake_trace()
+
+    summary = {}
+    unwritable = str(tmp_path / "missing_dir" / "m.snapshots.jsonl")  # parent dir does not exist
+    dt.write_snapshot_traces(summary, [{"step": 100, "path": "m.step100"}], trace_fn, unwritable)
+    assert "snapshotTraces" not in summary.get("artifacts", {})
+    assert calls == []  # bailed before generating any trace

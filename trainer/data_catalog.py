@@ -176,6 +176,8 @@ _ETFS = [
     _etf("XLF", "Financial Select Sector SPDR", 5),
     _etf("JETS", "US Global Jets ETF", 6),
     _etf("GDX", "VanEck Gold Miners ETF", 7),
+    _etf("SPY", "SPDR S&P 500 ETF (broad-equity risk proxy)", 8),
+    _etf("UUP", "Invesco DB US Dollar Bullish ETF (dollar proxy)", 9),
 ]
 
 _CLASSES = [

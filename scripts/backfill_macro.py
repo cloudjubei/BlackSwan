@@ -16,6 +16,7 @@ Usage (from the repo root):
 """
 
 import argparse
+import datetime
 import json
 import os
 import sys
@@ -29,21 +30,45 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _OBSERVATIONS_URL = "https://api.stlouisfed.org/fred/series/observations"
 _MISSING = (None, "", ".")
 
+# Series REVISED after first print -> fetch true initial-release vintages (output_type=4), releaseDate =
+# the vintage's realtime_start. Their monthly/quarterly/weekly cadence stays under FRED's per-request
+# vintage-date cap.
+_VINTAGE_SERIES = {"UNRATE", "PAYEMS", "CPIAUCNS", "CPIAUCSL", "PCEPILFE", "ICSA", "RSAFS", "GDPC1"}
+# Everything else here is a DAILY market rate: never revised (initial == final), but with far more vintage
+# dates than output_type=4 allows. Fetch standard observations (output_type=1) and stamp the release at the
+# reference date + a small publish lag. Leak-safe precisely BECAUSE the value is never revised. DFF (daily
+# effective fed funds) is published the NEXT day; the H.15 yields and the FOMC target print same-day (the
+# intraday publish time is applied later by trainer.pit_fusion), so their lag is 0.
+_ASOF_LAG_DAYS = {"DFF": 1}
+
 
 def observations_url(series_id, api_key):
-    """The FRED observations endpoint for a series, requesting INITIAL-RELEASE vintages (output_type=4)."""
-    query = urllib.parse.urlencode({
-        "series_id": series_id,
-        "api_key": api_key,
-        "file_type": "json",
-        "output_type": 4,
-    })
-    return f"{_OBSERVATIONS_URL}?{query}"
+    """The FRED observations endpoint for a series. Revised series -> INITIAL-RELEASE vintages across ALL
+    history (output_type=4 with the full realtime window; the default window is TODAY, which has no vintages
+    and 400s). Daily non-revised rates -> standard observations (output_type=1), stamped as-of in
+    extract_macro_observations because they exceed the output_type=4 vintage-date cap."""
+    params = {"series_id": series_id, "api_key": api_key, "file_type": "json"}
+    if series_id in _VINTAGE_SERIES:
+        params.update({"output_type": 4, "realtime_start": "1776-07-04", "realtime_end": "9999-12-31"})
+    else:
+        params["output_type"] = 1
+    return f"{_OBSERVATIONS_URL}?{urllib.parse.urlencode(params)}"
 
 
-def extract_macro_observations(payload):
-    """Point-in-time observations from a FRED output_type=4 payload: each row's `realtime_start` is the
-    release/vintage date (never the reference `date`). Missing (`.`) and non-numeric values are dropped."""
+def _shift_date(date_str, days):
+    """``date_str`` (``YYYY-MM-DD``) shifted by ``days`` calendar days; a no-op for 0 or a falsy date."""
+    if not date_str or not days:
+        return date_str
+    return (datetime.date.fromisoformat(date_str) + datetime.timedelta(days=days)).isoformat()
+
+
+def extract_macro_observations(payload, series_id=None):
+    """Point-in-time observations from a FRED payload. VINTAGE series (output_type=4): releaseDate =
+    `realtime_start` (the initial-release date, never the reference `date`). AS-OF series (daily non-revised
+    rates, output_type=1): releaseDate = reference date + the series' publish lag — leak-safe because the
+    value is never revised. Missing (`.`) and non-numeric values are dropped."""
+    vintage = series_id is None or series_id in _VINTAGE_SERIES
+    lag = _ASOF_LAG_DAYS.get(series_id, 0)
     out = []
     for obs in (payload or {}).get("observations", []) or []:
         value = obs.get("value")
@@ -53,12 +78,9 @@ def extract_macro_observations(payload):
             numeric = float(value)
         except (TypeError, ValueError):
             continue
-        out.append({
-            "refPeriod": obs.get("date"),
-            "releaseDate": obs.get("realtime_start"),
-            "value": numeric,
-            "vintage": obs.get("realtime_start"),
-        })
+        ref = obs.get("date")
+        release = obs.get("realtime_start") if vintage else _shift_date(ref, lag)
+        out.append({"refPeriod": ref, "releaseDate": release, "value": numeric, "vintage": release})
     return out
 
 
@@ -76,7 +98,7 @@ def backfill_series_macro(series_id, out_dir, api_key=None, dry_run=False):
         summary["errors"].append("no FRED_API_KEY — set it to mine macro series")
         return summary
     try:
-        observations = extract_macro_observations(fetch_series_observations(series_id, api_key))
+        observations = extract_macro_observations(fetch_series_observations(series_id, api_key), series_id)
     except (urllib.error.URLError, OSError, ValueError) as error:
         summary["errors"].append(f"{series_id}: {error}")
         return summary

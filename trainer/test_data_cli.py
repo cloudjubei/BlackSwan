@@ -20,6 +20,29 @@ def test_build_full_catalog_merges_on_disk_coverage(tmp_path):
     assert btc["onDisk"] == {}
 
 
+def test_asset_data_range_spans_all_timeframes():
+    assert cli._asset_data_range(
+        {"1m": {"start": "2022-01", "end": "2026-06"}, "1d": {"start": "2022-03", "end": "2026-05"}}
+    ) == ("2022-01", "2026-06")
+    assert cli._asset_data_range({}) == (None, None)
+
+
+def test_build_full_catalog_emits_supported_windows_for_price_instruments(tmp_path):
+    b = tmp_path / "binance"
+    b.mkdir()
+    (b / "BTCUSDT-1d-2020-1.json").write_text("[]")  # deep-history range 2020-01 .. 2026-06
+    (b / "BTCUSDT-1d-2026-6.json").write_text("[]")
+    cat = cli.build_full_catalog(str(tmp_path))
+    btc = next(i for c in cat for i in c["instruments"] if i["symbol"] == "BTCUSDT")
+    assert "2024" in btc["supportedWindows"] and "2026" in btc["supportedWindows"]
+    # A coin with no data on this root supports no window.
+    eth = next(i for c in cat for i in c["instruments"] if i["symbol"] == "ETHUSDT")
+    assert eth["supportedWindows"] == []
+    # Release classes (macro/fundamentals) aren't walk-forward-tradeable — no supportedWindows key.
+    macro = next(c for c in cat if c["id"] == data_catalog.MACRO)
+    assert all("supportedWindows" not in i for i in macro["instruments"])
+
+
 # --- plan_mine: resolve a request into concrete (instrument, intervals) targets ---
 
 

@@ -60,6 +60,12 @@ class ModelRLConfigSearch:
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+    continue_from: str | None = None
+    # A6: save a RETAINED checkpoint every N SB3 timesteps during training (for mid-training decision-trace
+    # snapshots). None = off, so the default training path is byte-identical (no callback).
+    snapshot_interval: int | None = None
+    # A6: ring-buffer the retained snapshots (keep last N, delete superseded .zip). None/0 = unbounded.
+    snapshot_cap: int | None = None
     seed: int | None = None
 @dataclass
 class ModelRLConfig:
@@ -126,6 +132,12 @@ class ModelRLConfig:
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+    continue_from: str | None = None
+    # A6: save a RETAINED checkpoint every N SB3 timesteps during training (mid-training trace snapshots).
+    # None = off (default training path byte-identical).
+    snapshot_interval: int | None = None
+    # A6: ring-buffer the retained snapshots (keep last N, delete superseded .zip). None/0 = unbounded.
+    snapshot_cap: int | None = None
     seed: int | None = None
 
 @dataclass
@@ -153,6 +165,7 @@ class ModelRegressionConfigSearch:
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+    continue_from: str | None = None
     seed: int | None = None
     pos_weight: float = 0.0
     decision_threshold: float = 0.5
@@ -180,6 +193,7 @@ class ModelRegressionConfig:
     progress_bar: bool = True
     checkpoints_folder: str = 'checkpoints'
     checkpoint_to_load: str | None = None
+    continue_from: str | None = None
     seed: int | None = None
     pos_weight: float = 0.0
     decision_threshold: float = 0.5

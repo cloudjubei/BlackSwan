@@ -12,6 +12,10 @@ class SelfAttention(nn.Module):
         self.value = nn.Linear(in_dim, in_dim)
         self.softmax = nn.Softmax(dim=-1)
         self.out = nn.Linear(in_dim, in_dim)
+        # Last EVAL forward's attention weights, detached + on CPU, for the decision-trace xAI heatmap (A6).
+        # Captured only when not self.training (the trace replay runs in eval), so training pays no per-step
+        # device->host sync; None until the first eval forward.
+        self.last_attn = None
 
     def forward(self, x):
         batch_size, seq_len = x.size()
@@ -25,6 +29,8 @@ class SelfAttention(nn.Module):
 
         scores = th.bmm(q, k.transpose(1, 2)) / th.sqrt(th.tensor(q.size(-1), dtype=th.float32))  # (batch_size, seq_len, seq_len)
         attn_weights = self.softmax(scores)  # (batch_size, seq_len, seq_len)
+        if not self.training:
+            self.last_attn = attn_weights.detach().cpu()
         attn_output = th.bmm(attn_weights, v)  # (batch_size, seq_len, hidden_dim)
 
         output = self.out(attn_output.squeeze(2))  # (batch_size, seq_len, in_dim)
@@ -38,6 +44,7 @@ class ScaledDotProductAttention(nn.Module):
         self.key = nn.Linear(hidden_dim, hidden_dim)
         self.value = nn.Linear(hidden_dim, hidden_dim)
         self.softmax = nn.Softmax(dim=-1)
+        self.last_attn = None
 
     def forward(self, x):
         query = self.query(x)
@@ -45,6 +52,8 @@ class ScaledDotProductAttention(nn.Module):
         value = self.value(x)
         scores = th.matmul(query, key.transpose(-2, -1)) / th.sqrt(th.tensor(self.hidden_dim, dtype=th.float32))
         attn_weights = self.softmax(scores)
+        if not self.training:
+            self.last_attn = attn_weights.detach().cpu()
         output = th.matmul(attn_weights, value)
         return output
     
@@ -54,9 +63,12 @@ class MultiHeadAttention(nn.Module):
         assert hidden_dim % num_heads == 0, "hidden_dim must be divisible by num_heads"
 
         self.attention = th.nn.MultiheadAttention(hidden_dim, num_heads=num_heads, batch_first=False)
-        
+        self.last_attn = None
+
     def forward(self, x):
         output, weights = self.attention(x, x, x)
+        if not self.training:
+            self.last_attn = weights.detach().cpu()
         return output
     
 class AdditiveAttention(nn.Module):
@@ -65,11 +77,14 @@ class AdditiveAttention(nn.Module):
         self.W1 = nn.Linear(hidden_dim, hidden_dim)
         self.W2 = nn.Linear(hidden_dim, hidden_dim)
         self.V = nn.Linear(hidden_dim, 1)
+        self.last_attn = None
 
     def forward(self, x):
         query_with_time_axis = x.unsqueeze(1)
         score = self.V(th.tanh(self.W1(query_with_time_axis) + self.W2(x)))
         attention_weights = th.softmax(score, dim=1)
+        if not self.training:
+            self.last_attn = attention_weights.detach().cpu()
         context_vector = attention_weights * x
         context_vector = th.sum(context_vector, dim=1)
         return context_vector
@@ -81,6 +96,7 @@ class GlobalContextAttention(nn.Module):
         self.key = nn.Linear(hidden_dim, hidden_dim)
         self.value = nn.Linear(hidden_dim, hidden_dim)
         self.conv = nn.Conv1d(in_channels=hidden_dim, out_channels=hidden_dim, kernel_size=1)
+        self.last_attn = None
 
     def forward(self, x):
         # A 2-D (batch, hidden) input — e.g. inside CustomQNetwork's flat MLP — is treated as a
@@ -94,6 +110,8 @@ class GlobalContextAttention(nn.Module):
 
         scores = th.bmm(query, key.transpose(1, 2))  # (batch_size, seq_len, seq_len)
         attn_weights = th.nn.functional.softmax(scores, dim=-1)  # (batch_size, seq_len, seq_len)
+        if not self.training:
+            self.last_attn = attn_weights.detach().cpu()
         context = th.bmm(attn_weights, value)  # (batch_size, seq_len, hidden_dim)
         context = context.transpose(1, 2)  # (batch_size, hidden_dim, seq_len)
         context = self.conv(context)  # (batch_size, hidden_dim, seq_len)
