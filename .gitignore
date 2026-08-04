@@ -64,6 +64,9 @@ target/
 
 binance
 stocks
+commodities
+etfs
+macro
 checkpoints
 trials
 .venv
@@ -71,3 +74,6 @@ run.sh
 mlruns/
 
 .factory/data
+
+# Local secrets / env (never track)
+.env
