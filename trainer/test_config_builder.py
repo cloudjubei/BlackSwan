@@ -532,6 +532,27 @@ def test_require_data_present_raises_when_window_data_missing(monkeypatch):
         config_builder.require_data_present({"walk_forward_window": "2023"})
 
 
+def test_require_data_present_raises_on_partially_mined_fixed_window(monkeypatch):
+    # L4: a FIXED window (meta test_to != 'latest') whose months are only PARTIALLY on disk must FAIL —
+    # running would silently train on the truncated subset while the window id still claims the full span.
+    def partial(pairs, symbol=config_builder._SYMBOL):
+        return [f"{y}-{m}" for (y, m) in pairs][:-2]  # two requested months absent from disk
+
+    monkeypatch.setattr(config_builder, "_daily_files", partial)
+    with pytest.raises(SystemExit, match="INCOMPLETE|SILENTLY TRUNCATE"):
+        config_builder.require_data_present({"walk_forward_window": "2022"})
+
+
+def test_require_data_present_allows_partial_open_ended_oos_window(monkeypatch):
+    # L4: open-ended oos-* windows (meta test_to == 'latest') are INTENTIONALLY truncated to disk, so a
+    # partial span is fine as long as SOMETHING is present — completeness is not enforced there.
+    def partial(pairs, symbol=config_builder._SYMBOL):
+        return [f"{y}-{m}" for (y, m) in pairs][:3]  # only the first few months present
+
+    monkeypatch.setattr(config_builder, "_daily_files", partial)
+    config_builder.require_data_present({"walk_forward_window": "oos-2024"})  # must NOT raise
+
+
 # --- _daily_files: builds binance/ paths and filters to those present on disk ---
 
 

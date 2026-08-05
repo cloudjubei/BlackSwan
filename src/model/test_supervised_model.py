@@ -65,6 +65,26 @@ def _make_env(prices, **cfg_kwargs):
     return env
 
 
+@pytest.mark.parametrize("horizon", [2, 3, 5])
+def test_forward_horizon_label_stays_inside_train_provider(horizon):
+    # L7 (purge/embargo boundary): the supervised forward-horizon label reads get_price(step + horizon),
+    # which must stay INSIDE the train provider (max index == timesteps, one past the last decision) — never
+    # further — so a train label can never reach into the next (test) window. Pins the tail-purge implied by
+    # `range(0, timesteps - horizon + 1)`; an unbounded `range(0, timesteps)` would read timesteps+horizon-1.
+    prices = [100.0 + (i % 7) for i in range(50)]
+    env = _make_env(prices)
+    provider = env.data_provider
+    reads = []
+    real = provider.get_price
+    provider.get_price = lambda step, _r=real, _s=reads: (_s.append(int(step)), _r(step))[1]
+    _make_model(forward_horizon=horizon).train(env)
+    assert reads, "no labels were built"
+    assert max(reads) <= provider.get_timesteps(), (
+        f"forward-horizon label read index {max(reads)} > timesteps {provider.get_timesteps()} "
+        f"(horizon={horizon}) — the label reaches beyond the train provider (would leak into the next window)"
+    )
+
+
 def test_features_flattens_multilayer_list_and_flat_array():
     prov_list = SimpleNamespace(get_values=lambda s: [np.zeros((2, 3)), np.ones((2, 1))])
     assert SupervisedModel._features(prov_list, 0).shape == (8,)

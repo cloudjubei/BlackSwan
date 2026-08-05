@@ -53,16 +53,34 @@ def _minute_files(pairs, symbol=_SYMBOL):
 
 
 def require_data_present(cfg=None):
-    """Fail fast with a clear message when the chosen asset's klines aren't on disk."""
+    """Fail fast when the chosen asset's klines aren't on disk — AND refuse to SILENTLY TRUNCATE a fixed
+    window whose span is only PARTIALLY mined (L4): the file globber drops absent months, so a run would
+    train on a shorter set while its window id still claims the full span (a provenance lie). Open-ended
+    oos-* windows (meta test_to == 'latest') are intentionally truncated to disk, so they are checked only
+    for presence, not completeness."""
     cfg = cfg or {}
     symbol = str(cfg.get("asset", _SYMBOL))
-    train_pairs, test_pairs, _ = resolve_walk_forward_window(cfg)
-    if not _daily_files(train_pairs, symbol) or not _daily_files(test_pairs, symbol):
+    train_pairs, test_pairs, meta = resolve_walk_forward_window(cfg)
+    _, fspec = resolve_fidelity(cfg)
+    tf = "1m" if fspec["fidelity_input"] == "1m" else "1d"
+    present = _minute_files if tf == "1m" else _daily_files
+    present_train = present(train_pairs, symbol)
+    present_test = present(test_pairs, symbol)
+    if not present_train or not present_test:
         from trainer.data_inventory import available_assets
 
         raise SystemExit(
-            f"binance/ 1d klines for {symbol} missing — only assets with daily files "
-            f"are runnable at 1d. Available at 1d: {available_assets('1d')}."
+            f"binance/ {tf} klines for {symbol} missing — only assets with {tf} files "
+            f"are runnable at this fidelity. Available at 1d: {available_assets('1d')}."
+        )
+    if meta.get("test_to") != "latest" and (
+        len(present_train) != len(train_pairs) or len(present_test) != len(test_pairs)
+    ):
+        raise SystemExit(
+            f"{symbol} {tf} klines INCOMPLETE for fixed window {meta.get('walk_forward_window')!r}: "
+            f"train {len(present_train)}/{len(train_pairs)}, test {len(present_test)}/{len(test_pairs)} "
+            f"months present — running would SILENTLY TRUNCATE the requested span. Mine the missing months, "
+            f"or use an open-ended oos-* window (intentionally truncated to disk)."
         )
 
 

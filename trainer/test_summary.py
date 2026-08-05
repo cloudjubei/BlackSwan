@@ -999,3 +999,42 @@ def test_build_summary_omits_capture_metrics_for_a_do_nothing_run():
     )
     for key in ("up_capture", "down_capture", "beta"):
         assert key not in out["metrics"]
+
+
+def test_dead_feature_flag_detects_constant_observation_column():
+    # L8: a feature column that never changes across the run (e.g. the known constant-0 z_score) is flagged
+    # so the judge/human sees a dead/broken feature instead of it silently wasting obs dimensions.
+    class P:
+        def get_timesteps(self):
+            return 100
+
+        def get_values(self, step):
+            return np.array([float(step), 7.0])  # col 0 varies; col 1 is constant (dead)
+
+    flags = summary_mod._dead_feature_flags(types.SimpleNamespace(data_provider=P()), lookback=1)
+    dead = [f for f in flags if f.startswith("dead_features:")]
+    assert dead and int(dead[0].split(":")[1]) >= 1
+
+
+def test_dead_feature_flag_silent_when_every_column_varies():
+    class P:
+        def get_timesteps(self):
+            return 100
+
+        def get_values(self, step):
+            return np.array([float(step), float(step * 2)])
+
+    assert summary_mod._dead_feature_flags(types.SimpleNamespace(data_provider=P()), lookback=1) == []
+
+
+def test_provenance_fingerprint_stable_and_config_sensitive():
+    # L5: the reproducibility fingerprint records a deterministic config hash + the resolved train/test span
+    # so a run can be audited and re-derived. The hash is stable across identical configs and MUST change on
+    # any lever change; the resolved span is stamped.
+    cfg = {"walk_forward_window": "2024", "asset": "BTCUSDT", "seed": 0}
+    stored = dict(cfg)
+    fp = summary_mod._provenance_fingerprint(cfg, stored)
+    assert "configHash" in fp
+    assert summary_mod._provenance_fingerprint(cfg, stored)["configHash"] == fp["configHash"]
+    assert summary_mod._provenance_fingerprint(cfg, {**stored, "seed": 1})["configHash"] != fp["configHash"]
+    assert fp.get("trainFrom") == "2020-01" and fp.get("testFrom") == "2024-01"

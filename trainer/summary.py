@@ -471,11 +471,38 @@ def _trades_per_day(n_trades, n_bars, timeframe):
     return _finite(n_trades / days) if days > 0 else 0.0
 
 
+def _dead_feature_flags(env, lookback):
+    """L8 feature-health: sample the observation across the run and flag how many observation entries are
+    CONSTANT (zero variance) post-warmup — a dead/broken feature (e.g. the known constant-0 z_score) that
+    wastes obs dimensions and can mask a NaN-zeroing bug. Surfaced as a health flag, never a crash."""
+    provider = getattr(env, "data_provider", None)
+    if provider is None:
+        return []
+    try:
+        n = int(provider.get_timesteps())
+    except Exception:
+        return []
+    if n <= lookback + 4:
+        return []
+    rows = []
+    for s in range(lookback, n, max(1, (n - lookback) // 50)):
+        try:
+            rows.append(np.asarray(provider.get_values(s), dtype=float).ravel())
+        except Exception:
+            return []
+    rows = [r for r in rows if rows and r.shape == rows[0].shape]
+    if len(rows) < 3:
+        return []
+    dead = int(np.sum(np.asarray(rows).var(axis=0) == 0.0))
+    return [f"dead_features:{dead}"] if dead else []
+
+
 def _health(env, state, is_rl, lookback):
     flags = []
     n_trades = _finite(state[17]) if len(state) > 17 else 0
     if any(not math.isfinite(_finite(state[i], float("nan"))) for i in (1, 2)):
         flags.append("nan_metrics")
+    flags.extend(_dead_feature_flags(env, lookback))
     if is_rl:
         live_actions = [_action_int(a) for a in getattr(env, "actions", [])[lookback:]]
         if live_actions and len(set(live_actions)) <= 1:
@@ -561,6 +588,66 @@ def _capture_stats(equity, prices):
     return out
 
 
+def _provenance_fingerprint(cfg, stored_cfg):
+    """Reproducibility fingerprint (L5): stamp code + config + data + lib versions + the resolved train/test
+    span so any result can be re-derived and audited. Every field is best-effort — a missing git or lib
+    never breaks a run."""
+    import hashlib
+    import json
+    import os
+    import subprocess
+
+    fp = {}
+    try:
+        fp["gitCommit"] = (
+            subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL).decode().strip()
+        )
+        fp["gitDirty"] = bool(
+            subprocess.check_output(["git", "status", "--porcelain"], stderr=subprocess.DEVNULL).decode().strip()
+        )
+    except Exception:
+        pass
+    try:
+        fp["configHash"] = hashlib.sha256(
+            json.dumps(stored_cfg, sort_keys=True, default=str).encode()
+        ).hexdigest()[:16]
+    except Exception:
+        pass
+    try:
+        from trainer.walk_forward import resolve_walk_forward_window
+
+        _, _, meta = resolve_walk_forward_window(cfg)
+        fp["trainFrom"], fp["trainTo"] = meta.get("train_from"), meta.get("train_to")
+        fp["testFrom"], fp["testTo"] = meta.get("test_from"), meta.get("test_to")
+    except Exception:
+        pass
+    try:
+        import trainer.config_builder as cb
+
+        dc = cb.build_data_config(cfg)
+        groups = list(dc.train_data_paths) + list(dc.test_data_paths)
+        paths = [p for g in groups for p in (g if isinstance(g, (list, tuple)) else [g])]
+        sig = sorted((os.path.basename(p), os.path.getsize(p)) for p in paths if os.path.exists(p))
+        fp["dataVersion"] = hashlib.sha256(repr(sig).encode()).hexdigest()[:16]
+        fp["dataFiles"] = len(sig)
+    except Exception:
+        pass
+    try:
+        import importlib.metadata as _im
+
+        libs = {}
+        for k in ("torch", "numpy", "pandas", "stable_baselines3", "sb3_contrib", "gymnasium"):
+            try:
+                libs[k] = _im.version(k)
+            except Exception:
+                pass
+        if libs:
+            fp["libVersions"] = libs
+    except Exception:
+        pass
+    return fp
+
+
 def build_summary(env, state, cfg, model, ran_at, is_rl):
     lookback = _lookback(env, cfg)
     fidelity = resolve_fidelity(cfg)[1]["fidelity_run"]
@@ -641,7 +728,7 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         "metrics": metrics,
         "health": _health(env, state, is_rl, lookback),
         "config": stored_cfg,
-        "provenance": {"ranAt": ran_at},
+        "provenance": {"ranAt": ran_at, **_provenance_fingerprint(cfg, stored_cfg)},
         "series": series,
         "dataset": _dataset(env, cfg, fidelity, len(equity)),
     }
