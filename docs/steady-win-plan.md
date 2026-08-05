@@ -100,6 +100,15 @@ the repo-split (all BlackSwan-domain items live here).
 - **Self-owned here regardless of who owns A2–A5:** the `asset` lever, the `calendar_features`/`regime` levers,
   metric emission, the `windows_supported` truncation guard, checkpoints-on.
 
+**Experiment governance (framework is the ENGINE's, not BlackSwan's).** RL MODEL runs go to the `blackswan-run`
+store ONLY (kept apples-to-apples pure). DIAGNOSTICS that produce no model (baseline scans, breadth analyses,
+ablations, correctness probes) are **side-experiments** — a GENERIC engine capability (modeltrainer **A4**:
+`-experiment` recordType + campaign + multi-source hypothesis evidence), reusable by every project, NOT
+re-implemented in BlackSwan. There is ONE thesis/hypothesis concept, fed by evidence from BOTH stores (a thesis
+may require both); the hypothesis aggregates across them. BlackSwan contributes only (a) the runs via the CLI
+contract and (b) an optional thin DOMAIN reducer for a side-experiment's trading-specific `aggregate` (e.g.
+equity-curve portfolio/breadth math) — added when the engine framework lands, never as standalone framework here.
+
 ---
 
 ## Stage -1. Operating model — semi-automate the loop (the answer to "how does an AI drive this?")

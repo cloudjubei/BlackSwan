@@ -13,10 +13,11 @@ import types
 from src.model.ma_crossover_strategy_model import MaCrossoverStrategyModel
 
 
-def _env(prices, current_step):
+def _env(prices, current_step, allow_shorting=False):
     return types.SimpleNamespace(
         current_step=current_step,
         get_price=lambda step: float(prices[step]),
+        env_config=types.SimpleNamespace(allow_shorting=allow_shorting),
     )
 
 
@@ -89,6 +90,27 @@ def test_short_window_averages_multiple_bars():
     # prices: last2 = (10+30)/2 = 20 ; last4 = (40+20+10+30)/4 = 25 -> short(20) < long(25) -> flat.
     env = _env([40, 20, 10, 30], current_step=3)
     assert _model(short_window=2, long_window=4).get_action(env, None) == 2
+
+
+# --- long/short: SHORT the downtrend when the env allows shorting -----------
+
+def test_short_on_downtrend_when_allow_shorting():
+    # Falling series -> short MA below long MA. In a long+SHORT env, be SHORT (3) instead of flat (2):
+    # long-only trend can only sit out downtrends; long/short profits from them.
+    env = _env([160, 140, 120, 100], current_step=3, allow_shorting=True)
+    assert _model(short_window=1, long_window=4).get_action(env, None) == 3
+
+
+def test_flat_on_downtrend_when_shorting_disabled():
+    # Same downtrend, long-only env -> still FLAT (2), never short (default behaviour unchanged).
+    env = _env([160, 140, 120, 100], current_step=3, allow_shorting=False)
+    assert _model(short_window=1, long_window=4).get_action(env, None) == 2
+
+
+def test_long_unaffected_by_allow_shorting():
+    # An uptrend is LONG (1) regardless of the shorting flag — shorting only changes the downtrend branch.
+    env = _env([100, 110, 120, 130], current_step=3, allow_shorting=True)
+    assert _model(short_window=1, long_window=4).get_action(env, None) == 1
 
 
 # --- guards -----------------------------------------------------------------

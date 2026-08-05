@@ -12,11 +12,29 @@ import types
 from src.model.breakout_strategy_model import BreakoutStrategyModel
 
 
-def _env(prices, current_step):
+def _env(prices, current_step, allow_shorting=False):
     return types.SimpleNamespace(
         current_step=current_step,
         get_price=lambda step: float(prices[step]),
+        env_config=types.SimpleNamespace(allow_shorting=allow_shorting),
     )
+
+
+def _breakout(window=3, band=0.0):
+    m = BreakoutStrategyModel.__new__(BreakoutStrategyModel)
+    m.breakout_config = types.SimpleNamespace(window=window, band=band)
+    return m
+
+
+def test_short_on_break_below_support_when_allow_shorting():
+    # prior window (100,90,95) min=90 ; now=80 < 90 -> break below support -> SHORT (3) in a long+short env.
+    env = _env([100, 90, 95, 80], current_step=3, allow_shorting=True)
+    assert _breakout(window=3).get_action(env, None) == 3
+
+
+def test_flat_on_break_below_support_when_shorting_disabled():
+    env = _env([100, 90, 95, 80], current_step=3, allow_shorting=False)
+    assert _breakout(window=3).get_action(env, None) == 2
 
 
 def _model(window=3, band=0.0):

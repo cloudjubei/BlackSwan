@@ -12,11 +12,27 @@ import types
 from src.model.momentum_strategy_model import MomentumStrategyModel
 
 
-def _env(prices, current_step):
+def _env(prices, current_step, allow_shorting=False):
     return types.SimpleNamespace(
         current_step=current_step,
         get_price=lambda step: float(prices[step]),
+        env_config=types.SimpleNamespace(allow_shorting=allow_shorting),
     )
+
+
+def test_short_on_negative_momentum_when_allow_shorting():
+    # now=90 vs 100 -> negative momentum. In a long+SHORT env, SHORT (3) instead of flat (2).
+    env = _env([100.0, 90.0], current_step=1, allow_shorting=True)
+    m = MomentumStrategyModel.__new__(MomentumStrategyModel)
+    m.momentum_config = types.SimpleNamespace(lookback_periods=1)
+    assert m.get_action(env, None) == 3
+
+
+def test_flat_on_negative_momentum_when_shorting_disabled():
+    env = _env([100.0, 90.0], current_step=1, allow_shorting=False)
+    m = MomentumStrategyModel.__new__(MomentumStrategyModel)
+    m.momentum_config = types.SimpleNamespace(lookback_periods=1)
+    assert m.get_action(env, None) == 2
 
 
 def _model(lookback_periods=3):

@@ -32,4 +32,6 @@ class MomentumStrategyModel(BaseStrategyModel):
 
         if trailing_return > 0:
             return 1  # positive momentum -> be long
-        return 2      # non-positive momentum -> be flat
+        # non-positive momentum -> downtrend. Long/short envs SHORT it; long-only be flat.
+        allow_shorting = getattr(getattr(env, "env_config", None), "allow_shorting", False)
+        return 3 if allow_shorting else 2

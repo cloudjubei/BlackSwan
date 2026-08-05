@@ -43,5 +43,7 @@ class BreakoutStrategyModel(BaseStrategyModel):
         if upper is not None and upper > 0 and price_now > upper * (1.0 + band):
             return 1  # broke above resistance -> be long
         if lower is not None and lower > 0 and price_now < lower * (1.0 - band):
-            return 2  # broke below support -> be flat
+            # broke below support -> downtrend. Long/short envs SHORT it; long-only be flat.
+            allow_shorting = getattr(getattr(env, "env_config", None), "allow_shorting", False)
+            return 3 if allow_shorting else 2
         return 0      # inside the range -> keep the current position

@@ -45,5 +45,7 @@ class MaCrossoverStrategyModel(BaseStrategyModel):
         if short_ma > long_ma * (1.0 + band):
             return 1  # short above long -> be long
         if short_ma < long_ma * (1.0 - band):
-            return 2  # short below long -> be flat
+            # short below long -> downtrend. Long/short envs SHORT it (profit the downtrend); long-only be flat.
+            allow_shorting = getattr(getattr(env, "env_config", None), "allow_shorting", False)
+            return 3 if allow_shorting else 2
         return 0      # inside the band -> keep the current position
