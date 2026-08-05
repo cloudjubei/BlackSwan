@@ -1,0 +1,3 @@
+# Persist the self-describing records (record.json + report.md); the per-cell raw RunSummaries are
+# regenerable from the matrix, so keep the repo light.
+*/summaries/
