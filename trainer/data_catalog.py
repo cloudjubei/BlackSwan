@@ -178,6 +178,11 @@ _ETFS = [
     _etf("GDX", "VanEck Gold Miners ETF", 7),
     _etf("SPY", "SPDR S&P 500 ETF (broad-equity risk proxy)", 8),
     _etf("UUP", "Invesco DB US Dollar Bullish ETF (dollar proxy)", 9),
+    # Rates/duration ETFs — the highest historical risk-adjusted trend class + a low-correlation leg for the
+    # diversified-trend basket (long/intermediate/short Treasuries).
+    _etf("TLT", "iShares 20+ Year Treasury Bond ETF (long-duration rates)", 10),
+    _etf("IEF", "iShares 7-10 Year Treasury Bond ETF (intermediate rates)", 11),
+    _etf("SHY", "iShares 1-3 Year Treasury Bond ETF (short rates)", 12),
 ]
 
 _CLASSES = [

@@ -55,6 +55,14 @@ def test_broad_market_proxies_are_catalogued():
     assert by_sym["UUP"]["sourceSymbol"] == "UUP"
 
 
+def test_rates_etfs_are_catalogued():
+    # TLT/IEF/SHY — the rates/duration ETFs (long/intermediate/short Treasuries) for the diversified-trend
+    # basket: the highest historical risk-adjusted trend class + a low-correlation leg.
+    by_sym = {i["symbol"]: i for i in _class(ETFS)["instruments"]}
+    for s in ("TLT", "IEF", "SHY"):
+        assert s in by_sym and by_sym[s]["sourceSymbol"] == s
+
+
 def test_each_asset_class_carries_a_label_and_directory():
     for cls in data_catalog.catalog():
         assert cls["label"]
