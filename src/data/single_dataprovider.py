@@ -36,7 +36,18 @@ class SingleDataProvider(AbstractDataProvider):
 
     def get_price(self, step: int) -> float:
         return self.prices[step + self.get_start_index()]
-    
+
+    def get_open(self, step: int) -> float:
+        # The OPEN of decision bar `step`, aligned with get_price's close. self.prices come from the same
+        # concatenated frame (process_df_simple reads price/price_open off the raw rows before any feature
+        # work), so the raw price_open at row `step + start_index` is this bar's open. Lazily read once
+        # (only when next_open fills are used) from the same cached raw build.
+        if getattr(self, "_opens", None) is None:
+            raw_df, *_ = self.get_raw_data(self.paths, self.config.timestamp)
+            self._opens = raw_df["price_open"].to_numpy()
+        i = min(max(step + self.get_start_index(), 0), len(self._opens) - 1)
+        return float(self._opens[i])
+
     def get_values(self, step: int):
         offset = step + self.get_start_index()
         vs = self.df.loc[

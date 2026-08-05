@@ -455,13 +455,26 @@ class BaseCryptoEnv(AbstractEnv):
             return 0.0
         return weight * abs(self.drawdowns[-1])
 
+    def _fill_price(self):
+        # Fill timing (env_config.fill_mode). "close" = the decision bar's close (SAME-BAR, historical —
+        # trades a price already observed). "next_open" = decide at this bar's close, EXECUTE at the NEXT
+        # bar's OPEN, removing that ~1-bar look-ahead. Terminal bar has no next bar -> fall back to the
+        # current close; a provider without get_open degrades to the next bar's close (still no same-bar leak).
+        if getattr(self.env_config, "fill_mode", "close") != "next_open":
+            return self.get_price(self.current_step)
+        nxt = self.current_step + 1
+        if nxt >= self.get_timesteps():
+            return self.get_price(self.current_step)
+        get_open = getattr(self.data_provider, "get_open", None)
+        return float(get_open(nxt)) if get_open is not None else self.get_price(nxt)
+
     def step(self, action):
         # make sure action is one value
         if isinstance(action, np.ndarray) and len(action.shape) > 0:
             action = action.item()
             # action = action[0]
 
-        self.current_price = self.get_price(self.current_step)
+        self.current_price = self._fill_price()
 
         # Execute one time step within the environment
         self.resolve_action(action)

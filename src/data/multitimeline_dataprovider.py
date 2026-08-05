@@ -211,6 +211,13 @@ class MultiTimelineDataProvider(AbstractDataProvider):
         # return self.prices[step*self.divider_run + self.get_start_index()]
         return self.prices[step]
 
+    def get_open(self, step: int) -> float:
+        # The OPEN of decision bar `step`. raw_df_for_plotting is strided to the decision cadence exactly
+        # like self.prices (get_price), so row `step` is the same decision bar — its price_open is the open.
+        df = self.raw_df_for_plotting
+        i = min(max(int(step), 0), len(df) - 1)
+        return float(df["price_open"].iloc[i])
+
     def get_timestamp(self, step: int):
         # The current decision bar's datetime — the SAME base row get_price/the observation anchor on
         # (start_index + step*divider_run). get_timestamp_datetime reads the bar OPEN, so .hour is the

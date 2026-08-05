@@ -20,6 +20,12 @@ class EnvConfig:
     vol_target: float = 0.02
     vol_target_min: float = 0.1
     vol_window: int = 10
+    # Trade FILL timing (execution realism, not a leak-in-features): "close" fills at the decision bar's
+    # close — the historical SAME-BAR behaviour, which lets a trade execute at a price it has already
+    # observed (~1 bar of look-ahead optimism). "next_open" decides at the close but EXECUTES at the NEXT
+    # bar's OPEN, removing that optimism. Default "close" keeps existing runs + the alignment test corpus
+    # unchanged; Stage-0 honesty runs pass fill_mode="next_open".
+    fill_mode: str = "close"
     # Shorting is an ENVIRONMENT property — what the action space ALLOWS, not a model knob. When enabled
     # the action space gains short(3)/cover(4) and positions may go negative (long+short); long-only
     # behaviour is unchanged when False. Managed via named environments in the hub (scope: environment).

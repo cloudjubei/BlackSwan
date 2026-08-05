@@ -34,6 +34,12 @@ class AbstractDataProvider(ABC):
     def get_price(self, step: int) -> float:
         pass
 
+    def get_open(self, step: int) -> float:
+        # The OPEN price of decision bar `step`. Default = the bar's close (get_price), a safe fallback for
+        # providers that don't expose opens; the real providers override with the true open so next_open
+        # fills execute at the next bar's OPEN. Never a look-ahead (open of `step` is known at `step`).
+        return self.get_price(step)
+
     @abstractmethod
     def get_signal_buy_sell(self, step: int) -> int:
         pass

@@ -1038,3 +1038,6 @@ def test_provenance_fingerprint_stable_and_config_sensitive():
     assert summary_mod._provenance_fingerprint(cfg, stored)["configHash"] == fp["configHash"]
     assert summary_mod._provenance_fingerprint(cfg, {**stored, "seed": 1})["configHash"] != fp["configHash"]
     assert fp.get("trainFrom") == "2020-01" and fp.get("testFrom") == "2024-01"
+    # dataVersion is hashed over the resolved (nested OmegaConf ListConfig) file list — must be stamped
+    assert isinstance(fp.get("dataVersion"), str) and fp["dataVersion"]
+    assert fp.get("dataFiles", 0) >= 1

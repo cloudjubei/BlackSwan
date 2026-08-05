@@ -511,7 +511,10 @@ def _health(env, state, is_rl, lookback):
             flags.append("zero_trades")
         elif n_trades <= DEGENERATE_TRADE_COUNT:
             flags.append("few_trades")
-    return {"status": "degenerate" if flags else "ok", "flags": flags}
+    # dead_features is INFORMATIONAL (a broken/constant obs column) — it must NOT mark the whole run
+    # degenerate (that would auto-reject nearly every non-crypto run, whose long-window z_score is constant).
+    serious = [f for f in flags if not f.startswith("dead_features")]
+    return {"status": "degenerate" if serious else "ok", "flags": flags}
 
 
 def _oos_stats(equity):
@@ -625,8 +628,18 @@ def _provenance_fingerprint(cfg, stored_cfg):
         import trainer.config_builder as cb
 
         dc = cb.build_data_config(cfg)
-        groups = list(dc.train_data_paths) + list(dc.test_data_paths)
-        paths = [p for g in groups for p in (g if isinstance(g, (list, tuple)) else [g])]
+
+        def _flat(x):
+            # train/test paths come back as (possibly nested) OmegaConf ListConfig, not plain lists — recurse
+            # to strings so the file signature covers every kline file regardless of nesting.
+            if isinstance(x, str):
+                return [x]
+            try:
+                return [p for e in x for p in _flat(e)]
+            except TypeError:
+                return []
+
+        paths = _flat(dc.train_data_paths) + _flat(dc.test_data_paths)
         sig = sorted((os.path.basename(p), os.path.getsize(p)) for p in paths if os.path.exists(p))
         fp["dataVersion"] = hashlib.sha256(repr(sig).encode()).hexdigest()[:16]
         fp["dataFiles"] = len(sig)

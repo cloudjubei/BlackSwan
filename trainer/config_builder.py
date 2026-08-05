@@ -205,6 +205,7 @@ def build_env_config(cfg):
             vol_target=float(cfg.get("vol_target", 0.02)),
             vol_target_min=float(cfg.get("vol_target_min", 0.1)),
             vol_window=int(cfg.get("vol_window", 10)),
+            fill_mode=str(cfg.get("fill_mode", "close")),
             allow_shorting=bool(cfg.get("allow_shorting", False)),
             max_short_size=float(cfg.get("max_short_size", 1.0)),
             observations_contain=[
