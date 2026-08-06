@@ -46,6 +46,13 @@ UNIVERSES = {
 }
 DEFAULT_UNIVERSE = "macro+stocks"
 
+# Which way the trailing-return rank is traded. "momentum" is the published rule the screen was built on;
+# "reversal" is its exact inversion, added because the 96-cell momentum screen's worst window by far was
+# stk-2023 at mean -63.50% — a loss that size is structure with the sign flipped, not noise. The two arms
+# share every other line of this file so a reversal cell is directly comparable to its momentum twin.
+SIGNALS = ("momentum", "reversal")
+DEFAULT_SIGNAL = "momentum"
+
 
 def align_prices(frames):
     """symbol -> frame(timestamp_close, price) onto ONE clock: a date-indexed price matrix, NaN where a
@@ -98,11 +105,25 @@ def momentum(prices, lookback):
     return pd.DataFrame(out, index=prices.index)
 
 
-def build_weights(prices, lookback, k, rebalance_days, long_only, start=None):
+def build_weights(prices, lookback, k, rebalance_days, long_only, signal=DEFAULT_SIGNAL, start=None):
     """The book HELD INTO each bar. A rank computed from data up to t is applied to the NEXT step's return
     (row t carries what was decided at t-1), so a signal is never traded on its own bar. Rebalance every
     `rebalance_days` bars; between rebalances the book is held. Long/short is equal-weight both sides and
-    therefore NET FLAT — the beta-neutrality the whole fork rests on."""
+    therefore NET FLAT — the beta-neutrality the whole fork rests on.
+
+    `signal` only chooses which END of the trailing-return rank is bought: "momentum" long the top k,
+    "reversal" long the bottom k. It defaults to "momentum", so every book built before the lever existed
+    is reproduced bar-for-bar and the 96 persisted screen cells stay comparable. An unrecognised value is
+    an error rather than a fallback — a typo'd lever that quietly ranked as momentum would file a momentum
+    result under a reversal label, which corrupts the evidence trail instead of merely losing money."""
+    if signal not in SIGNALS:
+        raise ValueError(f"unknown signal {signal!r}; choose one of {sorted(SIGNALS)}")
+    if int(lookback) < 1:
+        # A non-positive formation window inverts momentum()'s shift into a FORWARD ratio, so the rank is
+        # computed from bars that have not happened, and tradeable_mask waves it through because
+        # `prior >= lookback` is trivially true. The screen would report a clean-looking result built on a
+        # peek at the future, which is the one failure mode this module exists to make impossible.
+        raise ValueError(f"lookback must be >= 1; got {lookback!r}")
     weights = pd.DataFrame(0.0, index=prices.index, columns=prices.columns)
     if prices.empty:
         return weights
@@ -124,7 +145,7 @@ def build_weights(prices, lookback, k, rebalance_days, long_only, start=None):
         if len(ranked) < (k if long_only else 2 * k):
             continue
         since = 0
-        order = ranked.sort_values(ascending=False)
+        order = ranked.sort_values(ascending=(signal == "reversal"))
         nxt = pd.Series(0.0, index=prices.columns)
         for sym in order.index[:k]:
             nxt[sym] = 1.0 / k
@@ -196,6 +217,15 @@ def run(cfg):
     k = int(cfg.get("k", 3))
     rebalance_days = int(cfg.get("rebalance_days", 21))
     long_only = bool(cfg.get("long_only", False))
+    signal = str(cfg.get("signal", DEFAULT_SIGNAL))
+    if signal not in SIGNALS:
+        # build_weights raises on this too, but only after the universe has been read off disk and only as a
+        # ValueError traceback. A cell is launched from a swept config file, so a bad lever must fail the
+        # same way a bad `universe` does — one clean line, before any work — rather than as a stack trace
+        # buried in a run log that someone then has to attribute to the right lever.
+        raise SystemExit(f"unknown signal {signal!r}; choose one of {sorted(SIGNALS)}")
+    if lookback < 1:
+        raise SystemExit(f"lookback must be >= 1; got {lookback} (a non-positive window reads the future)")
     fee = float(cfg.get("transaction_fee", 0.0002))
 
     train_pairs, test_pairs, window = resolve_walk_forward_window(cfg)
@@ -206,7 +236,7 @@ def run(cfg):
     # The signal may look back into the TRAIN span, but only the TEST window is accounted — the same
     # out-of-sample rule the single-asset line reports under.
     test_start = pd.to_datetime(f"{test_pairs[0][0]}-{test_pairs[0][1]:02d}-01")
-    weights = build_weights(prices, lookback, k, rebalance_days, long_only, start=test_start)
+    weights = build_weights(prices, lookback, k, rebalance_days, long_only, signal, start=test_start)
     oos = prices.index >= test_start
     prices_oos = prices[oos]
     equity = backtest(prices_oos, weights[oos], fee)

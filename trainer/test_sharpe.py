@@ -5,7 +5,9 @@ the Probabilistic Sharpe Ratio (PSR, prob the true SR exceeds a benchmark given 
 expected-max-SR deflation level across N trials, the Deflated Sharpe Ratio (DSR = PSR at that level),
 and the minimum track-record length. No torch; numpy + scipy only."""
 import math
+from functools import lru_cache
 
+import numpy as np
 import pytest
 
 from trainer.sharpe import (
@@ -169,3 +171,207 @@ def test_psr_from_stats_golden_vectors():
     assert psr_from_stats(0.0, 0.0, 3.0, 100) == pytest.approx(0.5, abs=1e-12)  # SR=benchmark ⇒ Phi(0)
     assert psr_from_stats(0.1, 0.0, 3.0, 101) == pytest.approx(0.8407413278013518, rel=1e-9)  # normal moments
     assert psr_from_stats(0.15, -0.5, 4.0, 200, sr_benchmark=0.05) == pytest.approx(0.911495153669269, rel=1e-9)
+
+
+# --- ANTI-VACUITY (L3): the gate must REJECT a search that contains no real edge ----------------------------
+# The leak register pins this acceptance test verbatim: "K null runs (true edge 0) -> top DSR ~= 0.5, gate
+# rejects". Without it a gate that rubber-stamps every candidate is indistinguishable from one that works —
+# right up until it certifies noise as a champion. Every generator below is explicitly seeded: these are
+# correctness gates, and a flaky correctness gate gets deleted by whoever hits it on a bad day.
+
+NULL_TRIALS = 500     # K configs in one simulated search
+NULL_N_OBS = 252      # per-trial test window (a year of daily bars)
+NULL_SIGMA = 0.01     # per-observation return vol; the level is irrelevant — Sharpe is scale-free
+NULL_SEED = 20260806
+NULL_CORPORA = 64     # independent searches replayed for the distribution-level claims
+EDGE_SEED = 20260807
+EDGE_MU = 0.006       # true per-observation SR = EDGE_MU / NULL_SIGMA = 0.6, clear of the ~0.30 bar below
+DSR_GATE = 0.95       # the verdict layer's pass threshold
+# EDGE_MU must sit well ABOVE the sample Sharpe the gate actually demands at NULL_TRIALS/NULL_N_OBS, which
+# test_the_gate_demands_a_knowable_sample_sharpe pins at ~0.30/observation. A true SR only ~1.6 sampling
+# errors above that bar (EDGE_MU = 0.004) fails the gate on 6% of equally valid draws — the survival arm then
+# proves nothing but the seed. 0.6 is ~4.7 sampling errors clear, so survival is a property of the drift.
+
+
+@lru_cache(maxsize=None)
+def _null_search(seed):
+    """One complete null SEARCH: NULL_TRIALS independent return series whose TRUE edge is exactly zero
+    (loc=0.0), i.e. the eight-consecutive-nulls situation. Returns the moment bundle of the BEST trial —
+    what a researcher reports — plus the cross-trial Sharpe std the deflation level is built from."""
+    rng = np.random.default_rng(seed)
+    trials = rng.normal(0.0, NULL_SIGMA, size=(NULL_TRIALS, NULL_N_OBS))
+    trial_sharpes = np.array([sharpe_ratio(t) for t in trials])
+    winner = sharpe_stats(trials[int(np.argmax(trial_sharpes))])
+    return winner, float(trial_sharpes.std(ddof=1))
+
+
+def _dsr_of(bundle, n_trials, trial_sr_std):
+    return dsr_from_stats(
+        bundle["sharpe"], bundle["skew"], bundle["kurtosis"], bundle["n_obs"],
+        n_trials=n_trials, trial_sr_std=trial_sr_std,
+    )
+
+
+def _psr_of(bundle, sr_benchmark=0.0):
+    return psr_from_stats(
+        bundle["sharpe"], bundle["skew"], bundle["kurtosis"], bundle["n_obs"], sr_benchmark=sr_benchmark
+    )
+
+
+def test_null_search_winner_looks_like_a_find():
+    # Precondition for the whole section: the null winner is NOT a weak candidate. Best-of-500 under the
+    # null lands a healthy positive Sharpe — this is exactly the number a search reports as a lead.
+    winner, _ = _null_search(NULL_SEED)
+    assert winner["sharpe"] > 0.15
+    assert winner["n_obs"] == NULL_N_OBS
+
+
+def test_null_search_top_dsr_is_a_coin_flip_and_the_gate_rejects_it():
+    # THE headline property. True edge zero everywhere ⇒ the best of K trials is worth a coin flip, and the
+    # gate must say so.
+    winner, trial_sr_std = _null_search(NULL_SEED)
+    dsr = _dsr_of(winner, NULL_TRIALS, trial_sr_std)
+    # Band, not a knife edge: SR* is the EXPECTED max of K null Sharpes while the REALISED max scatters
+    # around it (asymptotically Gumbel, sd ≈ (π/√6)/√(2·ln K) ≈ 0.36 in the z-units DSR = Phi(z) consumes).
+    # So a single null search lands near 0.5 with roughly that spread; ±0.35 is about one such sd and stays
+    # far from the gate. The mean over NULL_CORPORA searches pins the 0.5 centre tightly.
+    assert abs(dsr - 0.5) <= 0.35
+    assert dsr < DSR_GATE  # gate rejects: DSR >= 0.95 is the pass condition
+
+
+def test_null_search_top_dsr_centres_on_half_and_the_gate_rejects_every_replication():
+    # Distribution-level version of the headline: NULL_CORPORA independent searches, all pure noise.
+    tops = np.array([
+        _dsr_of(winner, NULL_TRIALS, trial_sr_std)
+        for winner, trial_sr_std in (_null_search(NULL_SEED + i) for i in range(NULL_CORPORA))
+    ])
+    assert tops.mean() == pytest.approx(0.5, abs=0.05)  # theory says exactly 0.5; SEM over 64 searches ≈ 0.017
+    assert tops.max() < DSR_GATE  # not one null search in NULL_CORPORA is certified
+
+
+def test_deflation_alone_flips_the_null_winner_from_pass_to_reject():
+    # THE CRUX. The rejection above must come from the multiple-testing correction, not from the candidate
+    # being weak. Judged as a single hypothesis the very same winner sails through the same threshold.
+    winner, trial_sr_std = _null_search(NULL_SEED)
+    undeflated = _psr_of(winner, sr_benchmark=0.0)
+    assert undeflated >= DSR_GATE  # plain PSR vs benchmark 0: PASSES
+
+    # Two independent ways to switch the deflation off, both landing on that same passing number: one trial
+    # (no multiple testing) and zero cross-trial spread. Only the SR* term differs from the rejecting call.
+    assert _dsr_of(winner, 1, trial_sr_std) == pytest.approx(undeflated, rel=1e-12)
+    assert _dsr_of(winner, NULL_TRIALS, 0.0) == pytest.approx(undeflated, rel=1e-12)
+    assert _dsr_of(winner, 1, trial_sr_std) >= DSR_GATE
+
+    deflated = _dsr_of(winner, NULL_TRIALS, trial_sr_std)
+    assert deflated < DSR_GATE
+    # and the deflation level is the only thing that moved: a strictly positive SR* is the whole difference
+    # between the passing calls above and this rejecting one.
+    assert expected_max_sharpe(NULL_TRIALS, trial_sr_std) > 0
+    assert deflated < undeflated
+
+
+def test_every_null_replication_passes_undeflated_and_fails_deflated():
+    # The flip is not a property of one lucky seed: NULL_CORPORA out of NULL_CORPORA searches pass without
+    # deflation and fail with it.
+    passed_undeflated = 0
+    rejected_deflated = 0
+    for i in range(NULL_CORPORA):
+        winner, trial_sr_std = _null_search(NULL_SEED + i)
+        passed_undeflated += _psr_of(winner) >= DSR_GATE
+        rejected_deflated += _dsr_of(winner, NULL_TRIALS, trial_sr_std) < DSR_GATE
+    assert passed_undeflated == NULL_CORPORA
+    assert rejected_deflated == NULL_CORPORA
+
+
+def test_null_winner_has_no_track_record_long_enough_to_clear_the_deflation_level():
+    # The minTRL reading of the same verdict: to certify the null winner against SR* you would need more
+    # observations than it has (inf when its Sharpe never clears SR* at all).
+    winner, trial_sr_std = _null_search(NULL_SEED)
+    sr_star = expected_max_sharpe(NULL_TRIALS, trial_sr_std)
+    need = min_track_record_length_from_stats(
+        winner["sharpe"], winner["skew"], winner["kurtosis"], winner["n_obs"], sr_benchmark=sr_star
+    )
+    assert need > winner["n_obs"]
+
+
+def test_a_genuine_edge_survives_the_same_deflation():
+    # A gate that rejects everything is as useless as one that accepts everything. Same K, same trial_sr_std,
+    # same window length as the null search — only the true drift differs.
+    _, trial_sr_std = _null_search(NULL_SEED)
+    edge = sharpe_stats(np.random.default_rng(EDGE_SEED).normal(EDGE_MU, NULL_SIGMA, size=NULL_N_OBS))
+    assert _dsr_of(edge, NULL_TRIALS, trial_sr_std) >= DSR_GATE
+    # and it clears the deflation level with observations to spare, unlike the null winner.
+    assert min_track_record_length_from_stats(
+        edge["sharpe"], edge["skew"], edge["kurtosis"], edge["n_obs"],
+        sr_benchmark=expected_max_sharpe(NULL_TRIALS, trial_sr_std),
+    ) <= edge["n_obs"]
+
+
+def test_a_genuine_edge_survives_the_same_deflation_in_every_replication():
+    # Survival must not rest on one lucky draw any more than rejection does: NULL_CORPORA independent series
+    # carrying the same true drift all clear the gate, each with a track record long enough to prove it.
+    _, trial_sr_std = _null_search(NULL_SEED)
+    sr_star = expected_max_sharpe(NULL_TRIALS, trial_sr_std)
+    survived = 0
+    for i in range(NULL_CORPORA):
+        edge = sharpe_stats(np.random.default_rng(EDGE_SEED + i).normal(EDGE_MU, NULL_SIGMA, size=NULL_N_OBS))
+        survived += (
+            _dsr_of(edge, NULL_TRIALS, trial_sr_std) >= DSR_GATE
+            and min_track_record_length_from_stats(
+                edge["sharpe"], edge["skew"], edge["kurtosis"], edge["n_obs"], sr_benchmark=sr_star
+            ) <= edge["n_obs"]
+        )
+    assert survived == NULL_CORPORA
+
+
+def test_the_gate_demands_a_knowable_sample_sharpe():
+    # What the deflation actually costs a candidate, stated rather than implied: at NULL_TRIALS configs over
+    # NULL_N_OBS observations the gate passes nothing below ~0.30 per-observation Sharpe (~4.8 annualised) and
+    # passes normal-shaped returns above it. Bracketed loosely — SR* moves with the search's own trial spread
+    # (observed bar 0.284-0.318 over 300 null searches) — but tightly enough to keep the two arms honest: the
+    # null winner (~0.17) sits below the bar and EDGE_MU / NULL_SIGMA sits above it.
+    winner, trial_sr_std = _null_search(NULL_SEED)
+    sr_star = expected_max_sharpe(NULL_TRIALS, trial_sr_std)
+    assert psr_from_stats(0.25, 0.0, 3.0, NULL_N_OBS, sr_benchmark=sr_star) < DSR_GATE
+    assert psr_from_stats(0.36, 0.0, 3.0, NULL_N_OBS, sr_benchmark=sr_star) >= DSR_GATE
+    assert winner["sharpe"] < 0.25 < 0.36 < EDGE_MU / NULL_SIGMA
+
+
+def test_dsr_is_non_increasing_in_n_trials():
+    # Searching more configs makes any given Sharpe less impressive — never more.
+    winner, trial_sr_std = _null_search(NULL_SEED)
+    grid = [1, 2, 5, 10, 25, 100, 500, 2000, 10000, 100000]
+    vals = [_dsr_of(winner, n, trial_sr_std) for n in grid]
+    assert all(b <= a for a, b in zip(vals, vals[1:]))
+    assert vals[-1] < vals[0]  # not vacuously constant
+    assert _dsr_of(winner, 25, trial_sr_std) < _dsr_of(winner, 5, trial_sr_std)
+
+
+def test_expected_max_sharpe_is_non_decreasing_in_trials_and_in_trial_std():
+    trials = [1, 2, 5, 10, 25, 100, 500, 2000, 10000, 100000]
+    by_trials = [expected_max_sharpe(n, 0.5) for n in trials]
+    assert all(a <= b for a, b in zip(by_trials, by_trials[1:]))
+    assert by_trials[0] < by_trials[-1]  # not vacuously constant
+
+    stds = [0.0, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0]
+    by_std = [expected_max_sharpe(100, s) for s in stds]
+    assert all(a <= b for a, b in zip(by_std, by_std[1:]))
+    assert by_std[0] < by_std[-1]
+
+
+def test_no_deflation_for_degenerate_trial_counts_or_spreads():
+    # <2 trials or a non-positive cross-trial spread means there is nothing to correct for: SR* = 0, so DSR
+    # collapses onto the undeflated PSR rather than silently rejecting.
+    winner, _ = _null_search(NULL_SEED)
+    undeflated = _psr_of(winner, sr_benchmark=0.0)
+    assert expected_max_sharpe(-5, 0.5) == 0.0
+    assert expected_max_sharpe(NULL_TRIALS, -0.5) == 0.0
+    assert _dsr_of(winner, -5, 0.5) == pytest.approx(undeflated, rel=1e-12)
+    assert _dsr_of(winner, NULL_TRIALS, -0.5) == pytest.approx(undeflated, rel=1e-12)
+
+
+def test_dsr_is_undefined_below_two_observations():
+    assert dsr_from_stats(0.5, 0.0, 3.0, 1, n_trials=NULL_TRIALS, trial_sr_std=0.2) == 0.0
+    assert dsr_from_stats(0.5, 0.0, 3.0, 0, n_trials=NULL_TRIALS, trial_sr_std=0.2) == 0.0
+    assert deflated_sharpe_ratio([0.01], n_trials=NULL_TRIALS, trial_sr_std=0.2) == 0.0
+    assert min_track_record_length([0.01]) == math.inf

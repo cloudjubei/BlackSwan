@@ -352,6 +352,133 @@ MEAN while clearing fewer cells, and the lift is carried by one window (alt-oos-
 identical "moves the average without broadening the win" signature the Stage-1 `regime` channel showed. Finer
 observation buys variance, not selectivity.
 
+## Risk axis + reversal — nulls SEVEN and EIGHT (Aug 2026)
+
+Two further axes were screened under pre-registered gates and both failed; full detail in
+`docs/risk-axis-plan.md` and `docs/cross-sectional-plan.md` §1b.
+
+- **Risk axis (vol targeting).** The first axis in the campaign aimed at a *predictable* quantity: trailing→future
+  correlation is **+0.426** for volatility (12/12 symbols) against **+0.015** for return. 324/324 cells, 0 failed.
+  FAILS: 56/144 cells clear `sharpe_vs_hold>0`, 0 of 4 windows. **Three independent reads agree** — the
+  exploratory probe's 9/12 was a HORIZON artefact (per calendar year it is 38/78 = **49%**, a coin flip), and the
+  one condition that passed does not survive an honest control: vol targeting saved +3.10pp of drawdown where
+  merely holding 0.835 of the market constantly would have saved **+3.85pp** (only 22% of cells beat that
+  control). **Vol targeting is strictly dominated by holding less.**
+- **Cross-sectional reversal.** FAILS all four conditions. Its real value was diagnostic: *both* signs win
+  stk-2022 and lose every other window, so the P&L is not coming from the ranking — against a basket benchmark a
+  net-flat book measures the **absence of beta**, which means §1 was never a verdict on momentum.
+
+### What the combination axis is worth, measured (Aug 2026)
+
+The one axis never tested is **combination** — a portfolio of weak per-market signals, whose Sharpe comes from
+decorrelation rather than from any signal being good (distinct from cross-sectional, which bets assets *against*
+each other). Measured over the on-disk universe: 12 symbols carry only **3.89 effective independent bets**
+(mean pairwise ρ +0.189), a Sharpe multiplier of **1.97×**. The sub-structure matters — crypto's 3 symbols are
+**1.16** bets (ρ +0.791, effectively one asset), US equities+SPY **1.57**, and only macro/rates/FX/gold is
+genuinely diversifying at **3.53** (ρ +0.044); cross-class correlations are ~0.
+
+**But diversification multiplies an edge, and there is none to multiply.** Per-signal expectancy net of the
+round trip it pays, by rule family over 284 cells: `supervised-gbm` **−0.044%**, `momentum` **−0.043%**,
+`breakout` **−0.075%**, `ma_crossover` **+0.044%**. The one positive family is **carried entirely by 5 GOLD
+cells** (+0.818% expectancy, 60.3% hit); strip GOLD and it is negative, and 17/32 of its cells are positive — a
+coin flip. **Acquiring more markets (B3) would multiply zero**, so breadth is a *product* answer (hold a
+diversified basket) rather than a *model* answer — and no config in the corpus has beaten a basket.
+
+### L3 PRE-REGISTERED test of the GOLD lead (written BEFORE any DSR was computed — do not edit afterwards)
+
+The lead: GOLD is the only asset positive under two independent lenses (`ma_crossover` signal expectancy
++0.818% at 60.3% hit over 5 cells; the only positive mean ΔSharpe in the vol-target screen, +0.005). It is also
+exactly what a multiple-testing artefact looks like — the best of ~24 asset × rule combinations, drawn from a
+campaign that has searched far more than that. The Deflated Sharpe Ratio exists to settle precisely this.
+
+**Corpus / trial count.** The persisted store holds **1,109** completed configs, of which **861** carry the full
+moment bundle (`oos_sharpe`, `oos_ret_skew`, `oos_ret_kurt`, `oos_n_obs`) — the 248 `blackswan-run` records
+predate its emission. `trial_sr_std` = the standard deviation of `oos_sharpe` over those 861.
+`n_trials` = **1,109**: every completed config on disk was a trial that was looked at, whether or not it emitted
+moments. Deflating against the *whole* campaign rather than only the cells that produced the candidate is the
+honest reading — the campaign was one search for one edge, and reporting its best means N is everything that
+was tried. This is also the register's own wording ("`n_trials` = the real config count").
+
+**Candidate.** The **best** `oos_sharpe` among GOLD × `ma_crossover` cells. Best-of is precisely what DSR
+corrects for, so the best is the right thing to submit.
+
+**The GOLD lead is REAL iff ALL hold:**
+1. **DSR ≥ 0.95** at `n_trials = 1109`.
+2. **DSR ≥ 0.95** at `n_trials = 20888`, the historical search size the plan records. More trials can only
+   lower DSR, so this is the stricter half and it is the one that reflects what was actually searched.
+3. **`min_track_record_length ≤ oos_n_obs`** for the candidate — the second half of L3's stated acceptance,
+   i.e. the track record is long enough to establish the Sharpe it claims.
+4. **Consistency:** the **median** GOLD × `ma_crossover` cell's `oos_sharpe` also exceeds the deflation level
+   SR*. A lead that exists only in its luckiest window is a window, not an edge — the standing bar this
+   campaign has applied to every other arm.
+
+**Decision.** Pass → GOLD is the first real lead in the campaign; escalate under Stage 3 discipline (multi-seed,
+lockbox window **and** held-out asset, provenance). Fail → the campaign closes on eight nulls plus a lead that
+did not survive multiple-testing correction, which is a genuine and well-supported result rather than a
+repetition.
+
+**Stated in advance: I expect this to FAIL.** Recording the expectation now so that a failure cannot later be
+reframed as having been obvious, and so that a pass would be genuinely surprising evidence rather than a
+result the test was shaped to produce.
+
+### L3 RESULT: the GOLD lead is NOT ESTABLISHED (Aug 2026) — the campaign closes
+
+Judged against the gate above, unedited. Computed **twice**, independently — `trainer/sharpe.py` (the golden
+reference) and the engine's `deflatedCorpusVerdict` — because one number decided this. They agree to 6
+significant figures (DSR 0.0017632 vs 0.0017631; the residual is the TS `normalPpf` rational approximation).
+
+Corpus: 1,109 completed configs, **861** with the full moment bundle, `trial_sr_std` = **0.065857**.
+Candidate: the best of **8** GOLD × `ma_crossover` cells — `oos_sharpe` **0.090491**, n_obs 625,
+window stk-oos-2024 (skew −1.42, kurtosis 16.4).
+
+| condition (pre-registered) | result | |
+| --- | --- | --- |
+| (1) DSR ≥ 0.95 at n_trials=1,109 | **0.0018** | FAIL |
+| (2) DSR ≥ 0.95 at n_trials=20,888 | **0.0000** | FAIL |
+| (3) `min_track_record_length ≤ oos_n_obs` | 384.3 vs 625 | pass |
+| (4) median GOLD cell beats SR* | 0.0526 vs **0.2163** | FAIL |
+
+**The margin is the story.** The deflation level SR* — the Sharpe a search of this size produces by luck alone
+under a true edge of zero — is **0.2163**. The candidate's Sharpe is **0.0905**, *less than half* of it. The
+median GOLD cell (0.0526) is a quarter of it. And minTRL measured against SR* rather than zero is **infinite**:
+this configuration could never establish that it beats the multiple-testing threshold, no matter how long it
+ran. GOLD was the best of ~24 asset × rule combinations drawn from a 20,888-config search, and it looks exactly
+like what that search produces from noise.
+
+**Condition 3 is vacuous and should not be read as support.** The adversarial review proved it: fed the null
+winner its own proof constructs (sharpe 0.173204, skew −0.001524, kurt 2.911413, n_obs 252), the undeflated
+pair emits psr 0.9968 and minTRL 92.5 ≤ 252 — **pure noise satisfies L3's second half verbatim**, because
+minTRL at `sr_benchmark=0` knows nothing about multiple testing. It was pre-registered that way and so it is
+reported as passing, but the gate's work is done entirely by conditions 1, 2 and 4. The register's wording
+should be tightened to benchmark minTRL against SR*, which is the number that carries meaning (and which is
+infinite here).
+
+**Decision: the campaign closes.** Eight nulls, plus the single surviving lead failing multiple-testing
+correction by two orders of magnitude. This is a result, not a stall: the question "is there an exploitable
+directional or risk edge in this universe, net of real costs" has been answered no, and — for the first time —
+answered with the correction that makes a no trustworthy.
+
+### Remaining L3 work (the gate is now proven, but not yet honestly wired everywhere)
+
+- **The champion path under-deflates.** `diagnosticsUtils.ts:275` passes `nTrials = setupSharpes.length` — the
+  setups in the *current comparison*, not the ~1,100 persisted or ~20,888 searched. A champion would therefore
+  be deflated against a handful of trials instead of the search that produced it, which is the lenient
+  direction. The honest trial count must be threadable into `diagnostics.dsr`.
+- **`min_track_record_length` emits `null` when not establishable.** Safe in Python (a comparison raises), and
+  currently harmless because `metricOf` collapses `null` to `undefined` and nothing reads the key yet — but in
+  JS `null <= 7` is **true**, so a gate written in the register's literal wording would read TRUE for every
+  no-edge run. Omitting the key is safe in both languages and loses nothing (`psr` present + minTRL absent
+  already encodes "measured, no edge").
+
+### The one open lead, and the machinery that must judge it
+
+GOLD is the only asset positive under two independent lenses (the `ma_crossover` expectancy above; and the only
+positive mean ΔSharpe in the vol-target screen, +0.005). **That is also exactly what a multiple-testing artefact
+looks like** — best of ~24 asset × rule combinations. **L3 is still dead code**: `deflated_sharpe_ratio`
+(`trainer/sharpe.py:96`) is called from nowhere, so every result here — all eight nulls and this lead — has been
+read without correction across ~20,888 configs. Wiring L3 and judging the GOLD lead through it is the highest-value
+remaining work, because it is the difference between a lead and noise, and it applies retroactively to everything.
+
 **This is the sixth null, and the pre-registered decision rule applies: report the conclusion rather than trying
 a seventh costume.** Across single-asset direction, long-only breadth, long/short, features, cross-sectional and
 now intraday observation, the measured finding is consistent — in this universe, at costs that are real, apparent

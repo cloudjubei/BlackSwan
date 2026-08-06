@@ -1,3 +1,4 @@
+import json
 import math
 import types
 
@@ -5,6 +6,7 @@ import numpy as np
 import pytest
 
 from trainer import summary as summary_mod
+from trainer.sharpe import min_track_record_length_from_stats, psr_from_stats
 from trainer.summary import _oos_stats
 
 
@@ -413,11 +415,14 @@ def test_max_drawdown_pct_is_emitted():
     assert out["metrics"]["max_drawdown_pct"] <= 0
 
 
-def test_benchmark_is_hold_return_only():
+def test_benchmark_reports_hold_return_and_hold_risk():
+    # The benchmark carries the hold's RISK as well as its return — without hold_sharpe /
+    # hold_max_drawdown_pct the scorecard can only compare RETURN against buy-and-hold and a "steady win"
+    # is not expressible at all.
     out, _, _ = _two_trade_summary()
     assert "hold_return_pct" in out["benchmark"]
-    assert "hold_sharpe" not in out["benchmark"]
-    assert "hold_max_drawdown_pct" not in out["benchmark"]
+    assert "hold_sharpe" in out["benchmark"]
+    assert "hold_max_drawdown_pct" in out["benchmark"]
     assert "hold_return_pct" in out["metrics"]
 
 
@@ -704,9 +709,13 @@ def test_benchmark_filters_nonpositive_prices_to_none():
 
 
 def test_benchmark_hold_return_first_to_last():
-    # No fee multiplier on the fake env → fee-free hold (the absent-fee case).
+    # No fee multiplier on the fake env → fee-free hold (the absent-fee case). A two-price hold has only one
+    # return, so its Sharpe is unmeasurable and omitted, while its (never-dipping) drawdown is 0.
     env = _FakeEnv(net_worths=[1, 2], actions=[1, 2], prices=[100, 200])
-    assert summary_mod._benchmark(env, 0) == {"hold_return_pct": pytest.approx(100.0)}
+    assert summary_mod._benchmark(env, 0) == {
+        "hold_return_pct": pytest.approx(100.0),
+        "hold_max_drawdown_pct": 0.0,
+    }
 
 
 def test_benchmark_charges_entry_and_exit_fee():
@@ -714,13 +723,19 @@ def test_benchmark_charges_entry_and_exit_fee():
     env = _FakeEnv(net_worths=[1, 2], actions=[1, 2], prices=[100, 200])
     env.transaction_fee_multiplier = 0.001
     expected = (200 / 100 * (1 - 0.001) ** 2 - 1) * 100
-    assert summary_mod._benchmark(env, 0) == {"hold_return_pct": pytest.approx(expected)}
+    assert summary_mod._benchmark(env, 0) == {
+        "hold_return_pct": pytest.approx(expected),
+        "hold_max_drawdown_pct": 0.0,
+    }
 
 
 def test_benchmark_none_fee_multiplier_treated_as_zero():
     env = _FakeEnv(net_worths=[1, 2], actions=[1, 2], prices=[100, 200])
     env.transaction_fee_multiplier = None
-    assert summary_mod._benchmark(env, 0) == {"hold_return_pct": pytest.approx(100.0)}
+    assert summary_mod._benchmark(env, 0) == {
+        "hold_return_pct": pytest.approx(100.0),
+        "hold_max_drawdown_pct": 0.0,
+    }
 
 
 def test_build_summary_marks_hold_net_of_fees():
@@ -732,6 +747,161 @@ def test_build_summary_marks_hold_net_of_fees():
     assert out["metrics"]["hold_net_of_fees"] is True
     # the benchmark is charged the round-trip fee, so it's below the gross price move
     assert out["metrics"]["hold_return_pct"] < 10.0
+
+
+# --- benchmark RISK: hold_sharpe / hold_max_drawdown_pct + the strategy-minus-hold deltas ----------
+# The north star is a STEADY win, so the yardstick has to carry risk, not just return. Both sides are
+# measured by the SAME helpers (_oos_stats / _max_drawdown_pct) — a hand-rolled hold Sharpe would be an
+# apples-to-oranges comparison that silently invalidates the gates it exists to serve.
+
+# Prices whose ratios to the first bar are all exact in binary, so the hold curve and a net-worth curve
+# that tracks the same ratios are bit-identical and the "same code path" claim can be asserted with ==.
+_HOLD_PRICES = [100.0, 200.0, 150.0, 300.0, 250.0, 400.0]
+
+
+def _buy_and_hold_summary():
+    """A strategy that literally IS buy-and-hold: one long opened at the first live bar, never closed, so
+    its reconstructed equity curve is the marked-to-market price curve."""
+    env = _FakeEnv(
+        net_worths=[100000.0 * p / 100.0 for p in _HOLD_PRICES],
+        actions=[1, 0, 0, 0, 0, 0],
+        prices=_HOLD_PRICES,
+        actions_made=[True, False, False, False, False, False],
+        forced_actions=[0] * 6,
+    )
+    return summary_mod.build_summary(env, _state(n_trades=0), _CFG, _FakeModel(), "t", True)
+
+
+def test_hold_return_pct_is_byte_identical_when_hold_risk_is_added():
+    # NON-NEGOTIABLE regression: adding risk metrics must not perturb a single number already recorded in
+    # the config store. Pinned as an exact float (==, not approx) so any change to the hold construction —
+    # a different fee application, a re-based curve — shows up instead of hiding inside a tolerance.
+    out = _build({"timeframe": "1d", "lookback_window_size": 0})
+    assert out["metrics"]["hold_return_pct"] == 30.000000000000004
+
+    fee_env = _FakeEnv(net_worths=[1, 2], actions=[1, 2], prices=[100, 200])
+    fee_env.transaction_fee_multiplier = 0.001
+    assert summary_mod._benchmark(fee_env, 0)["hold_return_pct"] == 99.6002
+
+
+def test_hold_equity_starts_fee_adjusted_and_ends_at_the_hold_return():
+    # The round-trip fee is a one-off level haircut on a position opened once and closed once: the curve
+    # starts at the fee-adjusted entry and ends at exactly 1 + hold_return_pct/100, while every per-step
+    # return stays the raw price return. Sprinkling the fee onto individual bars would invent volatility
+    # and a drawdown the holder never experienced.
+    prices = [100.0, 200.0, 150.0]
+    round_trip = (1.0 - 0.001) ** 2
+    eq = summary_mod._hold_equity(prices, round_trip)
+    assert len(eq) == len(prices)
+    assert eq[0] == pytest.approx(round_trip)
+    assert (eq[-1] - 1.0) * 100 == pytest.approx((prices[-1] / prices[0] * round_trip - 1.0) * 100)
+    steps = [eq[i] / eq[i - 1] - 1.0 for i in range(1, len(eq))]
+    assert steps == [pytest.approx(prices[i] / prices[i - 1] - 1.0) for i in range(1, len(prices))]
+
+
+def test_hold_sharpe_is_measured_by_the_same_code_path_as_strategy_sharpe():
+    # When the strategy IS the hold, the two equity curves are the same curve up to a constant factor, so
+    # the two Sharpes must agree EXACTLY. An == that holds here is what catches a hand-rolled duplicate
+    # hold-Sharpe drifting away from _oos_stats.
+    m = _buy_and_hold_summary()["metrics"]
+    assert m["oos_sharpe"] != 0.0  # a non-vacuous equality: both sides are a real, non-degenerate Sharpe
+    assert m["hold_sharpe"] == m["oos_sharpe"]
+    assert m["hold_max_drawdown_pct"] == m["max_drawdown_pct"]
+
+
+def test_buy_and_hold_strategy_ties_the_hold_on_return_risk_and_drawdown():
+    m = _buy_and_hold_summary()["metrics"]
+    assert m["return_vs_hold_pct"] == pytest.approx(0.0, abs=1e-9)
+    assert m["sharpe_vs_hold"] == pytest.approx(0.0, abs=1e-12)
+    assert m["drawdown_vs_hold_pct"] == pytest.approx(0.0, abs=1e-12)
+
+
+def test_flat_strategy_draws_down_less_than_a_falling_hold():
+    # SIGN CONVENTION guard — the thing most likely to be wrong. Drawdowns are NEGATIVE on both sides, so
+    # a POSITIVE drawdown_vs_hold_pct means the strategy drew down LESS than buy-and-hold. A strategy that
+    # never took a position rode a -50% market to a flat 0% drawdown, so the delta must be strictly > 0.
+    env = _FakeEnv(
+        net_worths=[100000.0] * 6,
+        actions=[0] * 6,
+        prices=[100.0, 90.0, 80.0, 70.0, 60.0, 50.0],
+        actions_made=[False] * 6,
+        forced_actions=[0] * 6,
+    )
+    m = summary_mod.build_summary(env, _state(n_trades=0), _CFG, _FakeModel(), "t", True)["metrics"]
+    assert m["max_drawdown_pct"] == 0.0
+    assert m["hold_max_drawdown_pct"] == pytest.approx(-50.0)
+    assert m["drawdown_vs_hold_pct"] == pytest.approx(50.0)
+    assert m["drawdown_vs_hold_pct"] > 0
+    assert m["sharpe_vs_hold"] > 0  # a flat 0 Sharpe beats the falling hold's negative one
+
+
+def test_whipsawing_strategy_reads_negative_against_a_calm_rising_hold():
+    # The REJECT half of the sign convention. Every other risk-delta assertion in this file measures a
+    # strategy that matched or beat the hold, so all of them survive a sign-destroying `abs()` — under which
+    # `drawdown_vs_hold_pct > 0` and `sharpe_vs_hold > 0` become tautologies and the gate they exist to serve
+    # accepts every strategy including the ones it was written to throw out. Rejection is the job: a strategy
+    # that whipsawed -30% inside a market that only ever went up must read STRICTLY NEGATIVE on both deltas.
+    env = _FakeEnv(
+        net_worths=[100000.0, 70000.0, 100000.0, 70000.0, 100000.0, 100000.0],
+        actions=[1, 0, 0, 0, 0, 0],
+        prices=[100.0, 120.0, 140.0, 160.0, 180.0, 200.0],
+        actions_made=[True, False, False, False, False, False],
+        forced_actions=[0] * 6,
+    )
+    m = summary_mod.build_summary(env, _state(n_trades=1), _CFG, _FakeModel(), "t", True)["metrics"]
+    assert m["hold_max_drawdown_pct"] == 0.0  # a monotonically rising hold never dips below a prior peak
+    assert m["max_drawdown_pct"] == pytest.approx(-30.0)
+    assert m["drawdown_vs_hold_pct"] == pytest.approx(-30.0)
+    assert m["drawdown_vs_hold_pct"] < 0
+    assert m["hold_sharpe"] > m["oos_sharpe"]
+    assert m["sharpe_vs_hold"] == pytest.approx(m["oos_sharpe"] - m["hold_sharpe"])
+    assert m["sharpe_vs_hold"] < 0
+
+
+def test_hold_risk_keys_absent_when_the_benchmark_is_degenerate():
+    # Fewer than 2 usable prices → no benchmark at all. The risk keys must be ABSENT, never 0.0: a zero
+    # would read as "tied with the market", the single most misleading value a risk gate could be handed.
+    class _Prov:
+        prices = None
+
+        def get_price(self, i):
+            return [100.0][i]
+
+    env = types.SimpleNamespace(
+        net_worths=[100000], actions=[1], actions_made=[True], forced_actions=[0],
+        tpsls=[0], tpsl_kinds=[None], fees=[], initial_net_worth=100000.0,
+        initial_balance=100000.0, data_provider=_Prov(),
+    )
+    assert summary_mod._benchmark(env, 0) is None
+    m = summary_mod.build_summary(env, _state(n_trades=1), _CFG, _FakeModel(), "t", True)["metrics"]
+    for key in ("hold_sharpe", "hold_max_drawdown_pct", "sharpe_vs_hold", "drawdown_vs_hold_pct"):
+        assert key not in m
+
+
+def test_hold_sharpe_omitted_when_the_hold_curve_yields_too_few_returns():
+    # Two prices = one return: the hold's Sharpe is unmeasurable, so both it and its delta are omitted
+    # while the measurable drawdown side is still reported.
+    env = _FakeEnv(net_worths=[100000, 110000], actions=[1, 2], prices=[100, 110])
+    benchmark = summary_mod._benchmark(env, 0)
+    assert "hold_sharpe" not in benchmark
+    assert benchmark["hold_max_drawdown_pct"] == 0.0
+    m = summary_mod.build_summary(env, _state(n_trades=1), _CFG, _FakeModel(), "t", True)["metrics"]
+    assert "hold_sharpe" not in m and "sharpe_vs_hold" not in m
+
+
+def test_hold_risk_deltas_need_both_sides_present():
+    strategy = {"oos_sharpe": 2.0, "max_drawdown_pct": -3.0}
+    hold = {"hold_sharpe": 1.0, "hold_max_drawdown_pct": -5.0}
+    assert summary_mod._hold_risk(strategy, hold) == {
+        "hold_sharpe": 1.0,
+        "sharpe_vs_hold": 1.0,
+        "hold_max_drawdown_pct": -5.0,
+        # -3 drawn down vs the hold's -5 ⇒ +2: shallower than the market, so POSITIVE is better.
+        "drawdown_vs_hold_pct": 2.0,
+    }
+    # A missing strategy metric drops the delta but keeps the hold's own measurement.
+    assert summary_mod._hold_risk({}, hold) == {"hold_sharpe": 1.0, "hold_max_drawdown_pct": -5.0}
+    assert summary_mod._hold_risk(strategy, {}) == {}
 
 
 # --- _reconstruct_trades: empty / price-less envs return empty structures ---
@@ -1025,6 +1195,178 @@ def test_dead_feature_flag_silent_when_every_column_varies():
             return np.array([float(step), float(step * 2)])
 
     assert summary_mod._dead_feature_flags(types.SimpleNamespace(data_provider=P()), lookback=1) == []
+
+
+# --- L3 multiple-testing rigor: psr + min_track_record_length ---------------------------------------
+# The leak register's L3 acceptance is "DSR >= 0.95 AND min_track_record_length <= oos_n_obs", but a run
+# emitted no track-record length at all, so half of that condition was unevaluable by anything. Both metrics
+# are derived from the SAME moment bundle _oos_stats already emits, through trainer/sharpe.py — never a
+# second, drifting Sharpe.
+
+
+def _oos_bundle(sharpe, skew=0.0, kurt=3.0, n_obs=250):
+    return {"oos_sharpe": sharpe, "oos_ret_skew": skew, "oos_ret_kurt": kurt, "oos_n_obs": n_obs}
+
+
+def _flat_strategy_metrics():
+    """A run that never took a position: flat equity ⇒ an exactly-zero OOS Sharpe (no edge at all)."""
+    env = _FakeEnv(
+        net_worths=[100000.0] * 6,
+        actions=[0] * 6,
+        prices=[100.0, 90.0, 80.0, 70.0, 60.0, 50.0],
+        actions_made=[False] * 6,
+        forced_actions=[0] * 6,
+    )
+    return summary_mod.build_summary(env, _state(n_trades=0), _CFG, _FakeModel(), "t", True)["metrics"]
+
+
+def test_track_record_metrics_are_sharpe_modules_own_at_the_per_run_zero_benchmark():
+    # No drifting reimplementation: the emitted numbers ARE trainer/sharpe.py's, measured against a ZERO
+    # benchmark. Deflation is a selection-time quantity (a run cannot know how many configs were searched),
+    # so it is deliberately NOT applied here.
+    bundle = _oos_bundle(0.15, skew=-0.4, kurt=6.0, n_obs=300)
+    out = summary_mod._track_record_stats(bundle)
+    assert out["min_track_record_length"] == min_track_record_length_from_stats(0.15, -0.4, 6.0, 300)
+    assert out["psr"] == psr_from_stats(0.15, -0.4, 6.0, 300)
+    assert 0.0 < out["psr"] < 1.0
+
+
+def test_min_track_record_length_golden_vectors():
+    # ABSOLUTE pin on the operative number. Every other assertion here is RELATIVE — delegation to
+    # trainer/sharpe.py (which compares the function to itself), monotonicity (survives any positive
+    # rescaling), finiteness — so a wrong closed form in sharpe.py emits a wrong minTRL that nothing
+    # detects, and this metric IS the pre-registered L3 acceptance `min_track_record_length <= oos_n_obs`.
+    # A 1.5x error there flips the verdict on the campaign's one surviving lead: at SR=0.1 the truth needs
+    # 273 observations, so a 300-bar window PASSES, while the same window FAILS against an inflated 409.
+    # Hand-derived from Bailey & Lopez de Prado, minTRL = 1 + [1 - g3*SR + (g4-1)/4*SR^2] * (Z^-1(0.95)/SR)^2
+    # with Z^-1(0.95) = 1.6448536269514722 (kurtosis NON-excess, normal == 3). These are the cross-language
+    # pin for the engine's TS port, matching test_sharpe.py's golden vectors for the PSR sibling.
+    trl = lambda **kw: summary_mod._track_record_stats(_oos_bundle(**kw))["min_track_record_length"]
+    assert trl(sharpe=0.1) == pytest.approx(272.907117136589, rel=1e-9)  # normal moments
+    assert trl(sharpe=0.4) == pytest.approx(19.26241831514404, rel=1e-9)
+    assert trl(sharpe=0.15, skew=-0.4, kurt=6.0, n_obs=300) == pytest.approx(131.84308759944764, rel=1e-9)
+
+
+def test_more_edge_needs_a_shorter_track_record():
+    # DIRECTION pin — the thing most likely to be implemented backwards. A LARGER Sharpe proves itself in
+    # FEWER observations, so minTRL must fall strictly as the edge rises (and stay finite throughout).
+    trl = [summary_mod._track_record_stats(_oos_bundle(sr))["min_track_record_length"] for sr in (0.05, 0.1, 0.2, 0.4)]
+    assert all(math.isfinite(x) for x in trl)
+    assert all(trl[i] > trl[i + 1] for i in range(len(trl) - 1))
+
+
+def test_no_edge_is_not_establishable_and_the_key_is_absent_in_both_languages():
+    # A Sharpe at or below the benchmark can NEVER be established: minTRL is infinite. The representation has
+    # to be unreadable as "record long enough" by the VERDICT LAYER, which is TypeScript — and JSON `null` is
+    # the one choice that is safe in Python and unsafe in JS, because `null <= 7` is TRUE there (Number(null)
+    # is 0) while `undefined <= 7` is false. So the key is OMITTED: a Python gate raises KeyError (loud) and a
+    # JS gate reads false. Nothing is lost — `psr` is emitted whenever the bundle exists, so psr-present with
+    # minTRL-absent already distinguishes "measured, no edge" from "never measured".
+    for sr in (0.0, -0.3):
+        out = summary_mod._track_record_stats(_oos_bundle(sr))
+        assert "min_track_record_length" not in out
+        assert math.isfinite(out["psr"])
+        with pytest.raises(KeyError):
+            out["min_track_record_length"] <= 250
+
+
+def test_build_summary_emits_a_finite_min_track_record_length_for_a_positive_sharpe_run():
+    m = _two_trade_summary()[0]["metrics"]
+    assert m["psr"] == psr_from_stats(m["oos_sharpe"], m["oos_ret_skew"], m["oos_ret_kurt"], m["oos_n_obs"])
+    trl = m["min_track_record_length"]
+    assert math.isfinite(trl)
+    # The L3 read: a 5-bar test window is nowhere near long enough to establish this run's tiny Sharpe.
+    assert trl > m["oos_n_obs"]
+
+
+def test_build_summary_marks_a_no_edge_run_as_not_establishable():
+    m = _flat_strategy_metrics()
+    assert m["oos_sharpe"] == 0.0
+    assert "min_track_record_length" not in m
+    with pytest.raises(KeyError):  # the L3 comparison cannot silently pass on a run with no edge
+        m["min_track_record_length"] <= m["oos_n_obs"]
+
+
+def test_min_track_record_length_round_trips_through_json():
+    # The summary is written with json.dump, whose default allow_nan emits a BARE `Infinity` token — invalid
+    # JSON that some parsers silently accept and others reject. Both the establishable and the
+    # not-establishable value must serialise, and the latter as null.
+    text = json.dumps(_flat_strategy_metrics())
+    assert "Infinity" not in text and "NaN" not in text
+    assert "min_track_record_length" not in json.loads(text)
+    finite = json.loads(json.dumps(_two_trade_summary()[0]["metrics"]))
+    assert math.isfinite(finite["min_track_record_length"])
+
+
+def test_track_record_metrics_omitted_when_the_moment_bundle_is_unmeasurable():
+    # Fewer than 2 returns ⇒ no moment bundle ⇒ the keys are ABSENT rather than fabricated, exactly as the
+    # oos_* metrics they are derived from.
+    assert summary_mod._track_record_stats({}) == {}
+
+    class _Prov:
+        prices = None
+
+        def get_price(self, i):
+            return [100.0][i]
+
+    env = types.SimpleNamespace(
+        net_worths=[100000], actions=[1], actions_made=[True], forced_actions=[0],
+        tpsls=[0], tpsl_kinds=[None], fees=[], initial_net_worth=100000.0,
+        initial_balance=100000.0, data_provider=_Prov(),
+    )
+    m = summary_mod.build_summary(env, _state(n_trades=1), _CFG, _FakeModel(), "t", True)["metrics"]
+    assert "oos_sharpe" not in m
+    for key in ("psr", "min_track_record_length"):
+        assert key not in m
+
+
+# Every metric the ~1,100-config store already holds, pinned as EXACT floats (==, not approx).
+_PRE_L3_METRICS = {
+    "traded_return": 0.020000000000000004,
+    "baseline": 0.0,
+    "total_return_pct": 2.0,
+    "win_pct": 50.0,
+    "n_trades": 2.0,
+    "trade_gate": 0.010000000000000002,
+    "stop_losses": 1.0,
+    "final_net_worth": 102000.0,
+    "realized_cost_bps": 0.0,
+    "oos_sharpe": 0.0886581186848314,
+    "oos_n_obs": 5,
+    "oos_ret_skew": 0.6562249396104337,
+    "oos_ret_kurt": 5.231174081348567,
+    "max_drawdown_pct": -7.272727272727275,
+    "up_capture": 0.13100102145045991,
+    "down_capture": -0.0,
+    "beta": 0.1529650431072218,
+    "trades_per_day": 0.4,
+    "signal_expectancy": 0.0,
+    "signal_hit_rate": 0.0,
+    "signal_coverage": 0.5,
+    "signal_count": 1,
+    "signal_horizon": 5,
+    "hold_return_pct": 0.0,
+    "return_vs_hold_pct": 2.0,
+    "hold_net_of_fees": True,
+    "hold_sharpe": 0.040649113742001405,
+    "sharpe_vs_hold": 0.04800900494282999,
+    "hold_max_drawdown_pct": -18.181818181818187,
+    "drawdown_vs_hold_pct": 10.909090909090912,
+    "blocked_signals": 0,
+    "executed_signals": 3,
+    "blocked_signal_ratio": 0.0,
+    "signal_noise_pct": 0.0,
+}
+
+
+def test_track_record_metrics_perturb_nothing_already_in_the_config_store():
+    # NON-NEGOTIABLE regression: the L3 additions are PURE additions. Not one number already recorded across
+    # the ~1,100-config store may shift, so every pre-existing metric is pinned exactly and the new keys are
+    # the ONLY difference.
+    m = dict(_two_trade_summary()[0]["metrics"])
+    added = {k: m.pop(k) for k in ("psr", "min_track_record_length") if k in m}
+    assert set(added) == {"psr", "min_track_record_length"}
+    assert m == _PRE_L3_METRICS
 
 
 def test_provenance_fingerprint_stable_and_config_sensitive():

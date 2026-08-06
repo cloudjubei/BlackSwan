@@ -1,0 +1,68 @@
+{
+  "name": "blackswan-voltarget",
+  "recordType": "blackswan-voltarget",
+  "description": "The VOLATILITY-TARGET screen (B1 §2) — a deliberately crude, deterministic sizing rule run to falsify the multi-week env rewire cheaply. Measured over the 12 symbols on disk, trailing 20d RETURN predicts next 20d return at +0.015 (noise) while trailing 20d VOL predicts next 20d vol at +0.426 (positive on 12/12); six consecutive nulls in this campaign all bet on the first quantity and nothing has ever traded the second. This screen trades ONLY the second: no directional view, just a long book re-sized to a causal, expanding-median vol target, capped, rebalanced every N bars, fees charged on turnover both ways. It is a separate entry point because the env's _position_size() is consulted only at ENTRY (trade_all_crypto_env.py) and a held position is never re-sized, so the env cannot express a continuously vol-targeted book at all. READ THE RIGHT LENS: this strategy DE-RISKS, so it will usually earn LESS raw return than buy-and-hold and return_vs_hold_pct will reject it for working as intended — that is the wrong benchmark here. The objective is oos_sharpe and the hypothesis benchmark is sharpe_vs_hold, with drawdown_vs_hold_pct as the co-primary read (both signed so better-than-hold is POSITIVE). return_vs_hold_pct is still emitted, as context, not as a verdict. mean_exposure / max_exposure report the deployed book so a cash-heavy cell — whose Sharpe would be meaningless — is detectable rather than flattering. Produces no model; its cells are side-experiment evidence, kept in their own record type so they never mix with the single-asset RL run store.",
+  "run": ".venv/bin/python -m trainer.voltarget --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "sharpe_vs_hold",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choicesFrom": "datacatalog",
+      "choices": [
+        "SPY", "GOLD", "UUP", "TLT", "IEF", "SHY",
+        "NVDA", "MSFT", "AAPL", "GOOGL", "AMZN", "META", "AVGO", "TSLA", "JPM", "WMT",
+        "BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT", "LTCUSDT", "DOTUSDT", "DOGEUSDT", "ADAUSDT"
+      ],
+      "default": "SPY",
+      "scope": "dataset",
+      "description": "Which single asset to size. Daily bars only; the benchmark is buy-and-hold THIS asset, so a cell is a like-for-like comparison against the thing it de-risks. Data directory resolves from the catalog (crypto->binance, stocks->stocks, ETF/commodity->etfs/commodities). Pair the window to the asset's history: stocks/ETFs/commodities start 2018-01 and take the stk-* windows, BTCUSDT takes the plain year windows, the altcoins take alt-*."
+    },
+    "vol_window": {
+      "type": "number",
+      "default": 20,
+      "range": [5, 120],
+      "description": "Bars of trailing daily returns in the realized-vol estimate (population stdev, using returns up to and INCLUDING the decision bar). 20 is the horizon the +0.426 vol-persistence finding was measured at; shorter reacts faster and churns more, longer is calmer and slower to de-risk into a shock."
+    },
+    "weight_cap": {
+      "type": "number",
+      "default": 1.0,
+      "range": [0, 3],
+      "scope": "environment",
+      "description": "Upper clip on the weight. 1.0 is UNLEVERED — the book can only ever de-risk relative to buy-and-hold, which is what the exploratory probe measured. Above 1.0 the rule takes leverage in quiet tape, which is where an uncapped vol target does its damage; the cap is also what keeps a collapsing denominator from demanding infinite size. 0 is the degenerate flat-book control (equity ends at exactly 1.0, zero fees)."
+    },
+    "rebalance_days": {
+      "type": "number",
+      "default": 5,
+      "range": [1, 63],
+      "description": "Bars between re-sizings; the weight is held constant in between. This is the turnover — and therefore the cost — control, and cost is the term that killed several earlier arms of this campaign. A continuously re-sized vol target trades every bar and pays for it."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0002,
+      "range": [0, 0.01],
+      "scope": "environment",
+      "description": "Per-unit-of-turnover cost, charged on both the increase and the decrease of the weight, and charged once on the buy-and-hold benchmark so the two curves are netted the same way. Liquid equity/ETF/gold ~0.0002 (2bps); crypto ~0.001."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": ["stk-2022", "stk-2023", "stk-2024", "stk-2025", "stk-oos-2024", "2022", "2023", "2024", "2025", "oos-2024", "alt-2024", "alt-2025"],
+      "default": "stk-2024",
+      "scope": "dataset",
+      "description": "Which out-of-sample span is ACCOUNTED. The vol estimator and its expanding median may look back into the train span for their formation history — that is the point of an expanding target — but only the test window's P&L is reported."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the screen is fully deterministic (no training, no sampling), so seeds are not swept; three identical cells would fake replication."
+    }
+  }
+}

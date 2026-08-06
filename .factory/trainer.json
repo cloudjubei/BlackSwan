@@ -1,7 +1,7 @@
 {
   "name": "blackswan",
   "recordType": "blackswan-run",
-  "description": "BlackSwan trains reinforcement-learning agents to trade a SINGLE crypto asset (BTCUSDT) on the spot market, long-only by default, under realistic 0.1% per-trade fees. Each run trains on historical klines and is tested OUT-OF-SAMPLE (walk-forward windows 2022/2023/2024, expanding train); the agent observes multi-timeframe OHLCV (e.g. stacked 1h+1d layers) plus optional technical indicators. The objective (training steering signal) is total_return_pct = the raw post-fee portfolio return; whether a run is actually GOOD is the separate scorecard (gates + fitness): it must beat buy-and-hold, trade often enough over time (trades_per_day), and hold drawdown in bounds — a high return alone is not success. In the strong presets the agent has NO explicit sell action (no_sell_action): it only times entries and exits are forced by take-profit/stop-loss/trailing-stop — so 'many buys, few sells' is by design, not a bug. 'Good' = a setup that trades often and profitably AND beats buy-and-hold (positive return_vs_hold_pct) net of fees, stable across seeds and walk-forward windows.",
+  "description": "BlackSwan trains reinforcement-learning agents to trade a SINGLE crypto asset (BTCUSDT) on the spot market, long-only by default, under realistic 0.1% per-trade fees. Each run trains on historical klines and is tested OUT-OF-SAMPLE (walk-forward windows 2022/2023/2024, expanding train); the agent observes multi-timeframe OHLCV (e.g. stacked 1h+1d layers) plus optional technical indicators. The objective (training steering signal) is total_return_pct = the raw post-fee portfolio return; whether a run is actually GOOD is the separate scorecard (gates + fitness): it must beat buy-and-hold, trade often enough over time (trades_per_day), and hold drawdown in bounds \u2014 a high return alone is not success. In the strong presets the agent has NO explicit sell action (no_sell_action): it only times entries and exits are forced by take-profit/stop-loss/trailing-stop \u2014 so 'many buys, few sells' is by design, not a bug. 'Good' = a setup that trades often and profitably AND beats buy-and-hold (positive return_vs_hold_pct) net of fees, stable across seeds and walk-forward windows.",
   "run": ".venv/bin/python -m trainer.run --config-json {configPath} --summary-out {summaryOut}",
   "calibrate": ".venv/bin/python -m trainer.run --calibrate --summary-out {summaryOut}",
   "evaluate": ".venv/bin/python -m trainer.run --evaluate --config-json {configPath} --summary-out {summaryOut}",
@@ -108,7 +108,7 @@
         "metric": "down_capture",
         "op": "<",
         "value": 0.8,
-        "label": "not a closet-long — captures <80% of down-market moves"
+        "label": "not a closet-long \u2014 captures <80% of down-market moves"
       },
       {
         "metric": "max_drawdown_pct",
@@ -125,7 +125,8 @@
     ],
     "dsr": {
       "threshold": 0.95,
-      "minObs": 100
+      "minObs": 100,
+      "nTrials": 20888
     },
     "stability": {
       "metric": "return_vs_hold_pct",
@@ -138,25 +139,25 @@
       "version": "6.0",
       "date": "2026-07-09",
       "breaking": true,
-      "summary": "Fidelity price/observation LOOK-AHEAD fix in the multi-timeline (resolved-from-fidelity) data provider, for the family where an hourly/minute step observes ONLY coarser layers (the run cadence AND the base are BOTH absent from layers): timeframe=1h with fidelity_set 1d or 1d+1w, plus the minute-step equivalents. MultiTimelineDataProvider never sliced self.prices/raw_df_for_plotting to the decision cadence for this family, so get_price(step) read raw base row `step` while the observation was anchored at start_index+step*divider_run — the model saw ~32 days of FUTURE price (≈767 1h bars at lookback 32) relative to the price it traded, hugely inflating returns (e.g. supervised-logreg/gbm scoring +765%/+835% traded_return in the 2022 bear window: catches the monthly trend, ~60% win rate, big winners held / tiny losers cut). Prices/plot/reward series are now anchored on the base decision bar (aligned with the observation). ONLY this coarse-only family is affected — every other config (multi-layer 1h+1d / 1h+1d+1w, single-timeline, auto, and daily-step multi-fidelity) is byte-identical to v5 and stays comparable. Affected v<6 runs are marked status=invalid (excluded from all aggregation/xAI) and matching pending-queue items cancelled — re-run for a valid result."
+      "summary": "Fidelity price/observation LOOK-AHEAD fix in the multi-timeline (resolved-from-fidelity) data provider, for the family where an hourly/minute step observes ONLY coarser layers (the run cadence AND the base are BOTH absent from layers): timeframe=1h with fidelity_set 1d or 1d+1w, plus the minute-step equivalents. MultiTimelineDataProvider never sliced self.prices/raw_df_for_plotting to the decision cadence for this family, so get_price(step) read raw base row `step` while the observation was anchored at start_index+step*divider_run \u2014 the model saw ~32 days of FUTURE price (\u2248767 1h bars at lookback 32) relative to the price it traded, hugely inflating returns (e.g. supervised-logreg/gbm scoring +765%/+835% traded_return in the 2022 bear window: catches the monthly trend, ~60% win rate, big winners held / tiny losers cut). Prices/plot/reward series are now anchored on the base decision bar (aligned with the observation). ONLY this coarse-only family is affected \u2014 every other config (multi-layer 1h+1d / 1h+1d+1w, single-timeline, auto, and daily-step multi-fidelity) is byte-identical to v5 and stays comparable. Affected v<6 runs are marked status=invalid (excluded from all aggregation/xAI) and matching pending-queue items cancelled \u2014 re-run for a valid result."
     },
     {
       "version": "5.0",
       "date": "2026-06-25",
       "breaking": true,
-      "summary": "Observation/reward ALIGNMENT fix in the multi-timeline (resolved-from-fidelity) data provider. MultiTimelineDataProvider.get_values omitted the warmup (start_index) from its observation offset, so the observation ended ~one lookback window BEHIND the bar get_price/the reward used (≈31 days for 1h+1d at lookback 32, scaling with the window). This is a STALE-observation desync, NOT a look-ahead leak — the agent saw OLD data, never the future, so returns were never inflated; but training credit-assignment was corrupted. Every MULTI-timeline run is affected and NOT comparable to v5: multi-layer (1h+1d / 1h+1d+1w / 1d+1w), a coarser single layer at a finer step (1d@1h), a finer base at a coarser step (1h@1d), or auto@1h (= 1h+1d). Those v<5 runs are marked status=invalid and excluded from all aggregation/xAI. SINGLE-timeline runs (1d@1d, 1h@1h, auto@1d) used the SingleDataProvider and are UNAFFECTED. Also lands daily-step multi-fidelity (a daily step can now observe finer/multi layers by stepping the 1h base day by day, divider 24) — additive, with end-to-end look-ahead regression guards; no impact on prior runs."
+      "summary": "Observation/reward ALIGNMENT fix in the multi-timeline (resolved-from-fidelity) data provider. MultiTimelineDataProvider.get_values omitted the warmup (start_index) from its observation offset, so the observation ended ~one lookback window BEHIND the bar get_price/the reward used (\u224831 days for 1h+1d at lookback 32, scaling with the window). This is a STALE-observation desync, NOT a look-ahead leak \u2014 the agent saw OLD data, never the future, so returns were never inflated; but training credit-assignment was corrupted. Every MULTI-timeline run is affected and NOT comparable to v5: multi-layer (1h+1d / 1h+1d+1w / 1d+1w), a coarser single layer at a finer step (1d@1h), a finer base at a coarser step (1h@1d), or auto@1h (= 1h+1d). Those v<5 runs are marked status=invalid and excluded from all aggregation/xAI. SINGLE-timeline runs (1d@1d, 1h@1h, auto@1d) used the SingleDataProvider and are UNAFFECTED. Also lands daily-step multi-fidelity (a daily step can now observe finer/multi layers by stepping the 1h base day by day, divider 24) \u2014 additive, with end-to-end look-ahead regression guards; no impact on prior runs."
     },
     {
       "version": "4.0",
       "date": "2026-06-19",
       "breaking": true,
-      "summary": "Correctness bug-fix sweep — scores are NOT comparable to v3 for affected setups. (1) Prioritized replay (DQN/Rainbow PER) was effectively UNIFORM: add() seeded each new transition into the wrong slot from an all-zero max, and a full buffer could NaN-crash sampling; new transitions now get the correct max-priority seed and sampling is stable, so PER models train differently. (2) Multi-timeline get_values with lookback<=1 now CONCATENATES layer features instead of element-wise SUMMING them, correcting observations for multi-layer lookback<=1 data configs. (3) Removed the dead 'combo2' reward model (it silently fell through to profit_percentage). Other fixes with no impact on the main training path: reward-multiplier scalar defaults (were (0,) tuples), dataclass default_factory landmines (net_arch / layers / Config lists), process_df 'expanded' timestamp_close coercion (feature-identical in production), GlobalContextAttention non-square contraction, env_factory error message, derive_cache _to_ms / empty-frame guards, R2Loss / SquaredMeanLoss numerics, the dip-env streak metric, and the GlobalContextAttention 2-D path (now usable inside the custom MLP). Removed dead code entirely: the whole server path (ServerCryptoEnv / ServerDataProvider / run_server_model / src.server websocket+cache / src.config) and the duplicate 'duel-dqn-custom-lstm8' factory branch."
+      "summary": "Correctness bug-fix sweep \u2014 scores are NOT comparable to v3 for affected setups. (1) Prioritized replay (DQN/Rainbow PER) was effectively UNIFORM: add() seeded each new transition into the wrong slot from an all-zero max, and a full buffer could NaN-crash sampling; new transitions now get the correct max-priority seed and sampling is stable, so PER models train differently. (2) Multi-timeline get_values with lookback<=1 now CONCATENATES layer features instead of element-wise SUMMING them, correcting observations for multi-layer lookback<=1 data configs. (3) Removed the dead 'combo2' reward model (it silently fell through to profit_percentage). Other fixes with no impact on the main training path: reward-multiplier scalar defaults (were (0,) tuples), dataclass default_factory landmines (net_arch / layers / Config lists), process_df 'expanded' timestamp_close coercion (feature-identical in production), GlobalContextAttention non-square contraction, env_factory error message, derive_cache _to_ms / empty-frame guards, R2Loss / SquaredMeanLoss numerics, the dip-env streak metric, and the GlobalContextAttention 2-D path (now usable inside the custom MLP). Removed dead code entirely: the whole server path (ServerCryptoEnv / ServerDataProvider / run_server_model / src.server websocket+cache / src.config) and the duplicate 'duel-dqn-custom-lstm8' factory branch."
     },
     {
       "version": "3.0",
       "date": "2026-06-16",
       "breaking": false,
-      "summary": "Walk-forward evaluation: a walk_forward_window lever tests on 2022/2023/2024 with an expanding train window (default 2024 = train 2020-2023 / test 2024 reproduces the v2 single split EXACTLY, so v2 runs stay comparable to v3 window-2024 runs). Adds sharpe_alpha (risk-adjusted excess over buy-and-hold on the same window) to metrics and stamps the window into the dataset. Different windows are separate out-of-sample samples — group them, never compare a 2022 run to a 2024 run as one number."
+      "summary": "Walk-forward evaluation: a walk_forward_window lever tests on 2022/2023/2024 with an expanding train window (default 2024 = train 2020-2023 / test 2024 reproduces the v2 single split EXACTLY, so v2 runs stay comparable to v3 window-2024 runs). Adds sharpe_alpha (risk-adjusted excess over buy-and-hold on the same window) to metrics and stamps the window into the dataset. Different windows are separate out-of-sample samples \u2014 group them, never compare a 2022 run to a 2024 run as one number."
     },
     {
       "version": "2.0",
@@ -167,7 +168,7 @@
     {
       "version": "1.0",
       "breaking": false,
-      "summary": "Original pipeline — the historical results_hour.ods ledger import (Sharpe-era, pre-overhaul). Kept for reference; not comparable to v2."
+      "summary": "Original pipeline \u2014 the historical results_hour.ods ledger import (Sharpe-era, pre-overhaul). Kept for reference; not comparable to v2."
     }
   ],
   "runInvalidations": [
@@ -176,14 +177,14 @@
       "kind": "fidelityDesync",
       "beforePipelineMajor": 5,
       "cancelPendingQueue": true,
-      "reason": "Trained on observations ~one warmup window behind the priced/rewarded bar (multi-timeline observation/reward desync, fixed in pipeline v5). Not comparable to v5 — re-run for a valid result."
+      "reason": "Trained on observations ~one warmup window behind the priced/rewarded bar (multi-timeline observation/reward desync, fixed in pipeline v5). Not comparable to v5 \u2014 re-run for a valid result."
     },
     {
       "id": "fidelity-lookahead-v6",
       "kind": "fidelityLookahead",
       "beforePipelineMajor": 6,
       "cancelPendingQueue": true,
-      "reason": "Traded ~32 days of FUTURE price into every decision: an hourly/minute step observing ONLY coarser layers (e.g. timeframe=1h + fidelity_set=1d) left the price series un-sliced from the observation cadence, so get_price trailed the observation by the warmup window (fidelity price/observation look-ahead, fixed in pipeline v6). Returns were massively inflated — re-run for a valid result."
+      "reason": "Traded ~32 days of FUTURE price into every decision: an hourly/minute step observing ONLY coarser layers (e.g. timeframe=1h + fidelity_set=1d) left the price series un-sliced from the observation cadence, so get_price trailed the observation by the warmup window (fidelity price/observation look-ahead, fixed in pipeline v6). Returns were massively inflated \u2014 re-run for a valid result."
     }
   ],
   "migrations": [
@@ -358,7 +359,7 @@
         "hodl"
       ],
       "default": "reppo-custom",
-      "description": "The algorithm / policy. Naming conventions: a bare name is the vanilla SB3 build, '-custom' uses tuned network internals, '-lstm' adds a recurrent features-extractor, '-sbx' is the JAX/SBX build. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window — the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'reppo'/'reppo-custom' = RecurrentPPO; 'trpo'/'trpo-custom' = TRPO; 'a2c'/'a2c-custom' = A2C. DQN line: 'dqn'/'dqn-custom'/'dqn-lstm'/'dqn-sbx'; dueling 'duel-dqn*'; 'munchausen-*' add the Munchausen log-policy bonus; 'rainbow-dqn'/'rainbow-dqn-custom' add prioritized experience replay (importance-weighted sampling by TD-error). Distributional: 'iqn'/'iqn-custom' (implicit quantile) and 'qrdqn'/'qrdqn-custom' (quantile-regression). 'ars'/'ars-mlp' are Augmented Random Search (gradient-free) baselines. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'momentum' is a deterministic time-series-momentum baseline (long when the trailing `momentum_lookback`-bar return is positive, flat otherwise — Moskowitz-style), a non-RL control to beat. 'ma_crossover' is a deterministic variable-length moving-average crossover baseline (Brock/Lakonishok/LeBaron 1992; Grobys 2020) — long when the `ma_short_window`-bar MA is above the `ma_long_window`-bar MA by more than `ma_band`, flat when below; set ma_short_window=1 for the classic 1/N price-vs-MA rule (e.g. 1/50, 1/150, 1/200, 1/20). 'breakout' is a deterministic trading-range-breakout baseline (BLL 1992) — long when price breaks above the prior `breakout_window`-bar high by more than `breakout_band`, flat when it breaks below the low (50/150/200). Both take windows in BARS, so use a daily timeframe for the papers' daily rules. 'time' is a deterministic time-of-day baseline — long from UTC hour `time_buy` to hour `time_sell` every day (intraday round-trip, or overnight when buy>sell); needs intraday data (timeframe=1h) and is a control + a probe for time-of-day/overnight seasonality. 'weekday' is a deterministic day-of-week baseline — long from weekday `day_buy` (0=Mon..6=Sun) to `day_sell` every week (intra-week, or across the weekend when buy>sell); runs at a daily step (timeframe=1d) and probes weekly seasonality (the Monday/day-of-week effect). 'technical' is a deterministic technical-indicator baseline — buy/sell when a chosen [-1,1]-normalised indicator (rsi10, williams10, ...) crosses `technical_buy_threshold` / `technical_sell_threshold`; defaults to classic RSI mean-reversion (oversold buy / overbought sell) and auto-enables the curated indicators. 'hodl' is the buy-and-hold control."
+      "description": "The algorithm / policy. Naming conventions: a bare name is the vanilla SB3 build, '-custom' uses tuned network internals, '-lstm' adds a recurrent features-extractor, '-sbx' is the JAX/SBX build. 'attn-ppo' / 'tcn-ppo' are PPO over a true SEQUENCE features-extractor (self-attention / dilated-causal TCN) that reshapes the flat obs back to its bar grid and encodes over the lookback window \u2014 the principled modern-sequence architectures (vs reppo's LSTM); A/B them against reppo. 'reppo'/'reppo-custom' = RecurrentPPO; 'trpo'/'trpo-custom' = TRPO; 'a2c'/'a2c-custom' = A2C. DQN line: 'dqn'/'dqn-custom'/'dqn-lstm'/'dqn-sbx'; dueling 'duel-dqn*'; 'munchausen-*' add the Munchausen log-policy bonus; 'rainbow-dqn'/'rainbow-dqn-custom' add prioritized experience replay (importance-weighted sampling by TD-error). Distributional: 'iqn'/'iqn-custom' (implicit quantile) and 'qrdqn'/'qrdqn-custom' (quantile-regression). 'ars'/'ars-mlp' are Augmented Random Search (gradient-free) baselines. 'supervised-logreg' / 'supervised-gbm' are the NON-RL baseline: a classifier predicts next-bar direction from the same features and a fixed rule trades on it (the decisive 'is RL even the right tool?' control). 'momentum' is a deterministic time-series-momentum baseline (long when the trailing `momentum_lookback`-bar return is positive, flat otherwise \u2014 Moskowitz-style), a non-RL control to beat. 'ma_crossover' is a deterministic variable-length moving-average crossover baseline (Brock/Lakonishok/LeBaron 1992; Grobys 2020) \u2014 long when the `ma_short_window`-bar MA is above the `ma_long_window`-bar MA by more than `ma_band`, flat when below; set ma_short_window=1 for the classic 1/N price-vs-MA rule (e.g. 1/50, 1/150, 1/200, 1/20). 'breakout' is a deterministic trading-range-breakout baseline (BLL 1992) \u2014 long when price breaks above the prior `breakout_window`-bar high by more than `breakout_band`, flat when it breaks below the low (50/150/200). Both take windows in BARS, so use a daily timeframe for the papers' daily rules. 'time' is a deterministic time-of-day baseline \u2014 long from UTC hour `time_buy` to hour `time_sell` every day (intraday round-trip, or overnight when buy>sell); needs intraday data (timeframe=1h) and is a control + a probe for time-of-day/overnight seasonality. 'weekday' is a deterministic day-of-week baseline \u2014 long from weekday `day_buy` (0=Mon..6=Sun) to `day_sell` every week (intra-week, or across the weekend when buy>sell); runs at a daily step (timeframe=1d) and probes weekly seasonality (the Monday/day-of-week effect). 'technical' is a deterministic technical-indicator baseline \u2014 buy/sell when a chosen [-1,1]-normalised indicator (rsi10, williams10, ...) crosses `technical_buy_threshold` / `technical_sell_threshold`; defaults to classic RSI mean-reversion (oversold buy / overbought sell) and auto-enables the curated indicators. 'hodl' is the buy-and-hold control."
     },
     "reward_model": {
       "type": "choice",
@@ -366,7 +367,7 @@
         "combo_unified"
       ],
       "default": "combo_unified",
-      "description": "Which reward function shapes behaviour. combo_unified is the ONE shaped reward — a per-step WEIGHTED SUM of components, each a continuous lever: combo_sell/combo_buy/combo_positionprofitpercentage reward realized P&L on close / direction on open / held-position P&L; combo_direct adds the raw per-step PORTFOLIO return (direct RL — with every other weight 0 it IS the old profit_percentage_direct); combo_noaction weights price moves while flat; combo_wrongaction penalises wasted actions (a buy while long / sell while flat); combo_fee_penalty and combo_noop_penalty are explicit turnover / no-op penalties. It subsumes the retired combo_all/_fee/_noop/2 + profit_percentage_direct names as POINTS in that weight-space. The earlier profit_all2 / profit_percentage3 / profit_percentage_direct names were removed (profit_percentage3 had a reward-side look-ahead, like the dropped combo; the others don't fit the weight-space) — combo_unified is the single comparable reward."
+      "description": "Which reward function shapes behaviour. combo_unified is the ONE shaped reward \u2014 a per-step WEIGHTED SUM of components, each a continuous lever: combo_sell/combo_buy/combo_positionprofitpercentage reward realized P&L on close / direction on open / held-position P&L; combo_direct adds the raw per-step PORTFOLIO return (direct RL \u2014 with every other weight 0 it IS the old profit_percentage_direct); combo_noaction weights price moves while flat; combo_wrongaction penalises wasted actions (a buy while long / sell while flat); combo_fee_penalty and combo_noop_penalty are explicit turnover / no-op penalties. It subsumes the retired combo_all/_fee/_noop/2 + profit_percentage_direct names as POINTS in that weight-space. The earlier profit_all2 / profit_percentage3 / profit_percentage_direct names were removed (profit_percentage3 had a reward-side look-ahead, like the dropped combo; the others don't fit the weight-space) \u2014 combo_unified is the single comparable reward."
     },
     "combo_noaction": {
       "type": "choice",
@@ -380,7 +381,7 @@
           "combo_unified"
         ]
       },
-      "description": "Reward multiplier applied to price moves while the agent is FLAT (no position). Default 0 = direction-neutral (a flat agent is neither rewarded nor punished for which way price moves). -1 bakes a synthetic-short incentive (rewards price falling while flat) — kept as a deliberate variant to probe, NOT the default, since the agent is long-only."
+      "description": "Reward multiplier applied to price moves while the agent is FLAT (no position). Default 0 = direction-neutral (a flat agent is neither rewarded nor punished for which way price moves). -1 bakes a synthetic-short incentive (rewards price falling while flat) \u2014 kept as a deliberate variant to probe, NOT the default, since the agent is long-only."
     },
     "combo_wrongaction": {
       "type": "number",
@@ -394,7 +395,7 @@
           "combo_unified"
         ]
       },
-      "description": "Penalty (signed weight, ≤ 0) added when the agent emits a WRONG action — opening while already in position, or closing while flat. 0 = off (the default, ≈ the old combo_all). The old combo_all2 was this term turned on."
+      "description": "Penalty (signed weight, \u2264 0) added when the agent emits a WRONG action \u2014 opening while already in position, or closing while flat. 0 = off (the default, \u2248 the old combo_all). The old combo_all2 was this term turned on."
     },
     "combo_noop_penalty": {
       "type": "number",
@@ -408,7 +409,7 @@
           "combo_unified"
         ]
       },
-      "description": "The penalty subtracted each time the agent emits a NO-OP trade — a buy while ALREADY holding the asset, or a sell while holding cash (the action can't change the position). 0 = off (the default). The old combo_all_noop was this turned on (0.001). It only bites RELATIVE to the trade reward (combo_sell): at the baked combo_sell=1000 a tiny penalty is washed out, so the range allows up to 0.5 and Exp 15 sweeps it AGAINST combo_sell. Sweep it to find how hard to discourage dead actions without suppressing real trades."
+      "description": "The penalty subtracted each time the agent emits a NO-OP trade \u2014 a buy while ALREADY holding the asset, or a sell while holding cash (the action can't change the position). 0 = off (the default). The old combo_all_noop was this turned on (0.001). It only bites RELATIVE to the trade reward (combo_sell): at the baked combo_sell=1000 a tiny penalty is washed out, so the range allows up to 0.5 and Exp 15 sweeps it AGAINST combo_sell. Sweep it to find how hard to discourage dead actions without suppressing real trades."
     },
     "combo_fee_penalty": {
       "type": "number",
@@ -422,7 +423,7 @@
           "combo_unified"
         ]
       },
-      "description": "Weight on the per-trade turnover penalty (penalty = transaction_fee × this) that discourages over-trading/churn. 0 = off (the default). The old combo_all_fee was this turned on (1.0)."
+      "description": "Weight on the per-trade turnover penalty (penalty = transaction_fee \u00d7 this) that discourages over-trading/churn. 0 = off (the default). The old combo_all_fee was this turned on (1.0)."
     },
     "combo_drawdown_penalty": {
       "type": "number",
@@ -436,7 +437,7 @@
           "combo_unified"
         ]
       },
-      "description": "Weight on a per-step drawdown penalty (penalty = this × |current open-position drawdown|) that makes holding a losing position costly, pushing the agent to CUT rather than sit in it. 0 = off (the default, so a combo_unified run is unchanged). An experiment lever: does drawdown aversion make hold-forever / zero-trade policies actually exit and trade? (Prior attempts suggest it may just silence trading rather than help — treat as a falsifiable test.)"
+      "description": "Weight on a per-step drawdown penalty (penalty = this \u00d7 |current open-position drawdown|) that makes holding a losing position costly, pushing the agent to CUT rather than sit in it. 0 = off (the default, so a combo_unified run is unchanged). An experiment lever: does drawdown aversion make hold-forever / zero-trade policies actually exit and trade? (Prior attempts suggest it may just silence trading rather than help \u2014 treat as a falsifiable test.)"
     },
     "combo_sell": {
       "type": "number",
@@ -450,7 +451,7 @@
           "combo_unified"
         ]
       },
-      "description": "combo_unified weight on the REALIZED P&L when a position is closed (sell/cover or TP/SL) — the headline 'did this trade make money' term. Baked default 1000 (the old combo_all value)."
+      "description": "combo_unified weight on the REALIZED P&L when a position is closed (sell/cover or TP/SL) \u2014 the headline 'did this trade make money' term. Baked default 1000 (the old combo_all value)."
     },
     "combo_buy": {
       "type": "number",
@@ -492,7 +493,7 @@
           "combo_unified"
         ]
       },
-      "description": "combo_unified weight on the DIRECT per-step portfolio return (net_worth[t]/net_worth[t-1] − 1), added every step. 0 = off (the default). Set to 1 with every other weight 0 to reproduce the old profit_percentage_direct (direct RL); mix with the shaping terms to blend."
+      "description": "combo_unified weight on the DIRECT per-step portfolio return (net_worth[t]/net_worth[t-1] \u2212 1), added every step. 0 = off (the default). Set to 1 with every other weight 0 to reproduce the old profit_percentage_direct (direct RL); mix with the shaping terms to blend."
     },
     "learning_rate": {
       "type": "number",
@@ -510,7 +511,7 @@
         0.1,
         0.999
       ],
-      "description": "Discount factor for future reward (0–1). Higher = more far-sighted."
+      "description": "Discount factor for future reward (0\u20131). Higher = more far-sighted."
     },
     "batch_size": {
       "type": "choice",
@@ -529,7 +530,7 @@
         1000,
         1000000
       ],
-      "description": "Replay-buffer capacity — how many past steps the agent can learn from."
+      "description": "Replay-buffer capacity \u2014 how many past steps the agent can learn from."
     },
     "learning_starts": {
       "type": "number",
@@ -562,7 +563,7 @@
         "DGWO"
       ],
       "default": "RMSprop",
-      "description": "Gradient optimizer. RMSprop was the tuned choice. DGWO is an experimental Grey-Wolf-guided gradient optimizer (gradient descent + decaying metaheuristic exploration) — unproven vs Adam, kept as a sweep candidate."
+      "description": "Gradient optimizer. RMSprop was the tuned choice. DGWO is an experimental Grey-Wolf-guided gradient optimizer (gradient descent + decaying metaheuristic exploration) \u2014 unproven vs Adam, kept as a sweep candidate."
     },
     "activation_fn": {
       "type": "choice",
@@ -601,7 +602,7 @@
         0.01,
         0.5
       ],
-      "description": "Final exploration rate (epsilon) the schedule anneals to — the residual randomness kept late in training. DQN-family algorithms."
+      "description": "Final exploration rate (epsilon) the schedule anneals to \u2014 the residual randomness kept late in training. DQN-family algorithms."
     },
     "lookback_window": {
       "type": "choice",
@@ -645,7 +646,7 @@
       ],
       "default": "BTCUSDT",
       "scope": "dataset",
-      "description": "Which asset to train on. CRYPTO: BTCUSDT has full history from 2017 (1m/1h/1d); the altcoins have 1m from 2022-01 with 1h/1d derived — they need the alt-* walk-forward windows (train from 2022), NOT the plain year windows. US STOCKS (NVDA/MSFT/AAPL/GOOGL/AMZN/META/AVGO/TSLA/JPM/WMT): 1d ONLY (2018-01→), so they REQUIRE timeframe=1d + fidelity_set=1d, and use the plain year windows (train from 2020). Data directory is resolved from the catalog (crypto→binance, stocks→stocks). DATASET setting — managed as named datasets, not a model knob. COMMODITY/ETF DAILY ASSETS (GOLD, SPY, UUP dollar, TLT/IEF/SHY rates): 1d ONLY (2018-01->, catalog dirs commodities/etfs), so they REQUIRE timeframe=1d + fidelity_set=1d and the stk-* walk-forward windows (train from 2018). TLT/IEF/SHY are the low-correlation legs for the diversified-trend basket."
+      "description": "Which asset to train on. CRYPTO: BTCUSDT has full history from 2017 (1m/1h/1d); the altcoins have 1m from 2022-01 with 1h/1d derived \u2014 they need the alt-* walk-forward windows (train from 2022), NOT the plain year windows. US STOCKS (NVDA/MSFT/AAPL/GOOGL/AMZN/META/AVGO/TSLA/JPM/WMT): 1d ONLY (2018-01\u2192), so they REQUIRE timeframe=1d + fidelity_set=1d, and use the plain year windows (train from 2020). Data directory is resolved from the catalog (crypto\u2192binance, stocks\u2192stocks). DATASET setting \u2014 managed as named datasets, not a model knob. COMMODITY/ETF DAILY ASSETS (GOLD, SPY, UUP dollar, TLT/IEF/SHY rates): 1d ONLY (2018-01->, catalog dirs commodities/etfs), so they REQUIRE timeframe=1d + fidelity_set=1d and the stk-* walk-forward windows (train from 2018). TLT/IEF/SHY are the low-correlation legs for the diversified-trend basket."
     },
     "timeframe": {
       "type": "choice",
@@ -655,7 +656,7 @@
         "1h"
       ],
       "default": "1d",
-      "description": "STEP frequency — how OFTEN the agent acts (1d = once per day, 1h = once per hour). This is separate from which timeframes it OBSERVES (the fidelity_set dataset lever). Minute data behaved like noise for the RL models."
+      "description": "STEP frequency \u2014 how OFTEN the agent acts (1d = once per day, 1h = once per hour). This is separate from which timeframes it OBSERVES (the fidelity_set dataset lever). Minute data behaved like noise for the RL models."
     },
     "fidelity_set": {
       "type": "choice",
@@ -669,7 +670,7 @@
       ],
       "default": "auto",
       "scope": "dataset",
-      "description": "Observation LAYERS — which timeframes the agent sees AT ONCE at each step (separate from the STEP frequency, which is the timeframe lever). Higher layers are resampled from the base, so wider = more context but a bigger input. auto = follow timeframe (1h->1h+1d, 1d->1d). The loaded BASE is the finest layer in the set, and every coarser layer is resampled from it. At an HOURLY step (timeframe=1h): 1h (single), 1d (single coarser layer fed every hour, i.e. 1h+1d with the 1h dropped), 1h+1d, 1h+1d+1w, or 1d+1w. At a DAILY step (timeframe=1d): 1d (single), 1d+1w, OR finer/multi sets (1h, 1h+1d, 1h+1d+1w) — the 1h base is stepped day by day (divider 24), the symmetric counterpart of an hourly step observing a resampled 1d. DATASET setting — define named datasets (e.g. '1h' vs '1h+1d') in the Datasets tab. The only sub-hourly layers (none exist) would fail fast; everything selectable resolves."
+      "description": "Observation LAYERS \u2014 which timeframes the agent sees AT ONCE at each step (separate from the STEP frequency, which is the timeframe lever). Higher layers are resampled from the base, so wider = more context but a bigger input. auto = follow timeframe (1h->1h+1d, 1d->1d). The loaded BASE is the finest layer in the set, and every coarser layer is resampled from it. At an HOURLY step (timeframe=1h): 1h (single), 1d (single coarser layer fed every hour, i.e. 1h+1d with the 1h dropped), 1h+1d, 1h+1d+1w, or 1d+1w. At a DAILY step (timeframe=1d): 1d (single), 1d+1w, OR finer/multi sets (1h, 1h+1d, 1h+1d+1w) \u2014 the 1h base is stepped day by day (divider 24), the symmetric counterpart of an hourly step observing a resampled 1d. DATASET setting \u2014 define named datasets (e.g. '1h' vs '1h+1d') in the Datasets tab. The only sub-hourly layers (none exist) would fail fast; everything selectable resolves."
     },
     "walk_forward_window": {
       "type": "choice",
@@ -695,7 +696,7 @@
       ],
       "default": "2024",
       "scope": "dataset",
-      "description": "Walk-forward evaluation window — which year to TEST on, training on every year before it. Plain year ids train from 2020 (2025 = train 2020-2024 / test 2025; 2024 = train 2020-2023 / test 2024, the historical split; …). The alt-* ids train from 2022 for the altcoins whose on-disk history starts there (alt-2025 = train 2022-2024 / test 2025) — use them for any non-BTC asset. The stk-* ids train from 2018 — a DEEPER expanding window — for assets whose data reaches that far (stocks from 2018-01, BTC from 2017-08; stk-2024 = train 2018-2023 / test 2024). The oos-* / stk-oos-* ids test the FULL out-of-sample span from the cutoff through the latest data on disk (oos-2024 = train 2020-2023 / test 2024→latest) — use them to evaluate on ALL data after the training cutoff, not just one year. windows_supported gates every id by each asset's on-disk range, so an asset only ever offers the windows it can actually run. Run several windows to see whether a config is robust across market regimes OUT-OF-SAMPLE rather than tuned to one lucky year. DATASET setting — each window is a separate dataset; read them as a distribution, never as a single number."
+      "description": "Walk-forward evaluation window \u2014 which year to TEST on, training on every year before it. Plain year ids train from 2020 (2025 = train 2020-2024 / test 2025; 2024 = train 2020-2023 / test 2024, the historical split; \u2026). The alt-* ids train from 2022 for the altcoins whose on-disk history starts there (alt-2025 = train 2022-2024 / test 2025) \u2014 use them for any non-BTC asset. The stk-* ids train from 2018 \u2014 a DEEPER expanding window \u2014 for assets whose data reaches that far (stocks from 2018-01, BTC from 2017-08; stk-2024 = train 2018-2023 / test 2024). The oos-* / stk-oos-* ids test the FULL out-of-sample span from the cutoff through the latest data on disk (oos-2024 = train 2020-2023 / test 2024\u2192latest) \u2014 use them to evaluate on ALL data after the training cutoff, not just one year. windows_supported gates every id by each asset's on-disk range, so an asset only ever offers the windows it can actually run. Run several windows to see whether a config is robust across market regimes OUT-OF-SAMPLE rather than tuned to one lucky year. DATASET setting \u2014 each window is a separate dataset; read them as a distribution, never as a single number."
     },
     "projection": {
       "type": "choice",
@@ -706,7 +707,7 @@
       ],
       "default": "standard",
       "scope": "dataset",
-      "description": "Per-asset DATA EXPOSURE — how much of the asset's own data the model observes each step. minimal = the single own-return column (the bare microstructure floor); standard = own return + high/low/volume percents, no curated indicators (the historical default); with_indicators = standard + the curated indicator set (RSI/Williams/Stochastic/Choppiness + tanh-squashed meanReversion/turbulence/OBV + a realized-vol regime and a trend-slope feature, computed at RUNTIME from OHLCV, so it works on BOTH 1d and the 1m-derived 1h path). Replaces the old use_indicators toggle (with_indicators == the former use_indicators:true). DATASET setting."
+      "description": "Per-asset DATA EXPOSURE \u2014 how much of the asset's own data the model observes each step. minimal = the single own-return column (the bare microstructure floor); standard = own return + high/low/volume percents, no curated indicators (the historical default); with_indicators = standard + the curated indicator set (RSI/Williams/Stochastic/Choppiness + tanh-squashed meanReversion/turbulence/OBV + a realized-vol regime and a trend-slope feature, computed at RUNTIME from OHLCV, so it works on BOTH 1d and the 1m-derived 1h path). Replaces the old use_indicators toggle (with_indicators == the former use_indicators:true). DATASET setting."
     },
     "context_set": {
       "type": "choice",
@@ -719,7 +720,7 @@
       ],
       "default": "none",
       "scope": "dataset",
-      "description": "GLOBAL context channels — series fused onto the traded asset's bar clock as RAW-LEVEL observation columns (the model derives its own features), leakage-safe (each value visible only from its release instant, forward-filled). none = price only (default, byte-identical to pre-context runs). rates = DFF/DGS10/DFII10/T10Y2Y (rates/curve/real-rate as their level) and macro_core = rates + UNRATE + CPI + payrolls: both need the FRED macro series mined to disk (macro/), a context run fails fast if absent. majors = BTC + ETH daily returns as context (price-source, works on klines already on disk — use for an ALT; degenerate if the traded asset is itself a major). market = GOLD + SPY + UUP daily returns (gold / equities / dollar — the KEYLESS macro-risk panel via yfinance, no FRED key). A context run fails fast if its series aren't mined. A context-trained checkpoint replays ONLY on assets exposing the SAME panel (part of the obs-signature). DATASET setting."
+      "description": "GLOBAL context channels \u2014 series fused onto the traded asset's bar clock as RAW-LEVEL observation columns (the model derives its own features), leakage-safe (each value visible only from its release instant, forward-filled). none = price only (default, byte-identical to pre-context runs). rates = DFF/DGS10/DFII10/T10Y2Y (rates/curve/real-rate as their level) and macro_core = rates + UNRATE + CPI + payrolls: both need the FRED macro series mined to disk (macro/), a context run fails fast if absent. majors = BTC + ETH daily returns as context (price-source, works on klines already on disk \u2014 use for an ALT; degenerate if the traded asset is itself a major). market = GOLD + SPY + UUP daily returns (gold / equities / dollar \u2014 the KEYLESS macro-risk panel via yfinance, no FRED key). A context run fails fast if its series aren't mined. A context-trained checkpoint replays ONLY on assets exposing the SAME panel (part of the obs-signature). DATASET setting."
     },
     "calendar_features": {
       "type": "boolean",
@@ -762,7 +763,7 @@
         ]
       },
       "probabilistic": true,
-      "description": "SUPERVISED baseline only: go long only when the classifier's P(up) exceeds this (0.5 = act on any edge; higher = trade only high-confidence signals, fewer trades). Ignored by RL/hodl models. A decision CUTOFF — an edge that lives only here is easily threshold-tuned luck, so xAI flags a run whose score spread concentrates in it and doesn't hold across datasets."
+      "description": "SUPERVISED baseline only: go long only when the classifier's P(up) exceeds this (0.5 = act on any edge; higher = trade only high-confidence signals, fewer trades). Ignored by RL/hodl models. A decision CUTOFF \u2014 an edge that lives only here is easily threshold-tuned luck, so xAI flags a run whose score spread concentrates in it and doesn't hold across datasets."
     },
     "momentum_lookback": {
       "type": "number",
@@ -776,7 +777,7 @@
           "momentum"
         ]
       },
-      "description": "MOMENTUM baseline only: the trailing window (in bars) whose return SIGN sets the position — long when the price now exceeds the price this many bars ago, flat otherwise. Re-evaluated every bar. E.g. at 1d cadence 30 ≈ monthly, 252 ≈ Moskowitz's ~12-month time-series-momentum rule. Ignored by RL/supervised/hodl models."
+      "description": "MOMENTUM baseline only: the trailing window (in bars) whose return SIGN sets the position \u2014 long when the price now exceeds the price this many bars ago, flat otherwise. Re-evaluated every bar. E.g. at 1d cadence 30 \u2248 monthly, 252 \u2248 Moskowitz's ~12-month time-series-momentum rule. Ignored by RL/supervised/hodl models."
     },
     "ma_short_window": {
       "type": "number",
@@ -818,7 +819,7 @@
           "ma_crossover"
         ]
       },
-      "description": "MA-CROSSOVER baseline only: the fractional no-trade band around the crossover (e.g. 0.01 = 1%). A signal fires only when the short MA is above/below the long MA by more than this band; inside it the current position is held — the classic BLL/Grobys whipsaw filter. 0 = plain crossover. Ignored by other models."
+      "description": "MA-CROSSOVER baseline only: the fractional no-trade band around the crossover (e.g. 0.01 = 1%). A signal fires only when the short MA is above/below the long MA by more than this band; inside it the current position is held \u2014 the classic BLL/Grobys whipsaw filter. 0 = plain crossover. Ignored by other models."
     },
     "breakout_window": {
       "type": "number",
@@ -832,7 +833,7 @@
           "breakout"
         ]
       },
-      "description": "BREAKOUT baseline only: the look-back window, in bars, whose PRIOR high/low forms the trading range (e.g. 50, 150, 200 from Brock et al. 1992). Long when price breaks above the range high, flat when it breaks below the low. Windows are in BARS — use a daily timeframe for the paper's daily rules. Ignored by other models."
+      "description": "BREAKOUT baseline only: the look-back window, in bars, whose PRIOR high/low forms the trading range (e.g. 50, 150, 200 from Brock et al. 1992). Long when price breaks above the range high, flat when it breaks below the low. Windows are in BARS \u2014 use a daily timeframe for the paper's daily rules. Ignored by other models."
     },
     "breakout_band": {
       "type": "number",
@@ -846,7 +847,7 @@
           "breakout"
         ]
       },
-      "description": "BREAKOUT baseline only: the fractional band a breakout must clear (e.g. 0.01 = 1%). Price must exceed the prior high by (1+band) to go long, or fall below the prior low by (1−band) to go flat; inside the band the position is held — the BLL filter for marginal penetrations. 0 = plain breakout. Ignored by other models."
+      "description": "BREAKOUT baseline only: the fractional band a breakout must clear (e.g. 0.01 = 1%). Price must exceed the prior high by (1+band) to go long, or fall below the prior low by (1\u2212band) to go flat; inside the band the position is held \u2014 the BLL filter for marginal penetrations. 0 = plain breakout. Ignored by other models."
     },
     "time_buy": {
       "type": "number",
@@ -860,7 +861,7 @@
           "time"
         ]
       },
-      "description": "TIME baseline only: the UTC hour-of-day (0-23) to OPEN a long. Needs intraday data (timeframe=1h). E.g. 14 ≈ US equity open (~14:30 UTC), 0 ≈ UTC midnight / Asia. Sweep time_buy × time_sell to probe time-of-day / overnight seasonality. Ignored by other models."
+      "description": "TIME baseline only: the UTC hour-of-day (0-23) to OPEN a long. Needs intraday data (timeframe=1h). E.g. 14 \u2248 US equity open (~14:30 UTC), 0 \u2248 UTC midnight / Asia. Sweep time_buy \u00d7 time_sell to probe time-of-day / overnight seasonality. Ignored by other models."
     },
     "time_sell": {
       "type": "number",
@@ -937,7 +938,7 @@
           "technical"
         ]
       },
-      "description": "TECHNICAL baseline only: the buy trigger level on the [-1,1]-normalised buy indicator. With technical_buy_is_down_check=true (default, mean-reversion) buy when the indicator is at or BELOW this (oversold, e.g. rsi10 -0.4 ≈ RSI 30); with it false (trend-following) buy when at or ABOVE this (e.g. trendSlope10 ≥ 0 = price above its MA). Ignored by other models."
+      "description": "TECHNICAL baseline only: the buy trigger level on the [-1,1]-normalised buy indicator. With technical_buy_is_down_check=true (default, mean-reversion) buy when the indicator is at or BELOW this (oversold, e.g. rsi10 -0.4 \u2248 RSI 30); with it false (trend-following) buy when at or ABOVE this (e.g. trendSlope10 \u2265 0 = price above its MA). Ignored by other models."
     },
     "technical_sell_indicator": {
       "type": "choice",
@@ -972,7 +973,7 @@
           "technical"
         ]
       },
-      "description": "TECHNICAL baseline only: the sell trigger level on the [-1,1]-normalised sell indicator. With technical_sell_is_up_check=true (default, mean-reversion) sell when the indicator is at or ABOVE this (overbought, e.g. rsi10 +0.4 ≈ RSI 70); with it false (trend-following) sell when at or BELOW this (e.g. trendSlope10 ≤ 0 = price back under its MA). Ignored by other models."
+      "description": "TECHNICAL baseline only: the sell trigger level on the [-1,1]-normalised sell indicator. With technical_sell_is_up_check=true (default, mean-reversion) sell when the indicator is at or ABOVE this (overbought, e.g. rsi10 +0.4 \u2248 RSI 70); with it false (trend-following) sell when at or BELOW this (e.g. trendSlope10 \u2264 0 = price back under its MA). Ignored by other models."
     },
     "technical_buy_is_down_check": {
       "type": "boolean",
@@ -982,7 +983,7 @@
           "technical"
         ]
       },
-      "description": "TECHNICAL baseline only: rule FAMILY for the buy leg. true (default) = MEAN-REVERSION — buy when the indicator falls to/below technical_buy_threshold (oversold, e.g. rsi10 ≤ -0.4). false = TREND-FOLLOWING/breakout — buy when it rises to/above the threshold (e.g. trendSlope10 ≥ 0 = price above its MA, the moving-average/breakout rule the crypto TA papers test). Ignored by other models."
+      "description": "TECHNICAL baseline only: rule FAMILY for the buy leg. true (default) = MEAN-REVERSION \u2014 buy when the indicator falls to/below technical_buy_threshold (oversold, e.g. rsi10 \u2264 -0.4). false = TREND-FOLLOWING/breakout \u2014 buy when it rises to/above the threshold (e.g. trendSlope10 \u2265 0 = price above its MA, the moving-average/breakout rule the crypto TA papers test). Ignored by other models."
     },
     "technical_sell_is_up_check": {
       "type": "boolean",
@@ -992,7 +993,7 @@
           "technical"
         ]
       },
-      "description": "TECHNICAL baseline only: rule FAMILY for the sell leg. true (default) = MEAN-REVERSION — sell when the indicator rises to/above technical_sell_threshold (overbought). false = TREND-FOLLOWING — sell when it falls to/below the threshold (trend rolled over, e.g. trendSlope10 ≤ 0). Pair both flags false with trendSlope10 for a moving-average crossover rule. Ignored by other models."
+      "description": "TECHNICAL baseline only: rule FAMILY for the sell leg. true (default) = MEAN-REVERSION \u2014 sell when the indicator rises to/above technical_sell_threshold (overbought). false = TREND-FOLLOWING \u2014 sell when it falls to/below the threshold (trend rolled over, e.g. trendSlope10 \u2264 0). Pair both flags false with trendSlope10 for a moving-average crossover rule. Ignored by other models."
     },
     "obs_squash": {
       "type": "choice",
@@ -1013,7 +1014,7 @@
       ],
       "scope": "environment",
       "active": true,
-      "description": "Per-trade fee fraction applied to EACH trade (models real cost; discourages churn). ENVIRONMENT setting. WIRED into the sim (verified: it changes net return + trade path) — a sweepable cost lever. Crypto ~0.001 (10bps); liquid equity/ETF/gold ~0.0002 (2bps)."
+      "description": "Per-trade fee fraction applied to EACH trade (models real cost; discourages churn). ENVIRONMENT setting. WIRED into the sim (verified: it changes net return + trade path) \u2014 a sweepable cost lever. Crypto ~0.001 (10bps); liquid equity/ETF/gold ~0.0002 (2bps)."
     },
     "stop_loss": {
       "type": "number",
@@ -1023,7 +1024,7 @@
         0.1
       ],
       "scope": "environment",
-      "description": "Auto-close a losing position at this drawdown fraction (0 = off). ENVIRONMENT setting — an exit mechanic, not the model."
+      "description": "Auto-close a losing position at this drawdown fraction (0 = off). ENVIRONMENT setting \u2014 an exit mechanic, not the model."
     },
     "take_profit": {
       "type": "number",
@@ -1033,7 +1034,7 @@
         0.05
       ],
       "scope": "environment",
-      "description": "Auto-close a winning position at this gain fraction (0 = off). ENVIRONMENT setting — an exit mechanic, not the model."
+      "description": "Auto-close a winning position at this gain fraction (0 = off). ENVIRONMENT setting \u2014 an exit mechanic, not the model."
     },
     "trailing_take_profit": {
       "type": "number",
@@ -1047,7 +1048,7 @@
         "lever": "take_profit",
         "active": true
       },
-      "description": "Trailing take-profit fraction that follows the price up (0 = off). ENVIRONMENT setting — an exit mechanic, not the model. Only has an effect when take_profit is on, so sweeps skip it otherwise."
+      "description": "Trailing take-profit fraction that follows the price up (0 = off). ENVIRONMENT setting \u2014 an exit mechanic, not the model. Only has an effect when take_profit is on, so sweeps skip it otherwise."
     },
     "no_sell_action": {
       "type": "boolean",
@@ -1057,7 +1058,7 @@
         "lever": "allow_shorting",
         "active": false
       },
-      "description": "Remove the explicit sell action — exits happen only via TP/SL. Performed well in past runs. Ignored while shorting (the 5-way action space keeps sell), so sweeps skip it when allow_shorting is on."
+      "description": "Remove the explicit sell action \u2014 exits happen only via TP/SL. Performed well in past runs. Ignored while shorting (the 5-way action space keeps sell), so sweeps skip it when allow_shorting is on."
     },
     "position_sizing": {
       "type": "choice",
@@ -1068,7 +1069,7 @@
       ],
       "default": "fixed",
       "active": false,
-      "description": "How much of the balance to deploy per entry. fixed = all-in (historical default). vol_target = scale the deployed fraction to target a constant volatility (size = vol_target / recent realized vol, clamped to [0.1, 1]) — risks less in turbulent regimes, the structural fix for 'churns many trades for ~+1%'. Not currently wired into the sim — excluded from sweeps until re-enabled."
+      "description": "How much of the balance to deploy per entry. fixed = all-in (historical default). vol_target = scale the deployed fraction to target a constant volatility (size = vol_target / recent realized vol, clamped to [vol_target_min, 1]) \u2014 risks less in turbulent regimes. IS wired into the sim (base_crypto_env._position_size, live in TradeAllCryptoEnv), but it sizes ONLY THE ENTRY: a held position is never re-sized, so this lever does NOT express a continuously vol-targeted book and cannot test the risk-axis thesis. Kept inactive so no sweep silently measures entry-only sizing and reports it as vol targeting. Re-activate only after the per-bar exposure overlay in docs/risk-axis-plan.md \u00a72, and only once its future-corruption invariance test is green \u2014 _realized_vol reads the current step's price, which is causal under fill_mode=next_open but same-bar information under fill_mode=close."
     },
     "vol_target": {
       "type": "number",
@@ -1085,7 +1086,7 @@
       "type": "boolean",
       "default": false,
       "scope": "environment",
-      "description": "What the ENVIRONMENT allows: off = long-only (buy/close, 3-way action space), on = long+short (adds short(3)/cover(4), 5-way). It's a property of the env/action-space, not the model — managed as named environments (clone any env to a long+short variant). Test long-only vs long+short by running a model across both environments; short exits respect TP/SL (mirrored)."
+      "description": "What the ENVIRONMENT allows: off = long-only (buy/close, 3-way action space), on = long+short (adds short(3)/cover(4), 5-way). It's a property of the env/action-space, not the model \u2014 managed as named environments (clone any env to a long+short variant). Test long-only vs long+short by running a model across both environments; short exits respect TP/SL (mirrored)."
     },
     "device": {
       "type": "choice",
@@ -1128,8 +1129,8 @@
   },
   "presets": [
     {
-      "label": "Window robustness — supervised vs RL (1d · 2022/2023/2024)",
-      "thesis": "Cross-window OOS robustness: does each setup beat buy-and-hold net of 0.1% fees in 2022, 2023 AND 2024 — not just one lucky window? Pass = return_vs_hold_pct > 0 in every window with positive down-regime pnl. Supervised arms are deterministic (1 seed is exact); the RL arm runs the same single seed here — do a dedicated RL seed sweep as a follow-up if it looks promising.",
+      "label": "Window robustness \u2014 supervised vs RL (1d \u00b7 2022/2023/2024)",
+      "thesis": "Cross-window OOS robustness: does each setup beat buy-and-hold net of 0.1% fees in 2022, 2023 AND 2024 \u2014 not just one lucky window? Pass = return_vs_hold_pct > 0 in every window with positive down-regime pnl. Supervised arms are deterministic (1 seed is exact); the RL arm runs the same single seed here \u2014 do a dedicated RL seed sweep as a follow-up if it looks promising.",
       "thesisTarget": "walk_forward_window",
       "fixed": {
         "timeframe": "1d",
@@ -1174,7 +1175,7 @@
       "seeds": 1
     },
     {
-      "label": "Macro context — BTC + macro_core (1d)",
+      "label": "Macro context \u2014 BTC + macro_core (1d)",
       "thesis": "One BTC run that ALSO observes point-in-time US macro (rates + unemployment + CPI + payrolls) fused as raw-level context channels, vs the price-only baseline. Needs the FRED macro series mined to macro/.",
       "thesisTarget": "context_set",
       "fixed": {
@@ -1194,8 +1195,8 @@
       "seeds": 1
     },
     {
-      "label": "Context ablation — own-data × macro (BTC 1d)",
-      "thesis": "Does external macro context substitute for / complement own-price data? Four arms: own-price {minimal, with_indicators} × macro context {none, macro_core}. Reads: bare+ctx vs full+noctx = substitution; full+ctx vs full+noctx = complement. Needs the FRED macro series mined.",
+      "label": "Context ablation \u2014 own-data \u00d7 macro (BTC 1d)",
+      "thesis": "Does external macro context substitute for / complement own-price data? Four arms: own-price {minimal, with_indicators} \u00d7 macro context {none, macro_core}. Reads: bare+ctx vs full+noctx = substitution; full+ctx vs full+noctx = complement. Needs the FRED macro series mined.",
       "thesisTarget": "context_set",
       "fixed": {
         "model_name": "reppo-custom",
@@ -1238,8 +1239,8 @@
       "seeds": 3
     },
     {
-      "label": "Majors context — ADA + BTC/ETH returns (keyless, 1d)",
-      "thesis": "Trade an alt (ADA) that also observes the majors' (BTC + ETH) daily returns as context — the keyless linked-asset path (works on klines already on disk, no FRED key). ADA needs an alt-* window (trains from 2022).",
+      "label": "Majors context \u2014 ADA + BTC/ETH returns (keyless, 1d)",
+      "thesis": "Trade an alt (ADA) that also observes the majors' (BTC + ETH) daily returns as context \u2014 the keyless linked-asset path (works on klines already on disk, no FRED key). ADA needs an alt-* window (trains from 2022).",
       "thesisTarget": "context_set",
       "fixed": {
         "model_name": "reppo-custom",
@@ -1258,7 +1259,7 @@
       "seeds": 1
     },
     {
-      "label": "Market context — BTC + gold/SPY/UUP (keyless, 1d)",
+      "label": "Market context \u2014 BTC + gold/SPY/UUP (keyless, 1d)",
       "thesis": "Does the macro-risk backdrop (gold, equities, dollar) help time BTC? Observes the KEYLESS `market` panel (GOLD + SPY + UUP daily returns, yfinance) as context vs the price-only baseline. No FRED key needed.",
       "thesisTarget": "context_set",
       "fixed": {
@@ -1285,14 +1286,14 @@
       "url": "https://arxiv.org/abs/2209.05559",
       "authors": "Gort, Liu, Sun, Gao, Chen, Wang",
       "year": 2022,
-      "claim": "DRL crypto-trading agents readily OVERFIT the backtest. Framing backtest overfitting as a hypothesis test and rejecting high-overfit agents, LESS-overfitted agents earn HIGHER out-of-sample return than more-overfitted ones on crypto through the volatile May–Jun 2022 period — more training over the same history pushes an agent PAST the overfitting frontier.",
+      "claim": "DRL crypto-trading agents readily OVERFIT the backtest. Framing backtest overfitting as a hypothesis test and rejecting high-overfit agents, LESS-overfitted agents earn HIGHER out-of-sample return than more-overfitted ones on crypto through the volatile May\u2013Jun 2022 period \u2014 more training over the same history pushes an agent PAST the overfitting frontier.",
       "approach": "Estimate each agent's probability of backtest overfitting (PBO) and keep only low-PBO agents; extra passes over fixed history add gradient steps but no new information.",
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
-        "notes": "crypto DRL evaluated OOS through a volatile regime — directly BlackSwan-relevant; exact cost treatment not confirmed from the abstract"
+        "notes": "crypto DRL evaluated OOS through a volatile regime \u2014 directly BlackSwan-relevant; exact cost treatment not confirmed from the abstract"
       },
-      "verdictNote": "The strongest support for CAPPING training passes. BlackSwan's env is a DETERMINISTIC replay of fixed history, so extra `episodes` (re-passes) add gradient steps but no new information — this predicts OOS traded_return is FLAT or DECLINES as episodes rise (in-sample keeps improving = the overfitting fingerprint), with 1–2 episodes ≈ the OOS-best. Test: sweep `episodes` and watch in-sample vs OOS divergence.",
+      "verdictNote": "The strongest support for CAPPING training passes. BlackSwan's env is a DETERMINISTIC replay of fixed history, so extra `episodes` (re-passes) add gradient steps but no new information \u2014 this predicts OOS traded_return is FLAT or DECLINES as episodes rise (in-sample keeps improving = the overfitting fingerprint), with 1\u20132 episodes \u2248 the OOS-best. Test: sweep `episodes` and watch in-sample vs OOS divergence.",
       "tags": [
         "rl",
         "crypto",
@@ -1333,14 +1334,14 @@
       "url": "https://arxiv.org/abs/2502.12537",
       "authors": "Montazeri, Jumakhan, Mirzaeinia",
       "year": 2025,
-      "claim": "There is NO fixed-best observation-history length for RL trading — the optimum depends on how inputs are structured: short windows win with un-grouped features, longer windows (up to ~12 weeks) win only when features are reorganised per company. More history is NOT monotonically better.",
+      "claim": "There is NO fixed-best observation-history length for RL trading \u2014 the optimum depends on how inputs are structured: short windows win with un-grouped features, longer windows (up to ~12 weeks) win only when features are reorganised per company. More history is NOT monotonically better.",
       "approach": "Sweep the observation-window length for a CNN policy under different feature layouts and locate the OOS optimum.",
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
-        "notes": "equities, CNN policy; BlackSwan is single-asset with no per-company feature grouping → the paper's SHORT-window regime applies"
+        "notes": "equities, CNN policy; BlackSwan is single-asset with no per-company feature grouping \u2192 the paper's SHORT-window regime applies"
       },
-      "verdictNote": "Maps to BlackSwan's `lookback_window`. Single-asset (no per-company grouping) → predicts a SHORT window is OOS-best and 64 will NOT beat 16/32 out-of-sample — a concave (peaked), not monotone, response. Test: sweep `lookback_window` across windows and check the OOS peak.",
+      "verdictNote": "Maps to BlackSwan's `lookback_window`. Single-asset (no per-company grouping) \u2192 predicts a SHORT window is OOS-best and 64 will NOT beat 16/32 out-of-sample \u2014 a concave (peaked), not monotone, response. Test: sweep `lookback_window` across windows and check the OOS peak.",
       "tags": [
         "rl",
         "observation-window",
@@ -1379,14 +1380,14 @@
       "url": "https://arxiv.org/abs/2512.10913",
       "authors": "Hoque, Ferdaus, Hassan",
       "year": 2025,
-      "claim": "Across 167 studies, IMPLEMENTATION QUALITY and DOMAIN KNOWLEDGE outweigh algorithmic complexity; the dominant open challenges are robustness under non-stationary regimes, standardised benchmarking, and interpretability — not fancier algorithms.",
+      "claim": "Across 167 studies, IMPLEMENTATION QUALITY and DOMAIN KNOWLEDGE outweigh algorithmic complexity; the dominant open challenges are robustness under non-stationary regimes, standardised benchmarking, and interpretability \u2014 not fancier algorithms.",
       "approach": "Systematic review of 167 RL-in-finance papers; no single experiment.",
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
         "notes": "survey / methodology, not a single trading result"
       },
-      "verdictNote": "Meta-evidence, not a direct replicate (empty spec). Backs BlackSwan's existing discipline — OOS walk-forward, seed/window robustness, cost-realism — and the 'simpler ties/beats complex' prior: demand cross-regime robustness before crediting a complex model. Consumed as the reference behind the episodes / lookback / overfitting hypotheses.",
+      "verdictNote": "Meta-evidence, not a direct replicate (empty spec). Backs BlackSwan's existing discipline \u2014 OOS walk-forward, seed/window robustness, cost-realism \u2014 and the 'simpler ties/beats complex' prior: demand cross-regime robustness before crediting a complex model. Consumed as the reference behind the episodes / lookback / overfitting hypotheses.",
       "tags": [
         "rl",
         "survey",
@@ -1406,7 +1407,7 @@
       "url": "https://arxiv.org/abs/2502.14045",
       "authors": "Brigato, Morand, Strommen, Panagiotou, Schmidt, Mougiakakou",
       "year": 2025,
-      "claim": "Across 14 datasets and ~5000 trained nets, pairwise differences among DLinear/PatchTST/iTransformer/TimeMixer/TimeXer are mostly statistically INSIGNIFICANT (Friedman p~0.95); the 'champion' flips with setup + metric — no universal best forecaster.",
+      "claim": "Across 14 datasets and ~5000 trained nets, pairwise differences among DLinear/PatchTST/iTransformer/TimeMixer/TimeXer are mostly statistically INSIGNIFICANT (Friedman p~0.95); the 'champion' flips with setup + metric \u2014 no universal best forecaster.",
       "approach": "Large-scale, statistically-rigorous re-benchmark of long-term TSF models.",
       "assumptions": {
         "fees": false,
@@ -1432,14 +1433,14 @@
       "url": "https://arxiv.org/abs/2205.13504",
       "authors": "Zeng, Chen, Zhang, Xu",
       "year": 2023,
-      "claim": "A 1-layer linear model (DLinear/LTSF-Linear) outperforms FEDformer/Autoformer/Informer in all tested cases (often 20-50%); a naive repeat-last beats all Transformers ~45% on the financial Exchange-rate set — high-capacity Transformers overfit noisy series.",
+      "claim": "A 1-layer linear model (DLinear/LTSF-Linear) outperforms FEDformer/Autoformer/Informer in all tested cases (often 20-50%); a naive repeat-last beats all Transformers ~45% on the financial Exchange-rate set \u2014 high-capacity Transformers overfit noisy series.",
       "approach": "Strips Transformers to a linear baseline (trend+seasonal decomposition) across LTSF benchmarks.",
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
         "notes": "forecasting MSE; contested by PatchTST/iTransformer"
       },
-      "verdictNote": "Core SUPPORT for 'simpler wins on noisy financial data' — the prior reason to treat MLP/GBM as BlackSwan champions-to-beat. Contested (see the HF rebuttal blog).",
+      "verdictNote": "Core SUPPORT for 'simpler wins on noisy financial data' \u2014 the prior reason to treat MLP/GBM as BlackSwan champions-to-beat. Contested (see the HF rebuttal blog).",
       "tags": [
         "architecture-evidence",
         "forecasting",
@@ -1477,11 +1478,11 @@
       "url": "https://arxiv.org/abs/2207.08815",
       "authors": "Grinsztajn, Oyallon, Varoquaux",
       "year": 2022,
-      "claim": "Tree ensembles (XGBoost/RF/GBT) remain SOTA over deep nets on medium tabular data (~10K samples) even after ~20k compute-hours of tuning — NNs overfit irregular targets + uninformative features and are rotation-invariant.",
+      "claim": "Tree ensembles (XGBoost/RF/GBT) remain SOTA over deep nets on medium tabular data (~10K samples) even after ~20k compute-hours of tuning \u2014 NNs overfit irregular targets + uninformative features and are rotation-invariant.",
       "approach": "Standardized benchmark of trees vs deep nets across 45 tabular datasets.",
       "assumptions": {
         "netOfCosts": false,
-        "notes": "i.i.d. tabular, not time series — analogical transfer; gap narrows with more data"
+        "notes": "i.i.d. tabular, not time series \u2014 analogical transfer; gap narrows with more data"
       },
       "verdictNote": "Supports 'engineered-features -> tabular -> trees/MLP win' in BlackSwan's small-sample regime; grounds supervised-gbm as a hard baseline.",
       "tags": [
@@ -1571,7 +1572,7 @@
         "multiAsset": true,
         "notes": "futures not single-asset crypto; doesn't test stacked-MLP/GBT"
       },
-      "verdictNote": "REFUTES the strong 'simpler wins' form in a finance + COSTS setting — the key counter-evidence. For BlackSwan: sequence models CAN win on risk-adjusted P&L; the metric (P&L vs accuracy) is the pivot.",
+      "verdictNote": "REFUTES the strong 'simpler wins' form in a finance + COSTS setting \u2014 the key counter-evidence. For BlackSwan: sequence models CAN win on risk-adjusted P&L; the metric (P&L vs accuracy) is the pivot.",
       "tags": [
         "architecture-evidence",
         "finance",
@@ -1610,14 +1611,14 @@
       "url": "https://arxiv.org/abs/2405.13575",
       "authors": "Tang, Zhang",
       "year": 2024,
-      "claim": "An attention-free patch-based MLP beats PatchTST and iTransformer on long-term forecasting — the recent gains come from PATCHING + channel handling, not attention.",
+      "claim": "An attention-free patch-based MLP beats PatchTST and iTransformer on long-term forecasting \u2014 the recent gains come from PATCHING + channel handling, not attention.",
       "approach": "Patch embedding + channel mixing/independence in a pure MLP.",
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
         "notes": "forecasting MSE"
       },
-      "verdictNote": "Supports 'the input handling / inductive bias matters more than attention' — a well-fed MLP can match transformers.",
+      "verdictNote": "Supports 'the input handling / inductive bias matters more than attention' \u2014 a well-fed MLP can match transformers.",
       "tags": [
         "architecture-evidence",
         "forecasting",
@@ -1655,14 +1656,14 @@
       "url": "https://huggingface.co/blog/autoformer",
       "authors": "Hugging Face (Rasul et al.)",
       "year": 2023,
-      "claim": "Rebuttal to DLinear: a size-matched, properly-designed Transformer (plus RevIN for distribution shift) matches/beats the linear model — 'Transformers aren't ineffective, they were improperly used.'",
+      "claim": "Rebuttal to DLinear: a size-matched, properly-designed Transformer (plus RevIN for distribution shift) matches/beats the linear model \u2014 'Transformers aren't ineffective, they were improperly used.'",
       "approach": "Fair re-run of DLinear vs a comparable Transformer + Autoformer with normalization.",
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
         "notes": "blog (not peer-reviewed); forecasting MSE"
       },
-      "verdictNote": "Balancing/REFUTING the simpler-wins claim — argues linear-beats-transformer was a fairness artifact. Keep as the counterpoint to DLinear.",
+      "verdictNote": "Balancing/REFUTING the simpler-wins claim \u2014 argues linear-beats-transformer was a fairness artifact. Keep as the counterpoint to DLinear.",
       "tags": [
         "architecture-evidence",
         "forecasting",
@@ -1705,9 +1706,9 @@
       "assumptions": {
         "netOfCosts": false,
         "multiAsset": true,
-        "notes": "retail demand not finance; leans on POOLING across thousands of correlated series — not available single-asset"
+        "notes": "retail demand not finance; leans on POOLING across thousands of correlated series \u2014 not available single-asset"
       },
-      "verdictNote": "Supports 'GBM wins' — but the edge comes from cross-series pooling, an advantage BlackSwan (single asset) does NOT have. Read with that caveat.",
+      "verdictNote": "Supports 'GBM wins' \u2014 but the edge comes from cross-series pooling, an advantage BlackSwan (single asset) does NOT have. Read with that caveat.",
       "tags": [
         "architecture-evidence",
         "forecasting",
@@ -1768,7 +1769,7 @@
       ],
       "title": "An Application of Deep Reinforcement Learning to Algorithmic Trading",
       "url": "https://arxiv.org/abs/2004.06627",
-      "authors": "Thibaut Théate, Damien Ernst",
+      "authors": "Thibaut Th\u00e9ate, Damien Ernst",
       "year": 2021,
       "claim": "Introduces TDQN (Trading Deep Q-Network), a DQN adapted to single-asset algorithmic trading that trains one agent per instrument to maximize the annualised Sharpe ratio, using artificial-trajectory data augmentation. On a 30-instrument testbench it claims to outperform passive and active benchmarks on average, while candidly reporting mixed, asset-dependent results and overfitting on some stocks.",
       "approach": "A five-layer feedforward Deep Q-Network learns a discrete long/short/neutral position policy per asset; training is bootstrapped from artificial trajectories synthesized from limited historical OHLCV, and the 0.1% trading cost is folded directly into the decision process. One model is trained per stock (single-asset, single-split OOS) with shared hyperparameters across the testbench.",
@@ -1837,7 +1838,7 @@
       "authors": "Zihao Zhang, Stefan Zohren, Stephen Roberts",
       "year": 2020,
       "claim": "Deep RL trading agents (DQN, Policy Gradient, A2C) over discrete and continuous action spaces, with volatility scaling, outperform classical time-series momentum baselines on 50 liquid futures and continue to deliver positive profits even under heavy transaction costs (up to ~25bp per trade).",
-      "approach": "Three deep RL algorithms — DQN (discrete {-1,0,1}), Policy Gradients (discrete), and A2C (continuous [-1,1]) — map normalised prices, multi-horizon returns (1/2/3-month, 1-year), MACD and RSI into a target position. Reward is volatility-scaled to size positions inversely to market volatility, then aggregated across a 50-contract diversified portfolio with vol-targeting.",
+      "approach": "Three deep RL algorithms \u2014 DQN (discrete {-1,0,1}), Policy Gradients (discrete), and A2C (continuous [-1,1]) \u2014 map normalised prices, multi-horizon returns (1/2/3-month, 1-year), MACD and RSI into a target position. Reward is volatility-scaled to size positions inversely to market volatility, then aggregated across a 50-contract diversified portfolio with vol-targeting.",
       "claimedMetrics": {
         "sharpe_dqn": 1.288,
         "sharpe_a2c": 1.05,
@@ -1851,7 +1852,7 @@
         "netOfCosts": true,
         "multiAsset": true,
         "retrainCadence": "Expanding-window retrain every 5 years with parameters frozen for the next 5-year block; OOS spans 2011-2019. Coarse two/three-fold walk-forward, NOT tight rolling re-train.",
-        "notes": "Headline Sharpe (1.288/1.050) is a 50-contract DIVERSIFIED, vol-targeted FUTURES portfolio — much of the Sharpe comes from cross-sectional diversification and vol-targeting, not the RL signal alone. Positions are long-AND-short and vol-scaled (continuous sizing). Costs modelled as bp-per-trade up to 25bp with explicit sensitivity curves. Profitability stated at portfolio level, not single-asset breakeven. Coarse 5-year retrain blocks risk regime-staleness."
+        "notes": "Headline Sharpe (1.288/1.050) is a 50-contract DIVERSIFIED, vol-targeted FUTURES portfolio \u2014 much of the Sharpe comes from cross-sectional diversification and vol-targeting, not the RL signal alone. Positions are long-AND-short and vol-scaled (continuous sizing). Costs modelled as bp-per-trade up to 25bp with explicit sensitivity curves. Profitability stated at portfolio level, not single-asset breakeven. Coarse 5-year retrain blocks risk regime-staleness."
       },
       "replicateConfig": {
         "fixed": {
@@ -1878,7 +1879,7 @@
         },
         "seeds": 3
       },
-      "verdictNote": "Highly-cited benchmark (Oxford-Man, JFDS 2020); the algorithm/feature menu (DQN/PG/A2C + momentum + MACD/RSI + vol-scaling) maps directly onto the registry. BUT headline Sharpe does NOT transfer to single-asset BTC spot: (1) it is a 50-contract diversified portfolio — diversification and vol-targeting carry most of the 1.0-1.3 Sharpe, gone for one asset; (2) long-AND-short continuous sizing vs long-biased; (3) futures cost structure (~25bp) is not the same as 0.1%=10bp round-trip on spot. Their 25bp tolerance is nominally above 10bp, encouraging IF it survives single-asset. The 5-year frozen-retrain walk-forward is coarse. Replicate the algorithm menu + vol-scaling, but independently re-verify 'survives heavy costs' at single-asset BTC under 0.1%/trade with a finer rolling retrain.",
+      "verdictNote": "Highly-cited benchmark (Oxford-Man, JFDS 2020); the algorithm/feature menu (DQN/PG/A2C + momentum + MACD/RSI + vol-scaling) maps directly onto the registry. BUT headline Sharpe does NOT transfer to single-asset BTC spot: (1) it is a 50-contract diversified portfolio \u2014 diversification and vol-targeting carry most of the 1.0-1.3 Sharpe, gone for one asset; (2) long-AND-short continuous sizing vs long-biased; (3) futures cost structure (~25bp) is not the same as 0.1%=10bp round-trip on spot. Their 25bp tolerance is nominally above 10bp, encouraging IF it survives single-asset. The 5-year frozen-retrain walk-forward is coarse. Replicate the algorithm menu + vol-scaling, but independently re-verify 'survives heavy costs' at single-asset BTC under 0.1%/trade with a finer rolling retrain.",
       "tags": [
         "positive-method",
         "rl",
@@ -1905,7 +1906,7 @@
       "url": "https://doi.org/10.1109/72.935097",
       "authors": "John Moody, Matthew Saffell",
       "year": 2001,
-      "claim": "Direct/recurrent reinforcement learning (RRL) — the policy outputs a trading position directly with no value function or price forecast, trained by gradient ascent on a risk-adjusted utility — discovers profitable trading systems while accounting for transaction costs. RRL outperforms Q-learning, and optimizing the differential Sharpe ratio yields more consistent results than maximizing profit; both beat a forecast/MSE-based trader. Demonstrates predictability in the monthly S&P 500 (1970-1994).",
+      "claim": "Direct/recurrent reinforcement learning (RRL) \u2014 the policy outputs a trading position directly with no value function or price forecast, trained by gradient ascent on a risk-adjusted utility \u2014 discovers profitable trading systems while accounting for transaction costs. RRL outperforms Q-learning, and optimizing the differential Sharpe ratio yields more consistent results than maximizing profit; both beat a forecast/MSE-based trader. Demonstrates predictability in the monthly S&P 500 (1970-1994).",
       "approach": "A recurrent policy maps recent returns/indicators plus its own prior position directly to a new long/short/neutral position; parameters trained by online gradient ascent on a risk-adjusted utility (the differential Sharpe ratio, an incrementally-updatable per-step reward), with an explicit transaction-cost penalty in the reward so the agent learns not to over-trade.",
       "claimedMetrics": {
         "transaction_cost_pct": 0.5,
@@ -1937,7 +1938,7 @@
         },
         "seeds": 3
       },
-      "verdictNote": "Genuinely seminal POSITIVE method — the long/short single-asset RRL framing maps almost 1:1 onto long-biased single-BTC spot with optional shorting, and the in-reward transaction-cost term plus differential Sharpe are directly portable (this is the seed for our differential_sharpe reward). BUT original evidence is weak by the registry's bar: single historical path, no walk-forward / deflated-Sharpe, low turnover, ~0.5% costs on monthly/half-hourly traditional instruments. Crypto at 0.1%/trade with higher vol and far more decision points means cost drag and overfit risk are materially worse. Whether DSR-RRL clears 0.1% fees out-of-sample walk-forward on BTC is precisely the open question to TEST. Treat 2001 results as method-validation, not transferable numbers.",
+      "verdictNote": "Genuinely seminal POSITIVE method \u2014 the long/short single-asset RRL framing maps almost 1:1 onto long-biased single-BTC spot with optional shorting, and the in-reward transaction-cost term plus differential Sharpe are directly portable (this is the seed for our differential_sharpe reward). BUT original evidence is weak by the registry's bar: single historical path, no walk-forward / deflated-Sharpe, low turnover, ~0.5% costs on monthly/half-hourly traditional instruments. Crypto at 0.1%/trade with higher vol and far more decision points means cost drag and overfit risk are materially worse. Whether DSR-RRL clears 0.1% fees out-of-sample walk-forward on BTC is precisely the open question to TEST. Treat 2001 results as method-validation, not transferable numbers.",
       "tags": [
         "positive-method",
         "reinforcement-learning",
@@ -1998,7 +1999,7 @@
         },
         "seeds": 3
       },
-      "verdictNote": "Closest published match to the registry's setup (single-BTC, cost-aware, risk-adjusted reward, direct/recurrent RL) and a genuine positive method — but headline 350% / IR 1.46 will NOT transfer to a spot, long-biased, 0.1%-fee walk-forward mandate. ~71% of the return is perpetual funding carry that is structurally ABSENT on spot; residual directional alpha is only ~29% (~15%/yr gross). It trades a leveraged derivative, so leverage and funding distort the comparison. One historical path, no deflated-Sharpe / no clear blocked walk-forward or benchmark. The replicable kernel is the architecture (ESN/recurrent features + direct RL + utility with a cost penalty to suppress over-trading); treat the dollar/IR claims as derivative-and-funding-inflated, not spot directional edge.",
+      "verdictNote": "Closest published match to the registry's setup (single-BTC, cost-aware, risk-adjusted reward, direct/recurrent RL) and a genuine positive method \u2014 but headline 350% / IR 1.46 will NOT transfer to a spot, long-biased, 0.1%-fee walk-forward mandate. ~71% of the return is perpetual funding carry that is structurally ABSENT on spot; residual directional alpha is only ~29% (~15%/yr gross). It trades a leveraged derivative, so leverage and funding distort the comparison. One historical path, no deflated-Sharpe / no clear blocked walk-forward or benchmark. The replicable kernel is the architecture (ESN/recurrent features + direct RL + utility with a cost penalty to suppress over-trading); treat the dollar/IR claims as derivative-and-funding-inflated, not spot directional edge.",
       "tags": [
         "positive-method",
         "reinforcement-learning",
@@ -2087,7 +2088,7 @@
       "authors": "Zhengyao Jiang, Dixing Xu, Jinjun Liang",
       "year": 2017,
       "claim": "A model-free deep RL framework (EIIE topology + Portfolio-Vector Memory + Online Stochastic Batch Learning, realized as CNN/RNN/LSTM, trained by deterministic policy gradient on a log-return reward) for cryptocurrency portfolio management achieves at least 4-fold returns in 50 days even at a high 0.25% commission rate, with all three network instances occupying the top three positions against benchmark portfolio-selection algorithms.",
-      "approach": "An Ensemble of Identical Independent Evaluators (EIIE) — weight-shared CNN/RNN/LSTM scoring each asset independently — outputs portfolio weights via softmax; trained end-to-end by deterministic policy gradient to maximize average log accumulated return, with a Portfolio-Vector Memory feeding prior weights to penalize turnover and Online Stochastic Batch Learning for continual updates.",
+      "approach": "An Ensemble of Identical Independent Evaluators (EIIE) \u2014 weight-shared CNN/RNN/LSTM scoring each asset independently \u2014 outputs portfolio weights via softmax; trained end-to-end by deterministic policy gradient to maximize average log accumulated return, with a Portfolio-Vector Memory feeding prior weights to penalize turnover and Online Stochastic Batch Learning for continual updates.",
       "claimedMetrics": {
         "return_multiple": 4,
         "backtest_days": 50,
@@ -2124,7 +2125,7 @@
         },
         "seeds": 3
       },
-      "verdictNote": "Seminal and heavily cited (foundational to the EIIE/PVM lineage behind FinRL), but the headline 4x/50-day result is the textbook FLUFF-to-disprove case. It is a 12-COIN PORTFOLIO, not single-asset BTC, so not directly comparable to a long-biased BTC spot target. The backtest is a single ~2-month OOS window inside the 2017 bull regime — almost certainly regime-overfit; pre-selected top-volume coins inject survivorship/look-ahead bias. 0.25% commission is modelled (above target) but there is no slippage/market-impact, and 30-min rebalancing implies heavy turnover real fills would erode. No Sharpe, no PBO/deflated-Sharpe, no rolling walk-forward. Use as a methodology/architecture reference (EIIE, PVM, policy-gradient log-return reward), NOT as a credible return claim — a single-asset port loses the cross-asset weighting that is the whole mechanism.",
+      "verdictNote": "Seminal and heavily cited (foundational to the EIIE/PVM lineage behind FinRL), but the headline 4x/50-day result is the textbook FLUFF-to-disprove case. It is a 12-COIN PORTFOLIO, not single-asset BTC, so not directly comparable to a long-biased BTC spot target. The backtest is a single ~2-month OOS window inside the 2017 bull regime \u2014 almost certainly regime-overfit; pre-selected top-volume coins inject survivorship/look-ahead bias. 0.25% commission is modelled (above target) but there is no slippage/market-impact, and 30-min rebalancing implies heavy turnover real fills would erode. No Sharpe, no PBO/deflated-Sharpe, no rolling walk-forward. Use as a methodology/architecture reference (EIIE, PVM, policy-gradient log-return reward), NOT as a credible return claim \u2014 a single-asset port loses the cross-asset weighting that is the whole mechanism.",
       "tags": [
         "positive-method",
         "drl",
@@ -2153,7 +2154,7 @@
       "url": "https://doi.org/10.1016/j.jfineco.2011.11.003",
       "authors": "Tobias J. Moskowitz, Yao Hua Ooi, Lasse Heje Pedersen",
       "year": 2012,
-      "claim": "A simple time-series momentum rule — go long (short) over the next month if the past 12-month excess return was positive (negative), sizing each position to a constant ex-ante volatility target — generates significant, persistent abnormal returns. Significant for each of 58 liquid futures/forwards across equity indices, currencies, commodities and bonds; a diversified TSM portfolio earns substantial alpha with little factor exposure and performs best in extreme markets.",
+      "claim": "A simple time-series momentum rule \u2014 go long (short) over the next month if the past 12-month excess return was positive (negative), sizing each position to a constant ex-ante volatility target \u2014 generates significant, persistent abnormal returns. Significant for each of 58 liquid futures/forwards across equity indices, currencies, commodities and bonds; a diversified TSM portfolio earns substantial alpha with little factor exposure and performs best in extreme markets.",
       "approach": "A single-instrument trend rule: the sign of the trailing 12-month excess return sets a long/short position for the next month, each position scaled by inverse ex-ante (rolling) volatility to target constant risk (the diversified portfolio scaled to ~40% vol, realizing ~12%). Positions are equal-risk-weighted and aggregated across 58 futures/forwards.",
       "claimedMetrics": {
         "sharpe": 1.2,
@@ -2170,8 +2171,8 @@
         "frictionless": false,
         "netOfCosts": false,
         "multiAsset": true,
-        "retrainCadence": "None — fixed parametric rule (12-month lookback, 1-month hold), no training/refit; full-sample in-sample parameter choice.",
-        "notes": "Headline results are GROSS of transaction costs (robust to low futures costs, but reported Sharpe is essentially pre-cost); long-AND-short; uses leverage/vol-targeting to ~40% vol (12% realized); 58-instrument DIVERSIFIED portfolio — the ~1.2 Sharpe is cross-asset, NOT single-asset; sample 1985-2009 predates crypto; full-sample parameter selection (single lookback/hold, no walk-forward optimization but also no OOS holdout)."
+        "retrainCadence": "None \u2014 fixed parametric rule (12-month lookback, 1-month hold), no training/refit; full-sample in-sample parameter choice.",
+        "notes": "Headline results are GROSS of transaction costs (robust to low futures costs, but reported Sharpe is essentially pre-cost); long-AND-short; uses leverage/vol-targeting to ~40% vol (12% realized); 58-instrument DIVERSIFIED portfolio \u2014 the ~1.2 Sharpe is cross-asset, NOT single-asset; sample 1985-2009 predates crypto; full-sample parameter selection (single lookback/hold, no walk-forward optimization but also no OOS holdout)."
       },
       "replicateConfig": {
         "fixed": {
@@ -2195,7 +2196,7 @@
         },
         "seeds": 1
       },
-      "verdictNote": "MEASURED 2026-06-27 (momentum lookback 30/90/252 × walk-forward 2022/2023/2024, 0.1% fees): REFUTED — no lookback beats buy-and-hold in all three windows. Best (lookback 30) wins the 2022 bear (+19.5% vs hold) and the short 2024 window (+6.6%) but badly lags the 2023 bull (−70.6% vs hold); a textbook downside-protection-but-trend-lag pattern that nets out negative against a long-biased B&H. (DSR-graded status pending the verdict layer; the basic beats-hold criterion already fails.) Replicated via the deterministic `momentum` model (long when the trailing momentum_lookback-bar return is positive, flat otherwise; long/flat single-asset BTC spot, fixed sizing — vol-target sizing deferred as a multi-asset precursor, shorting a future extension), swept over 30/90/252-bar lookbacks. Seminal, but transplanting the ~1.2 Sharpe to single-asset spot BTC under 0.1% fees + walk-forward is unjustified for three compounding reasons. (1) Diversification: the strong Sharpe is a 58-instrument cross-asset portfolio; a single asset loses nearly all the variance reduction — expect single-asset TSM Sharpe far lower (often <0.5). (2) Costs: results are essentially GROSS; 0.1%/trade spot fees plus a vol-scaled frequently-resized rule bleed materially, and crypto's high vol forces more turnover. (3) The registry is long-biased spot, so the short leg (TSM's crisis-alpha) is constrained, cutting return. Net: TSM is the RIGHT honest, parameter-light non-ML CONTROL to beat — a deep model that cannot beat this adapted, net-of-fee, walk-forward control is fluff.",
+      "verdictNote": "MEASURED 2026-06-27 (momentum lookback 30/90/252 \u00d7 walk-forward 2022/2023/2024, 0.1% fees): REFUTED \u2014 no lookback beats buy-and-hold in all three windows. Best (lookback 30) wins the 2022 bear (+19.5% vs hold) and the short 2024 window (+6.6%) but badly lags the 2023 bull (\u221270.6% vs hold); a textbook downside-protection-but-trend-lag pattern that nets out negative against a long-biased B&H. (DSR-graded status pending the verdict layer; the basic beats-hold criterion already fails.) Replicated via the deterministic `momentum` model (long when the trailing momentum_lookback-bar return is positive, flat otherwise; long/flat single-asset BTC spot, fixed sizing \u2014 vol-target sizing deferred as a multi-asset precursor, shorting a future extension), swept over 30/90/252-bar lookbacks. Seminal, but transplanting the ~1.2 Sharpe to single-asset spot BTC under 0.1% fees + walk-forward is unjustified for three compounding reasons. (1) Diversification: the strong Sharpe is a 58-instrument cross-asset portfolio; a single asset loses nearly all the variance reduction \u2014 expect single-asset TSM Sharpe far lower (often <0.5). (2) Costs: results are essentially GROSS; 0.1%/trade spot fees plus a vol-scaled frequently-resized rule bleed materially, and crypto's high vol forces more turnover. (3) The registry is long-biased spot, so the short leg (TSM's crisis-alpha) is constrained, cutting return. Net: TSM is the RIGHT honest, parameter-light non-ML CONTROL to beat \u2014 a deep model that cannot beat this adapted, net-of-fee, walk-forward control is fluff.",
       "tags": [
         "non-ML-control",
         "momentum",
@@ -2220,9 +2221,9 @@
       ],
       "title": "Machine Learning-Based Bitcoin Trading Under Transaction Costs: Evidence From Walk-Forward Forecasting",
       "url": "https://arxiv.org/abs/2606.00060",
-      "authors": "Andrei Bysik, Robert Ślepaczuk",
+      "authors": "Andrei Bysik, Robert \u015alepaczuk",
       "year": 2026,
-      "claim": "Machine-learning forecasts (XGBoost, LSTM, iTransformer) of hourly BTC-USDT returns produce positive GROSS trading returns, but naive sign-based strategies COLLAPSE once 10 bps (0.1%) per-trade costs are imposed; a cost-aware turnover/execution filter that trades only when forecast magnitude exceeds the cost threshold restores net profitability for selected configurations, with the strongest long-only XGBoost variant reaching ~65.4% annualized return and Sharpe ~1.09 — only marginally above buy-and-hold (~56.3% / Sharpe 0.82).",
+      "claim": "Machine-learning forecasts (XGBoost, LSTM, iTransformer) of hourly BTC-USDT returns produce positive GROSS trading returns, but naive sign-based strategies COLLAPSE once 10 bps (0.1%) per-trade costs are imposed; a cost-aware turnover/execution filter that trades only when forecast magnitude exceeds the cost threshold restores net profitability for selected configurations, with the strongest long-only XGBoost variant reaching ~65.4% annualized return and Sharpe ~1.09 \u2014 only marginally above buy-and-hold (~56.3% / Sharpe 0.82).",
       "approach": "Forecast-then-trade supervised ML (NOT reinforcement learning): XGBoost, LSTM, iTransformer forecast next-hour BTC-USDT returns; point predictions are converted to long/short (or long-only) positions via sign rules, optionally gated by a cost-aware filter suppressing trades unless the predicted move exceeds round-trip cost. Evaluated OOS in a 27-fold walk-forward over ~70k hourly bars (2018-2026), all returns net of 10 bps per-position-change.",
       "claimedMetrics": {
         "sharpe": 1.09,
@@ -2239,7 +2240,7 @@
         "netOfCosts": true,
         "multiAsset": false,
         "retrainCadence": "Walk-forward: model refit each of 27 sequential folds (rolling/expanding train -> next OOS block).",
-        "notes": "Single-asset BTC-USDT, hourly. 10 bps treated as an 'all-in effective' per-trade cost per unit of turnover, not just exchange fees — matches the registry's 0.1% standard. No slippage/market-impact beyond the flat 10 bps. Genuine multi-fold walk-forward OOS. Holm correction on bootstrap dominance tests, BUT the 'restored' Sharpe>1 result is for SELECTED winning configurations across many model/feature/threshold specs -> config-selection bias; no Deflated Sharpe / PBO on the winning config."
+        "notes": "Single-asset BTC-USDT, hourly. 10 bps treated as an 'all-in effective' per-trade cost per unit of turnover, not just exchange fees \u2014 matches the registry's 0.1% standard. No slippage/market-impact beyond the flat 10 bps. Genuine multi-fold walk-forward OOS. Holm correction on bootstrap dominance tests, BUT the 'restored' Sharpe>1 result is for SELECTED winning configurations across many model/feature/threshold specs -> config-selection bias; no Deflated Sharpe / PBO on the winning config."
       },
       "replicateConfig": {
         "fixed": {
@@ -2263,7 +2264,7 @@
         },
         "seeds": 3
       },
-      "verdictNote": "MEASURED 2026-06-27 (supervised-gbm, 1h+1d, prob_threshold 0.5/0.6/0.7 × walk-forward 2022/2023/2024, 0.1% fees): collapse CONFIRMED — thr 0.5 does ~1400 trades/window and returns −210% to −377% vs hold (0/3 beat); thr 0.6 still −58%/−190%/−107% (0/3). Raising prob_threshold cuts turnover (1394→493→5 trades) but 'restores' returns only by converging to CASH (thr 0.7 ≈ 5 trades, ~0% return — beats hold ONLY in the 2022 bear, by being flat). NO threshold yields a tradeable edge over buy-and-hold: the skeptical thesis HOLDS UP, the cost-aware-filter restoration does NOT transfer to beating B&H on single-asset spot. HIGH constructive-skeptic value: directly demonstrates the registry's central thesis — sign-based ML that looks great gross is FLUFF once a realistic 0.1% per-trade fee applies, because turnover dominates the edge. The restored result is fragile: cost-aware long-only XGBoost Sharpe ~1.09 / ~65.4% barely exceeds B&H (~0.82 / ~56.3%), so most apparent edge is just BTC's bull drift, and the win is a SELECTED configuration with no DSR/PBO deflation. The 27-fold walk-forward and net-of-cost reporting are sound; under the registry's 0.1% + walk-forward bar, naive strategies clearly FAIL and the filtered strategy only marginally survives, likely losing Sharpe>1 after deflation. Best as a calibration/skeptical anchor and a single-asset BTC walk-forward template — replicate the cost-aware filter and apply DSR/PBO to its winning spec.",
+      "verdictNote": "MEASURED 2026-06-27 (supervised-gbm, 1h+1d, prob_threshold 0.5/0.6/0.7 \u00d7 walk-forward 2022/2023/2024, 0.1% fees): collapse CONFIRMED \u2014 thr 0.5 does ~1400 trades/window and returns \u2212210% to \u2212377% vs hold (0/3 beat); thr 0.6 still \u221258%/\u2212190%/\u2212107% (0/3). Raising prob_threshold cuts turnover (1394\u2192493\u21925 trades) but 'restores' returns only by converging to CASH (thr 0.7 \u2248 5 trades, ~0% return \u2014 beats hold ONLY in the 2022 bear, by being flat). NO threshold yields a tradeable edge over buy-and-hold: the skeptical thesis HOLDS UP, the cost-aware-filter restoration does NOT transfer to beating B&H on single-asset spot. HIGH constructive-skeptic value: directly demonstrates the registry's central thesis \u2014 sign-based ML that looks great gross is FLUFF once a realistic 0.1% per-trade fee applies, because turnover dominates the edge. The restored result is fragile: cost-aware long-only XGBoost Sharpe ~1.09 / ~65.4% barely exceeds B&H (~0.82 / ~56.3%), so most apparent edge is just BTC's bull drift, and the win is a SELECTED configuration with no DSR/PBO deflation. The 27-fold walk-forward and net-of-cost reporting are sound; under the registry's 0.1% + walk-forward bar, naive strategies clearly FAIL and the filtered strategy only marginally survives, likely losing Sharpe>1 after deflation. Best as a calibration/skeptical anchor and a single-asset BTC walk-forward template \u2014 replicate the cost-aware filter and apply DSR/PBO to its winning spec.",
       "tags": [
         "skeptical",
         "transaction-costs",
@@ -2288,19 +2289,19 @@
       "id": "bailey-deflated-sharpe-2014",
       "title": "The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting and Non-Normality",
       "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2460551",
-      "authors": "David H. Bailey, Marcos López de Prado",
+      "authors": "David H. Bailey, Marcos L\u00f3pez de Prado",
       "year": 2014,
-      "claim": "The Deflated Sharpe Ratio (DSR) is a statistical correction returning the probability a reported Sharpe reflects genuine skill rather than the luck of multiple testing. It deflates the observed Sharpe for (a) the number of independent trials N — via the expected maximum Sharpe under the null (the 'False Strategy Theorem') — and (b) the non-normality of returns (skewness/kurtosis) and finite track-record length T, separating legitimate findings from statistical flukes.",
-      "approach": "Compute DSR = Φ((SR* − SR₀)·√(T−1) / √(1 − γ₃·SR* + ((γ₄−1)/4)·SR*²)), where SR₀ is the expected maximum Sharpe of N unskilled trials (depends on N and cross-trial variance of Sharpe estimates), and γ₃, γ₄ are return skewness/kurtosis. A high DSR (near 1) means the Sharpe survives correction for selection bias and fat tails; a low DSR flags an overfit/lucky result.",
+      "claim": "The Deflated Sharpe Ratio (DSR) is a statistical correction returning the probability a reported Sharpe reflects genuine skill rather than the luck of multiple testing. It deflates the observed Sharpe for (a) the number of independent trials N \u2014 via the expected maximum Sharpe under the null (the 'False Strategy Theorem') \u2014 and (b) the non-normality of returns (skewness/kurtosis) and finite track-record length T, separating legitimate findings from statistical flukes.",
+      "approach": "Compute DSR = \u03a6((SR* \u2212 SR\u2080)\u00b7\u221a(T\u22121) / \u221a(1 \u2212 \u03b3\u2083\u00b7SR* + ((\u03b3\u2084\u22121)/4)\u00b7SR*\u00b2)), where SR\u2080 is the expected maximum Sharpe of N unskilled trials (depends on N and cross-trial variance of Sharpe estimates), and \u03b3\u2083, \u03b3\u2084 are return skewness/kurtosis. A high DSR (near 1) means the Sharpe survives correction for selection bias and fat tails; a low DSR flags an overfit/lucky result.",
       "assumptions": {
         "fees": false,
         "frictionless": true,
         "netOfCosts": false,
         "multiAsset": false,
-        "retrainCadence": "N/A — an evaluation/significance metric, not a trained strategy; applied post hoc to any candidate's OOS Sharpe and to the count of trials tried during selection.",
-        "notes": "Methodology/metrics paper (no return/Sharpe of its own; models no costs). Requires an HONEST count of independent trials N (estimated via clustering of correlated trials) — under-reporting N defeats the deflation. The False Strategy Theorem uses an extreme-value approximation under a normal null; skewness/kurtosis corrections are first-order finite-sample estimates."
+        "retrainCadence": "N/A \u2014 an evaluation/significance metric, not a trained strategy; applied post hoc to any candidate's OOS Sharpe and to the count of trials tried during selection.",
+        "notes": "Methodology/metrics paper (no return/Sharpe of its own; models no costs). Requires an HONEST count of independent trials N (estimated via clustering of correlated trials) \u2014 under-reporting N defeats the deflation. The False Strategy Theorem uses an extreme-value approximation under a normal null; skewness/kurtosis corrections are first-order finite-sample estimates."
       },
-      "verdictNote": "A SKEPTICAL/methodology entry — not a strategy to replicate. It does not 'survive fees' or 'beat buy-and-hold'; it is the GATE to apply to every RL/ML candidate's OOS Sharpe. The single most actionable multiple-testing correction for this registry given crypto's fat tails and the dozens of hyperparameter/feature/seed configs that will be tried. CRITICAL: the DSR is only as honest as the logged trial count N — if the registry under-reports the true number of independent configs explored (or treats correlated trials as one), the deflation is silently defeated. Note DSR deflates a Sharpe but does NOT incorporate the 0.1% fee drag, so apply it to the net-of-fees, walk-forward Sharpe. Widely cited, no replication controversy (it is math).",
+      "verdictNote": "A SKEPTICAL/methodology entry \u2014 not a strategy to replicate. It does not 'survive fees' or 'beat buy-and-hold'; it is the GATE to apply to every RL/ML candidate's OOS Sharpe. The single most actionable multiple-testing correction for this registry given crypto's fat tails and the dozens of hyperparameter/feature/seed configs that will be tried. CRITICAL: the DSR is only as honest as the logged trial count N \u2014 if the registry under-reports the true number of independent configs explored (or treats correlated trials as one), the deflation is silently defeated. Note DSR deflates a Sharpe but does NOT incorporate the 0.1% fee drag, so apply it to the net-of-fees, walk-forward Sharpe. Widely cited, no replication controversy (it is math).",
       "tags": [
         "skeptical",
         "methodology",
@@ -2320,7 +2321,7 @@
       "id": "bailey-pseudo-math-2014",
       "title": "Pseudo-Mathematics and Financial Charlatanism: The Effects of Backtest Overfitting on Out-of-Sample Performance",
       "url": "https://www.ams.org/notices/201405/rnoti-p458.pdf",
-      "authors": "David H. Bailey, Jonathan M. Borwein, Marcos López de Prado, Qiji Jim Zhu",
+      "authors": "David H. Bailey, Jonathan M. Borwein, Marcos L\u00f3pez de Prado, Qiji Jim Zhu",
       "year": 2014,
       "claim": "Trying even a modest number of alternative strategy configurations on the same data almost guarantees a high in-sample Sharpe with zero expected out-of-sample performance; the more configurations tried, the higher the probability the backtest is overfit. They derive a 'Minimum Backtest Length' (MinBTL): the backtest must be long enough relative to the number of independent trials N, otherwise the best in-sample Sharpe is pure overfitting. Because analysts rarely report how many configurations were tried, the degree of overfitting is usually unknowable.",
       "approach": "A statistical/theoretical proof: under repeated trials, the expected maximum in-sample Sharpe of N independent random strategies grows with N (roughly proportional to sqrt(2 ln N)), so selecting the best backtest yields a strategy whose true OOS Sharpe is ~0. They invert this into MinBTL = minimum years of (IID) returns needed before the highest-in-sample Sharpe among N trials can be distinguished from luck.",
@@ -2332,10 +2333,10 @@
         "frictionless": true,
         "netOfCosts": false,
         "multiAsset": false,
-        "retrainCadence": "N/A — a methodology/theory paper; the result concerns how many configurations/trials are run, not a training cadence.",
+        "retrainCadence": "N/A \u2014 a methodology/theory paper; the result concerns how many configurations/trials are run, not a training cadence.",
         "notes": "Methodology paper, no own returns to net of costs. Core bound assumes (near-)IID Gaussian returns and a researcher optimizing/selecting on the evaluation window; real trials are usually correlated, so the EFFECTIVE number of independent trials N (and thus MinBTL) must be estimated. Under serial-dependence the OOS expectation is NEGATIVE, not merely zero. It quantifies the danger of selection across trials; not a per-strategy verdict."
       },
-      "verdictNote": "A SKEPTICAL/methodology cornerstone — does not 'survive 0.1% fees + walk-forward OOS' because it makes no return claim; it is the calibration tool for judging everything else. Direct application: if a candidate model does not report how many configs/hyperparameters/seeds/lookbacks were tried, its walk-forward Sharpe cannot be trusted, and the Deflated Sharpe is the companion correction. MinBTL tells us whether our walk-forward windows are even long enough given how many BlackSwan presets we sweep. Caveat: its clean bound assumes IID-ish returns and test-window optimization, so it OVER-states danger for genuinely held-out walk-forward and UNDER-states it when trials are highly correlated — estimate the effective N. Highly cited, not subject to replication failure (it is a proof).",
+      "verdictNote": "A SKEPTICAL/methodology cornerstone \u2014 does not 'survive 0.1% fees + walk-forward OOS' because it makes no return claim; it is the calibration tool for judging everything else. Direct application: if a candidate model does not report how many configs/hyperparameters/seeds/lookbacks were tried, its walk-forward Sharpe cannot be trusted, and the Deflated Sharpe is the companion correction. MinBTL tells us whether our walk-forward windows are even long enough given how many BlackSwan presets we sweep. Caveat: its clean bound assumes IID-ish returns and test-window optimization, so it OVER-states danger for genuinely held-out walk-forward and UNDER-states it when trials are highly correlated \u2014 estimate the effective N. Highly cited, not subject to replication failure (it is a proof).",
       "tags": [
         "skeptical",
         "methodology",
@@ -2357,16 +2358,16 @@
       "url": "https://arxiv.org/abs/2310.06625",
       "authors": "Liu, Hu, Zhang, Wu, Wang, Ma, Long",
       "year": 2024,
-      "claim": "Inverting the Transformer — tokenising each VARIATE's whole series (not each timestep) so self-attention models cross-variate correlations and the FFN learns per-series representations — beats vanilla Transformers and specialised models on multivariate long-term forecasting, with better generalisation to unseen variates. No new components, only inverted dimensions.",
-      "approach": "Embed each variate's full lookback series as one token; self-attention ACROSS variate tokens (no temporal positional encoding — variates are unordered); a per-variate feed-forward network; LayerNorm over variates.",
+      "claim": "Inverting the Transformer \u2014 tokenising each VARIATE's whole series (not each timestep) so self-attention models cross-variate correlations and the FFN learns per-series representations \u2014 beats vanilla Transformers and specialised models on multivariate long-term forecasting, with better generalisation to unseen variates. No new components, only inverted dimensions.",
+      "approach": "Embed each variate's full lookback series as one token; self-attention ACROSS variate tokens (no temporal positional encoding \u2014 variates are unordered); a per-variate feed-forward network; LayerNorm over variates.",
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
         "multiAsset": false,
-        "retrainCadence": "N/A — a forecasting-architecture paper, not a trading strategy.",
+        "retrainCadence": "N/A \u2014 a forecasting-architecture paper, not a trading strategy.",
         "notes": "Forecasting benchmark (MSE/MAE on ETT/Traffic/Weather/etc.), not trading. The open question is whether inverted cross-variate attention helps a single-asset RL policy on a noisy OHLCV+portfolio observation under 0.1% fees."
       },
-      "verdictNote": "The architecture we A/B as `itransformer-ppo` (src/model/custom/sequence_extractor.py, encoder='itransformer') against attn-ppo (attention over time) and tcn-ppo. Per no-champions-tsf-2025, expect a near-wash on a single noisy asset — the value is the rigorous A/B under walk-forward + fees, not a regime oracle.",
+      "verdictNote": "The architecture we A/B as `itransformer-ppo` (src/model/custom/sequence_extractor.py, encoder='itransformer') against attn-ppo (attention over time) and tcn-ppo. Per no-champions-tsf-2025, expect a near-wash on a single noisy asset \u2014 the value is the rigorous A/B under walk-forward + fees, not a regime oracle.",
       "tags": [
         "architecture",
         "transformer",
@@ -2411,7 +2412,7 @@
         "netOfCosts": true,
         "notes": "Equity-ETF microstructure anchored to a REAL open/close auction; reported breakeven is single-digit bps ONE-WAY, at/below BlackSwan's 10bps round-trip. A 24/7 crypto asset has no such close, so neither the signal definition nor the cost result transfers cleanly."
       },
-      "verdictNote": "The seminal intraday-momentum paper and the theoretical backbone for the `time` baseline. It DOES test costs (rare), but the effect is an equity open/close phenomenon; on a single 24/7 crypto asset net of 0.1% it is not expected to survive — the literature anchor + a falsification target.",
+      "verdictNote": "The seminal intraday-momentum paper and the theoretical backbone for the `time` baseline. It DOES test costs (rare), but the effect is an equity open/close phenomenon; on a single 24/7 crypto asset net of 0.1% it is not expected to survive \u2014 the literature anchor + a falsification target.",
       "tags": [
         "intraday-momentum",
         "seasonality",
@@ -2453,13 +2454,13 @@
       "authors": "Dehua Shen, Andrew Urquhart, Pengfei Wang",
       "year": 2022,
       "claim": "Bitcoin shows intraday time-series momentum (first half-hour predicts last half-hour), strongest in the highest-volume/volatility sessions, attributed to liquidity provision.",
-      "approach": "Crypto replication of Gao et al. — predictive regressions + a market-timing strategy keyed to fixed UTC session windows.",
+      "approach": "Crypto replication of Gao et al. \u2014 predictive regressions + a market-timing strategy keyed to fixed UTC session windows.",
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
         "notes": "The accessible abstract/repository reports 'economic gains' but NO foregrounded net-of-0.1%-round-trip backtest beating buy-and-hold OOS on a single asset; the signal is conditional on an observed early return, not a static clock."
       },
-      "verdictNote": "The on-point CRYPTO analogue backing a time-of-day round-trip — but UNPROVEN net of BlackSwan's fees and signal-conditional (not a pure buy-at-X/sell-at-Y rule). Backs the `time` baseline as a probe; the deterministic clock is the cost-robust skeleton to beat.",
+      "verdictNote": "The on-point CRYPTO analogue backing a time-of-day round-trip \u2014 but UNPROVEN net of BlackSwan's fees and signal-conditional (not a pure buy-at-X/sell-at-Y rule). Backs the `time` baseline as a probe; the deterministic clock is the cost-robust skeleton to beat.",
       "tags": [
         "intraday-momentum",
         "crypto",
@@ -2508,9 +2509,9 @@
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
-        "notes": "Descriptive only — documents WHEN volume/volatility/liquidity concentrate (UTC hours tied to equity-market opens); no trading strategy or cost test."
+        "notes": "Descriptive only \u2014 documents WHEN volume/volatility/liquidity concentrate (UTC hours tied to equity-market opens); no trading strategy or cost test."
       },
-      "verdictNote": "Motivates WHICH UTC hours to probe with the `time` baseline (volatility peaks at EU/US opens; off-hours are quiet) — where any hour-of-day edge would plausibly live. Not itself a strategy.",
+      "verdictNote": "Motivates WHICH UTC hours to probe with the `time` baseline (volatility peaks at EU/US opens; off-hours are quiet) \u2014 where any hour-of-day edge would plausibly live. Not itself a strategy.",
       "tags": [
         "time-of-day",
         "crypto",
@@ -2558,7 +2559,7 @@
         "netOfCosts": false,
         "notes": "No clean net-of-cost survival claim; the headline (sign flips momentum<->reversal by regime) is itself a warning that a static rule is unstable OOS."
       },
-      "verdictNote": "SKEPTICAL CONTROL for the time / intraday family: the predictability sign FLIPS by regime, so a fixed deterministic time-of-day rule is unlikely to be stable OOS net of fees — the falsification frame for the `time` baseline.",
+      "verdictNote": "SKEPTICAL CONTROL for the time / intraday family: the predictability sign FLIPS by regime, so a fixed deterministic time-of-day rule is unlikely to be stable OOS net of fees \u2014 the falsification frame for the `time` baseline.",
       "tags": [
         "intraday-momentum",
         "reversal",
@@ -2579,9 +2580,9 @@
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
-        "notes": "No net-of-cost trading test; 2010-2017 is early/illiquid/trending BTC — high data-mining + OOS-decay risk."
+        "notes": "No net-of-cost trading test; 2010-2017 is early/illiquid/trending BTC \u2014 high data-mining + OOS-decay risk."
       },
-      "verdictNote": "The day-of-week backbone for the 'maybe weekly patterns emerge' extension of the time baseline. Treat as a WEAK prior to re-validate OOS, not a backed strategy — a day-of-week long/flat rule trades infrequently (low fee drag), so a cheap control to test once a calendar lever exists.",
+      "verdictNote": "The day-of-week backbone for the 'maybe weekly patterns emerge' extension of the time baseline. Treat as a WEAK prior to re-validate OOS, not a backed strategy \u2014 a day-of-week long/flat rule trades infrequently (low fee drag), so a cheap control to test once a calendar lever exists.",
       "tags": [
         "calendar",
         "day-of-week",
@@ -2622,14 +2623,14 @@
       "url": "https://arxiv.org/abs/1406.1078",
       "authors": "Cho, van Merrienboer, Gulcehre, Bahdanau, Bougares, Schwenk, Bengio",
       "year": 2014,
-      "claim": "Introduces the gated recurrent unit (GRU) — a reset/update-gated RNN cell with no separate cell state — that matches LSTM-quality sequence modelling with fewer gates and parameters.",
+      "claim": "Introduces the gated recurrent unit (GRU) \u2014 a reset/update-gated RNN cell with no separate cell state \u2014 that matches LSTM-quality sequence modelling with fewer gates and parameters.",
       "approach": "Proposes the GRU inside an RNN encoder-decoder for translation; since widely used as a lighter LSTM alternative for sequence modelling.",
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
-        "notes": "NLP / sequence modelling, not trading P&L — the relevance is the RECURRENT CORE, not the task."
+        "notes": "NLP / sequence modelling, not trading P&L \u2014 the relevance is the RECURRENT CORE, not the task."
       },
-      "verdictNote": "For BlackSwan: the GRU recurrent core (gru / gru-custom) is the lighter-gate sibling of the reppo LSTM arm, with recurrent state in the POLICY (not a features-extractor). Expected ~wash vs LSTM — a cheap architecture control; credit only a margin that survives seeds + walk-forward windows.",
+      "verdictNote": "For BlackSwan: the GRU recurrent core (gru / gru-custom) is the lighter-gate sibling of the reppo LSTM arm, with recurrent state in the POLICY (not a features-extractor). Expected ~wash vs LSTM \u2014 a cheap architecture control; credit only a margin that survives seeds + walk-forward windows.",
       "tags": [
         "architecture-evidence",
         "recurrent",
@@ -2663,14 +2664,14 @@
       "url": "https://arxiv.org/abs/2206.11893",
       "authors": "Gu, Gupta, Goel, Re",
       "year": 2022,
-      "claim": "A purely DIAGONAL state-space model (S4D) — diagonal complex A with ZOH discretisation and the S4D-Lin/Inv initialisation — recovers the full structured S4 (DPLR) on long-range sequence benchmarks while being far simpler to implement.",
+      "claim": "A purely DIAGONAL state-space model (S4D) \u2014 diagonal complex A with ZOH discretisation and the S4D-Lin/Inv initialisation \u2014 recovers the full structured S4 (DPLR) on long-range sequence benchmarks while being far simpler to implement.",
       "approach": "Reduces S4's structured kernel to a diagonal SSM and identifies the parameterisation + initialisation that matches S4's long-range performance.",
       "assumptions": {
         "fees": false,
         "netOfCosts": false,
-        "notes": "Long-range sequence-modelling benchmarks (LRA etc.), not trading P&L — the relevance is the SSM recurrent core."
+        "notes": "Long-range sequence-modelling benchmarks (LRA etc.), not trading P&L \u2014 the relevance is the SSM recurrent core."
       },
-      "verdictNote": "For BlackSwan: the s4d / s4d-custom arm is an SSM FALSIFICATION arm — an alternative recurrent core to the LSTM/GRU, threaded across env steps in the policy (the complex state is packed real/imag into the SB3 (hidden, cell) slots). Low prior; credit only if it beats reppo net of fees across seeds + windows.",
+      "verdictNote": "For BlackSwan: the s4d / s4d-custom arm is an SSM FALSIFICATION arm \u2014 an alternative recurrent core to the LSTM/GRU, threaded across env steps in the policy (the complex state is packed real/imag into the SB3 (hidden, cell) slots). Low prior; credit only if it beats reppo net of fees across seeds + windows.",
       "tags": [
         "architecture-evidence",
         "state-space-model",
@@ -3062,7 +3063,7 @@
       "id": "gru",
       "slug": "gru",
       "name": "Recurrent PPO (GRU core)",
-      "description": "On-policy RecurrentPPO whose recurrent core is a GRU carried across bars in the POLICY (not a features-extractor) — the lighter-gate sibling of the reppo LSTM arm. 'gru-custom' adds the regularised custom actor-critic head. Expected ~wash vs LSTM.",
+      "description": "On-policy RecurrentPPO whose recurrent core is a GRU carried across bars in the POLICY (not a features-extractor) \u2014 the lighter-gate sibling of the reppo LSTM arm. 'gru-custom' adds the regularised custom actor-critic head. Expected ~wash vs LSTM.",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -3094,7 +3095,7 @@
       "id": "s4d",
       "slug": "s4d",
       "name": "Recurrent PPO (S4D diagonal SSM core)",
-      "description": "On-policy RecurrentPPO whose recurrent core is a diagonal state-space model (S4D) threaded across env steps in the POLICY — an SSM FALSIFICATION arm vs the LSTM/GRU cores. The complex SSM state is packed real/imag into the SB3 (hidden, cell) slots; ssm_state_dim sets the modes per channel. 's4d-custom' adds the custom head.",
+      "description": "On-policy RecurrentPPO whose recurrent core is a diagonal state-space model (S4D) threaded across env steps in the POLICY \u2014 an SSM FALSIFICATION arm vs the LSTM/GRU cores. The complex SSM state is packed real/imag into the SB3 (hidden, cell) slots; ssm_state_dim sets the modes per channel. 's4d-custom' adds the custom head.",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -3203,7 +3204,7 @@
       "id": "dqn",
       "slug": "dqn",
       "name": "DQN",
-      "description": "Deep Q-network (replay buffer + target net). Covers the stock MLP policy, the custom head, the LSTM features-extractor variant, the JAX/SBX build, and Théate & Ernst's Trading DQN (TDQN) — mechanically the custom-head DQN under a specific launch config.",
+      "description": "Deep Q-network (replay buffer + target net). Covers the stock MLP policy, the custom head, the LSTM features-extractor variant, the JAX/SBX build, and Th\u00e9ate & Ernst's Trading DQN (TDQN) \u2014 mechanically the custom-head DQN under a specific launch config.",
       "category": "rl",
       "status": "implemented",
       "aliases": [
@@ -3305,7 +3306,7 @@
       "id": "munchausen-dqn-custom",
       "slug": "munchausen-dqn-custom",
       "name": "Munchausen DQN",
-      "description": "DQN augmented with the Munchausen term (a scaled log-policy bonus added to the reward) — implicit KL-regularised policy iteration. Consolidates the plain, custom-head, and dueling+LSTM Munchausen variants.",
+      "description": "DQN augmented with the Munchausen term (a scaled log-policy bonus added to the reward) \u2014 implicit KL-regularised policy iteration. Consolidates the plain, custom-head, and dueling+LSTM Munchausen variants.",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -3393,7 +3394,7 @@
       "id": "agent57",
       "slug": "agent57",
       "name": "Agent57",
-      "description": "DQN with an Agent57-style intrinsic-reward exploration buffer (count-based + prediction-error + episodic-memory novelty). Fixed 2026-06-26: CustomAgent57ReplayBuffer now records the sampled buffer positions (last_sampled_indices) so compute_intrinsic_rewards can look the per-sample bonus up — SB3's ReplayBufferSamples carries no indices.",
+      "description": "DQN with an Agent57-style intrinsic-reward exploration buffer (count-based + prediction-error + episodic-memory novelty). Fixed 2026-06-26: CustomAgent57ReplayBuffer now records the sampled buffer positions (last_sampled_indices) so compute_intrinsic_rewards can look the per-sample bonus up \u2014 SB3's ReplayBufferSamples carries no indices.",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -3490,7 +3491,7 @@
       "id": "itransformer-ppo",
       "slug": "itransformer-ppo",
       "name": "iTransformer sequence encoder (PPO)",
-      "description": "PPO over an inverted-attention (iTransformer, Liu et al. 2024) sequence encoder — each VARIATE (feature column) is a token embedding its full lookback series, with attention ACROSS variates (no positional embedding; variates are unordered). A third SequenceFeaturesExtractor variant to A/B against attn-ppo (attention over time) and tcn-ppo. Built 2026-06-26 (sequence_extractor.py `encoder='itransformer'`).",
+      "description": "PPO over an inverted-attention (iTransformer, Liu et al. 2024) sequence encoder \u2014 each VARIATE (feature column) is a token embedding its full lookback series, with attention ACROSS variates (no positional embedding; variates are unordered). A third SequenceFeaturesExtractor variant to A/B against attn-ppo (attention over time) and tcn-ppo. Built 2026-06-26 (sequence_extractor.py `encoder='itransformer'`).",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -3514,7 +3515,7 @@
       "id": "a2c",
       "slug": "a2c",
       "name": "A2C",
-      "description": "Advantage Actor-Critic — a synchronous on-policy actor-critic. Covers the stock SB3 MLP build and the tuned custom-net-arch head. Also the project's Policy-Gradient representative (Zhang/Zohren/Roberts 2020): vanilla REINFORCE is subsumed by A2C, which adds a learned baseline and is strictly stronger.",
+      "description": "Advantage Actor-Critic \u2014 a synchronous on-policy actor-critic. Covers the stock SB3 MLP build and the tuned custom-net-arch head. Also the project's Policy-Gradient representative (Zhang/Zohren/Roberts 2020): vanilla REINFORCE is subsumed by A2C, which adds a learned baseline and is strictly stronger.",
       "category": "rl",
       "status": "implemented",
       "aliases": [
@@ -3543,7 +3544,7 @@
       "id": "qrdqn",
       "slug": "qrdqn",
       "name": "QR-DQN",
-      "description": "Quantile-Regression DQN — distributional RL that learns a set of return quantiles (via quantile-Huber regression) instead of a single Q-value. Covers the SB3-contrib build and the custom quantile net.",
+      "description": "Quantile-Regression DQN \u2014 distributional RL that learns a set of return quantiles (via quantile-Huber regression) instead of a single Q-value. Covers the SB3-contrib build and the custom quantile net.",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -3565,7 +3566,7 @@
       "id": "ars",
       "slug": "ars",
       "name": "ARS",
-      "description": "Augmented Random Search — a gradient-free baseline that perturbs policy weights along random directions and keeps the best. A decisive control: if random search rivals the gradient learners, the learned gradient isn't earning its keep.",
+      "description": "Augmented Random Search \u2014 a gradient-free baseline that perturbs policy weights along random directions and keeps the best. A decisive control: if random search rivals the gradient learners, the learned gradient isn't earning its keep.",
       "category": "baseline",
       "status": "implemented",
       "flavors": [
@@ -3584,7 +3585,7 @@
       "id": "momentum",
       "slug": "momentum",
       "name": "Time-Series Momentum",
-      "description": "A non-RL time-series-momentum baseline (Moskowitz/Ooi/Pedersen 2012): take a long/short position on the sign of the trailing return over a lookback. The rule-based trend-following control — 'does a learned policy actually beat simple momentum net of fees?'.",
+      "description": "A non-RL time-series-momentum baseline (Moskowitz/Ooi/Pedersen 2012): take a long/short position on the sign of the trailing return over a lookback. The rule-based trend-following control \u2014 'does a learned policy actually beat simple momentum net of fees?'.",
       "category": "baseline",
       "status": "implemented",
       "flavors": [
@@ -3603,7 +3604,7 @@
       "id": "rrl",
       "slug": "rrl",
       "name": "Recurrent Reinforcement Learning (RRL)",
-      "description": "Moody & Saffell (2001) DIRECT recurrent RL — no Q-values, no SB3. A recurrent linear policy F_t = tanh(w·x_t + u·F_{t-1} + b) outputs a CONTINUOUS position in [-1,1] (the previous position feeds back, so it holds through noise), trained by gradient ASCENT on the Sharpe ratio of the realised strategy return R_t = F_{t-1}·r_t − δ·|ΔF| (the objective the online DIFFERENTIAL Sharpe estimates), via truncated BPTT. Single-asset; the continuous position is discretised to the env's discrete long/flat/short actions at eval.",
+      "description": "Moody & Saffell (2001) DIRECT recurrent RL \u2014 no Q-values, no SB3. A recurrent linear policy F_t = tanh(w\u00b7x_t + u\u00b7F_{t-1} + b) outputs a CONTINUOUS position in [-1,1] (the previous position feeds back, so it holds through noise), trained by gradient ASCENT on the Sharpe ratio of the realised strategy return R_t = F_{t-1}\u00b7r_t \u2212 \u03b4\u00b7|\u0394F| (the objective the online DIFFERENTIAL Sharpe estimates), via truncated BPTT. Single-asset; the continuous position is discretised to the env's discrete long/flat/short actions at eval.",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -3623,7 +3624,7 @@
       "id": "esn-rrl",
       "slug": "esn-rrl",
       "name": "ESN-RRL (Echo State Network + RRL)",
-      "description": "Borrageiro (2022) — RRL on top of a fixed ECHO STATE NETWORK reservoir. A random recurrent net, scaled to a sub-unit spectral radius (the echo-state property), is run over the inputs WITHOUT training; its high-dimensional leaky-integrator state is the feature the trained RRL position layer reads (only the readout learns). Inherits RRL's direct Sharpe-ascent training + discretised-action eval; only the feature map differs.",
+      "description": "Borrageiro (2022) \u2014 RRL on top of a fixed ECHO STATE NETWORK reservoir. A random recurrent net, scaled to a sub-unit spectral radius (the echo-state property), is run over the inputs WITHOUT training; its high-dimensional leaky-integrator state is the feature the trained RRL position layer reads (only the readout learns). Inherits RRL's direct Sharpe-ascent training + discretised-action eval; only the feature map differs.",
       "category": "rl",
       "status": "implemented",
       "flavors": [
@@ -3642,7 +3643,7 @@
       "id": "eiie",
       "slug": "eiie",
       "name": "EIIE (Ensemble of Identical Independent Evaluators)",
-      "description": "DEFERRED — a multi-asset PORTFOLIO architecture (Jiang et al 2017): one weight-shared network is applied INDEPENDENTLY to each asset's price tensor, producing a softmax allocation over N assets + cash. It cannot be built faithfully in BlackSwan's SINGLE-asset, discrete-action env (it degenerates to a position sizer). Revisit once the multi-asset / portfolio env lands (Wave-3).",
+      "description": "DEFERRED \u2014 a multi-asset PORTFOLIO architecture (Jiang et al 2017): one weight-shared network is applied INDEPENDENTLY to each asset's price tensor, producing a softmax allocation over N assets + cash. It cannot be built faithfully in BlackSwan's SINGLE-asset, discrete-action env (it degenerates to a position sizer). Revisit once the multi-asset / portfolio env lands (Wave-3).",
       "category": "rl",
       "status": "deferred",
       "flavors": [],
@@ -3656,7 +3657,7 @@
       "id": "time",
       "slug": "time",
       "name": "Time-of-Day Baseline",
-      "description": "A deterministic clock strategy: open a long at a fixed UTC hour and close at another, every day — an intraday round-trip (buy<sell) or an OVERNIGHT hold (buy>sell). A control to BEAT and a probe for time-of-day / overnight seasonality; needs intraday data (timeframe=1h). Sweep time_buy x time_sell to surface any hour-of-day pattern. Per the literature (intraday momentum is an equity open/close-auction effect; crypto calendar effects are regime-dependent and cost-fragile) these rarely survive 0.1% fees on a 24/7 asset — so the value is the baseline + the falsification.",
+      "description": "A deterministic clock strategy: open a long at a fixed UTC hour and close at another, every day \u2014 an intraday round-trip (buy<sell) or an OVERNIGHT hold (buy>sell). A control to BEAT and a probe for time-of-day / overnight seasonality; needs intraday data (timeframe=1h). Sweep time_buy x time_sell to surface any hour-of-day pattern. Per the literature (intraday momentum is an equity open/close-auction effect; crypto calendar effects are regime-dependent and cost-fragile) these rarely survive 0.1% fees on a 24/7 asset \u2014 so the value is the baseline + the falsification.",
       "category": "baseline",
       "status": "implemented",
       "flavors": [
@@ -3719,7 +3720,7 @@
       "id": "weekday",
       "slug": "weekday",
       "name": "Day-of-Week Baseline",
-      "description": "A deterministic weekly clock: open a long at the start of weekday `day_buy` (0=Mon..6=Sun) and close at `day_sell`, every week — an intra-week hold (buy<sell, e.g. Mon->Fri) or a WEEKEND hold (buy>sell, e.g. Fri->Mon; crypto trades the weekend). A control to BEAT and a probe for weekly seasonality (the Monday / day-of-week effect; Aharon-Qadan). Runs at a daily step (timeframe=1d). Per the literature these calendar effects are in-sample, data-mining-prone and unlikely to survive OOS net of 0.1% fees — so the value is the baseline + falsification.",
+      "description": "A deterministic weekly clock: open a long at the start of weekday `day_buy` (0=Mon..6=Sun) and close at `day_sell`, every week \u2014 an intra-week hold (buy<sell, e.g. Mon->Fri) or a WEEKEND hold (buy>sell, e.g. Fri->Mon; crypto trades the weekend). A control to BEAT and a probe for weekly seasonality (the Monday / day-of-week effect; Aharon-Qadan). Runs at a daily step (timeframe=1d). Per the literature these calendar effects are in-sample, data-mining-prone and unlikely to survive OOS net of 0.1% fees \u2014 so the value is the baseline + falsification.",
       "category": "baseline",
       "status": "implemented",
       "flavors": [
@@ -3762,7 +3763,7 @@
       "id": "sequence-features-extractor",
       "slug": "sequence-features-extractor",
       "name": "Sequence Features Extractor",
-      "description": "An SB3 features extractor that encodes the lookback window with a modern sequence model — single-block self-attention, a dilated-causal TCN, or an inverted-transformer (iTransformer) — instead of flattening the bars. The shared sequence backbone behind the attn-ppo / tcn-ppo / itransformer-ppo models.",
+      "description": "An SB3 features extractor that encodes the lookback window with a modern sequence model \u2014 single-block self-attention, a dilated-causal TCN, or an inverted-transformer (iTransformer) \u2014 instead of flattening the bars. The shared sequence backbone behind the attn-ppo / tcn-ppo / itransformer-ppo models.",
       "category": "component",
       "status": "implemented",
       "flavors": [],
@@ -3776,7 +3777,7 @@
       "id": "lstm-features-extractor",
       "slug": "lstm-features-extractor",
       "name": "LSTM Features Extractor (LSTMFCE)",
-      "description": "A recurrent (LSTM) features extractor that carries hidden state across bars before the value/policy head — the sequence memory reused by the DQN-family `*-lstm` variants.",
+      "description": "A recurrent (LSTM) features extractor that carries hidden state across bars before the value/policy head \u2014 the sequence memory reused by the DQN-family `*-lstm` variants.",
       "category": "component",
       "status": "implemented",
       "flavors": [],
@@ -3820,7 +3821,7 @@
       "id": "custom-q-network",
       "slug": "custom-q-network",
       "name": "Custom Q-Network",
-      "description": "A configurable Q-network builder (`create_mlp_custom`) that tiles a `-custom` recipe's hidden block pattern to an exact layer count — the shared Q-head for the custom DQN family.",
+      "description": "A configurable Q-network builder (`create_mlp_custom`) that tiles a `-custom` recipe's hidden block pattern to an exact layer count \u2014 the shared Q-head for the custom DQN family.",
       "category": "component",
       "status": "implemented",
       "flavors": [],
@@ -3842,7 +3843,7 @@
       "id": "prioritized-replay-buffer",
       "slug": "prioritized-replay-buffer",
       "name": "Prioritized Replay Buffer",
-      "description": "A proportional prioritized experience-replay buffer that samples transitions by TD-error priority — the replay component behind the Rainbow / prioritized-DQN line.",
+      "description": "A proportional prioritized experience-replay buffer that samples transitions by TD-error priority \u2014 the replay component behind the Rainbow / prioritized-DQN line.",
       "category": "component",
       "status": "implemented",
       "flavors": [],
@@ -3863,7 +3864,7 @@
     {
       "id": "dgwo-optimizer",
       "slug": "dgwo-optimizer",
-      "name": "DGWO — Grey-Wolf Optimizer",
+      "name": "DGWO \u2014 Grey-Wolf Optimizer",
       "description": "A Grey-Wolf-guided gradient optimizer (gradient-descent update plus a decaying metaheuristic exploration pull toward a tracked leader), selectable via the `optimizer_class` lever as an experimental alternative to Adam/RMSprop.",
       "category": "component",
       "status": "implemented",
@@ -3875,7 +3876,7 @@
       "id": "attention-blocks",
       "slug": "attention-blocks",
       "name": "Attention Blocks",
-      "description": "A kit of attention modules — scaled-dot-product, multi-head, additive, global-context and a self-attention wrapper — selectable as blocks in the custom Q-network `custom_net_arch` recipes (consumed by `create_mlp_custom`).",
+      "description": "A kit of attention modules \u2014 scaled-dot-product, multi-head, additive, global-context and a self-attention wrapper \u2014 selectable as blocks in the custom Q-network `custom_net_arch` recipes (consumed by `create_mlp_custom`).",
       "category": "component",
       "status": "implemented",
       "flavors": [],

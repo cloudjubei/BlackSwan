@@ -17,7 +17,7 @@ import math
 import numpy as np
 
 from trainer.fidelity import resolve_fidelity
-from trainer.sharpe import sharpe_stats
+from trainer.sharpe import min_track_record_length_from_stats, psr_from_stats, sharpe_stats
 
 _MAX_SERIES_POINTS = 200
 
@@ -220,6 +220,20 @@ def _signal_expectancy(trades, prices, horizon):
     }
 
 
+def _hold_equity(prices, round_trip):
+    """The buy-and-hold EQUITY CURVE behind the benchmark's risk metrics: one unit of capital entered at the
+    first live bar and marked to market every bar after, already charged the round-trip fee.
+
+    A hold opens once and closes once, so its fee is a single level haircut, not a per-bar cost — it belongs
+    on the whole curve as a constant factor. The curve therefore starts at ``round_trip`` (below 1: the entry
+    is already worth less than the capital committed) and ends at exactly ``1 + hold_return_pct/100``, while
+    every per-step return stays the raw price return. Sprinkling the fee onto individual bars instead would
+    invent volatility and a drawdown the holder never actually experienced, which would corrupt the very risk
+    comparison this curve exists to support."""
+    base = prices[0]
+    return [p / base * round_trip for p in prices]
+
+
 def _benchmark(env, lookback):
     """Buy-and-hold control over the same live window — a display yardstick, NOT a reward target.
 
@@ -228,6 +242,13 @@ def _benchmark(env, lookback):
     per-trade fee the model pays — once on entry, once on exit — so a strategy that merely buys and holds
     scores ~0 against it instead of losing by its fee drag. The capital base differs from the fixed-stake
     strategy, so the delta is indicative, not exact.
+
+    Alongside the return it reports the hold's RISK — ``hold_sharpe`` and ``hold_max_drawdown_pct`` — because
+    the project's goal is a STEADY win and a return-only yardstick cannot express that at all. Both are
+    measured by the SAME ``_oos_stats`` / ``_max_drawdown_pct`` helpers the strategy's own metrics use, on the
+    hold's equity curve: a hand-rolled hold Sharpe would be an apples-to-oranges comparison that silently
+    invalidates every gate built on it. Each risk key is OMITTED (never zeroed) when its helper cannot measure
+    the curve — e.g. a two-bar window yields one return, too few for a Sharpe — exactly as on the strategy side.
     """
     actions = _live(getattr(env, "actions", []), lookback)
     prices = _run_prices(env, len(actions)) if len(actions) >= 2 else []
@@ -237,7 +258,40 @@ def _benchmark(env, lookback):
     fee = getattr(env, "transaction_fee_multiplier", 0.0)
     fee = fee if isinstance(fee, (int, float)) and math.isfinite(fee) else 0.0
     round_trip = (1.0 - fee) ** 2
-    return {"hold_return_pct": (prices[-1] / prices[0] * round_trip - 1.0) * 100}
+    out = {"hold_return_pct": (prices[-1] / prices[0] * round_trip - 1.0) * 100}
+    equity = _hold_equity(prices, round_trip)
+    stats = _oos_stats(equity)
+    if "oos_sharpe" in stats:
+        out["hold_sharpe"] = stats["oos_sharpe"]
+    drawdown = _max_drawdown_pct(equity)
+    if "max_drawdown_pct" in drawdown:
+        out["hold_max_drawdown_pct"] = drawdown["max_drawdown_pct"]
+    return out
+
+
+def _hold_risk(metrics, benchmark):
+    """The strategy-minus-hold RISK deltas that let a gate say "steadier than just holding", mirrored next to
+    the hold's own measurements so both sides of each comparison sit in the same bag.
+
+    SIGN CONVENTION — drawdowns are NEGATIVE percents on both sides, so ``drawdown_vs_hold_pct`` is POSITIVE
+    when the strategy drew down LESS than buy-and-hold (shallower = better) and NEGATIVE when it drew down
+    MORE. Read the other way round it inverts every gate built on it, so it is stated here rather than left
+    to each caller to re-derive. ``sharpe_vs_hold`` is the ordinary "higher is better" direction.
+
+    A delta is OMITTED whenever either side is missing, never defaulted to 0.0 — a zero would read as "tied
+    with the market", the single most misleading value a risk gate could be handed."""
+    out = {}
+    if "hold_sharpe" in benchmark:
+        out["hold_sharpe"] = benchmark["hold_sharpe"]
+        if "oos_sharpe" in metrics:
+            out["sharpe_vs_hold"] = _finite(metrics["oos_sharpe"] - benchmark["hold_sharpe"])
+    if "hold_max_drawdown_pct" in benchmark:
+        out["hold_max_drawdown_pct"] = benchmark["hold_max_drawdown_pct"]
+        if "max_drawdown_pct" in metrics:
+            out["drawdown_vs_hold_pct"] = _finite(
+                metrics["max_drawdown_pct"] - benchmark["hold_max_drawdown_pct"]
+            )
+    return out
 
 
 def _trade(entry, exit_step, exit_price, reason, pnl, initial):
@@ -534,6 +588,38 @@ def _oos_stats(equity):
     }
 
 
+def _track_record_stats(oos):
+    """The L3 multiple-testing rigor pair, derived from the SAME moment bundle ``_oos_stats`` emits (never a
+    second, drifting Sharpe): ``psr`` — the probabilistic Sharpe, i.e. the probability the TRUE per-step Sharpe
+    is above 0 given the sample's length/skew/kurtosis — and ``min_track_record_length``, the observations that
+    Sharpe would need before it clears 0 at 95% confidence. The verdict layer's L3 acceptance reads minTRL
+    against ``oos_n_obs``; the PSR it is derived from is emitted alongside so that arithmetic is auditable
+    rather than opaque. Both come straight from ``trainer/sharpe.py``.
+
+    The benchmark is 0 because this is a PER-RUN measurement: a run cannot know how many configs the campaign
+    searched, so the DEFLATED benchmark (the expected maximum Sharpe over N trials) is a selection-time
+    quantity for the verdict layer, not this module.
+
+    NOT-ESTABLISHABLE — minTRL is INFINITE whenever the observed Sharpe is not above the benchmark: no length
+    of track record can establish an edge that is not there. The key is then OMITTED. Neither alternative is
+    safe: ``math.inf`` is not JSON (``json.dump`` emits a bare ``Infinity`` token that is invalid JSON, which
+    would make the whole summary unparseable), 0.0 would say "no track record needed" — the exact inverse of
+    the truth — and ``None``/``null`` is safe only in Python, because the verdict layer is TypeScript and
+    ``null <= 7`` is TRUE there while ``undefined <= 7`` is false. Omission is the one representation under
+    which the register's acceptance test ``min_track_record_length <= oos_n_obs`` cannot silently pass a run
+    with no edge in EITHER language. Nothing is lost: ``psr`` is emitted whenever the bundle exists, so
+    psr-present with minTRL-absent already distinguishes "measured, no edge" from "never measured". Empty
+    (skippable via ``metrics.update``) when the bundle is absent."""
+    if not oos:
+        return {}
+    moments = (oos["oos_sharpe"], oos["oos_ret_skew"], oos["oos_ret_kurt"], oos["oos_n_obs"])
+    trl = min_track_record_length_from_stats(*moments)
+    out = {"psr": _finite(psr_from_stats(*moments))}
+    if math.isfinite(trl):
+        out["min_track_record_length"] = trl
+    return out
+
+
 def _max_drawdown_pct(equity):
     """Worst peak-to-trough decline of the test-window equity curve, as a signed percent (<= 0, 0 when the
     curve never dips below a prior peak). The one risk metric surfaced — the Diagnosis tab's risk lens and the
@@ -701,7 +787,10 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         "final_net_worth": equity[-1] if equity else initial,
         "realized_cost_bps": _finite(fees_paid / initial * 10000) if initial else 0.0,
     }
-    metrics.update(_oos_stats(equity))
+    oos = _oos_stats(equity)
+    metrics.update(oos)
+    # L3: the multiple-testing rigor pair (psr + min_track_record_length) off that same moment bundle.
+    metrics.update(_track_record_stats(oos))
     metrics.update(_max_drawdown_pct(equity))
     metrics.update(_capture_stats(equity, prices))
     # Time-normalised trade liveness (the scorecard's trades_per_day gate) — over the test bars (oos_n_obs
@@ -718,6 +807,8 @@ def build_summary(env, state, cfg, model, ran_at, is_rl):
         # Provenance flag: this run's hold benchmark already nets out the round-trip fee, so the
         # viewer's one-time migration knows not to re-adjust it.
         metrics["hold_net_of_fees"] = True
+        # Risk against the same yardstick — see _hold_risk for the drawdown sign convention.
+        metrics.update(_hold_risk(metrics, benchmark))
 
     # RL-only: the share of the agent's buy/sell output that was a no-op (a signal it couldn't act on).
     # The headline number for "can I trust the raw signal stream?" — see _signal_noise.
