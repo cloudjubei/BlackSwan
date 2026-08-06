@@ -98,6 +98,11 @@ def build_data_config(cfg):
     _, projection = resolve_projection(cfg, asset)
     data_type = projection["type"]
     use_indicators = projection["use_indicators"] or is_technical(cfg)
+    # Stage-1 channels are INDEPENDENT of the projection ladder: each is a single lens the search can add
+    # to the lean projection and attribute on its own (the bundle already contains the regime pair, so
+    # testing regime on top of `with_indicators` would be a no-op).
+    calendar_features = bool(cfg.get("calendar_features", False))
+    regime = bool(cfg.get("regime", False))
     train_pairs, test_pairs, window = resolve_walk_forward_window(cfg)
     wf = window["walk_forward_window"]
     fset_id, fspec = resolve_fidelity(cfg)
@@ -127,6 +132,8 @@ def build_data_config(cfg):
                 timestamp="day_of_week",
                 obs_squash=str(cfg.get("obs_squash", "none")),
                 context=str(cfg.get("context_set", "none")),
+                calendar_features=calendar_features,
+                regime=regime,
                 fidelity_input="1m",
                 fidelity_run=fidelity_run,
                 layers=layers,
@@ -157,6 +164,8 @@ def build_data_config(cfg):
                 timestamp="day_of_week",
                 obs_squash=str(cfg.get("obs_squash", "none")),
                 context=str(cfg.get("context_set", "none")),
+                calendar_features=calendar_features,
+                regime=regime,
                 fidelity_input="1h",
                 fidelity_run=fidelity_run,
                 layers=layers,
@@ -176,6 +185,8 @@ def build_data_config(cfg):
             timestamp="none",
             obs_squash=str(cfg.get("obs_squash", "none")),
             context=str(cfg.get("context_set", "none")),
+            calendar_features=calendar_features,
+            regime=regime,
             fidelity_input="1d",
             fidelity_run="1d",
             layers=layers,

@@ -737,3 +737,38 @@ def test_build_data_config_1h_altcoin_with_minute_files_derives(monkeypatch):
     cfg = config_builder.build_data_config({"timeframe": "1h", "asset": "ETHUSDT"})
     assert list(cfg.train_data_paths[0]) == ["ETHUSDT-1h"]
     assert cfg.id.startswith("ETHUSDT-")
+
+
+# ---------------------------------------------------------------------------
+# Stage 1 feature levers: calendar_features + regime. Both are OFF by default so an
+# existing run's observation is byte-identical; each threads into DataConfig so the
+# provider can emit its channel INDEPENDENTLY of the with_indicators bundle.
+# ---------------------------------------------------------------------------
+
+
+def test_calendar_features_lever_threads_into_the_data_config(monkeypatch):
+    _echo_daily(monkeypatch)
+    off = config_builder.build_data_config({"timeframe": "1d"})
+    on = config_builder.build_data_config({"timeframe": "1d", "calendar_features": True})
+    assert off.calendar_features is False
+    assert on.calendar_features is True
+
+
+def test_regime_lever_threads_into_the_data_config(monkeypatch):
+    _echo_daily(monkeypatch)
+    off = config_builder.build_data_config({"timeframe": "1d"})
+    on = config_builder.build_data_config({"timeframe": "1d", "regime": True})
+    assert off.regime is False
+    assert on.regime is True
+
+
+def test_feature_levers_are_independent_of_the_projection_bundle(monkeypatch):
+    # The whole point of Stage 1: a regime channel WITHOUT the curated-indicator bundle, so the
+    # search can attribute the volatility lens on its own.
+    _echo_daily(monkeypatch)
+    cfg = config_builder.build_data_config(
+        {"timeframe": "1d", "projection": "standard", "regime": True, "calendar_features": True}
+    )
+    assert cfg.use_indicators is False
+    assert cfg.regime is True
+    assert cfg.calendar_features is True

@@ -28,6 +28,13 @@ class DataConfig:
     # Global context panel id (see trainer.context CONTEXT_PANELS): macro series fused onto the bar clock
     # as raw-level observation columns. "none" = no context channels (byte-identical to pre-context runs).
     context: str = "none"
+    # Stage-1 feature channels, each toggled ALONE so its contribution is attributable. Both default off,
+    # so an observation is byte-identical to a pre-Stage-1 run unless the lever is set.
+    # Seasonality derived purely from the bar timestamp (no external table, nothing to look ahead to).
+    calendar_features: bool = False
+    # The realized-volatility / trend-slope lens on its own, WITHOUT the rest of the curated indicator
+    # bundle (which also emits it) — so the search can attribute the regime lens in isolation.
+    regime: bool = False
 
 data_2017_to_2023vs2024_only_price_percent = DataConfig(
     id= "data_2020_to_2023vs2024_only_price_percent",

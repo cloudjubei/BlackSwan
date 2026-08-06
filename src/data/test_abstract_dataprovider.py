@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from src.conf.data_config import DataConfig
-from src.data.abstract_dataprovider import AbstractDataProvider, days_in_month
+from src.data.abstract_dataprovider import AbstractDataProvider, days_in_month, _infer_minutes_per_bar
 
 _COLUMNS = [
     "timestamp",
@@ -793,3 +793,180 @@ def test_get_data_reads_json_and_runs_full_process_df():
     assert len(prices) == 8
     assert len(bs) == 8
     assert out.select_dtypes(include=[np.number]).shape[1] == out.shape[1]
+
+
+# ---------------------------------------------------------------------------
+# L8: dead observation features. A time-scaled rolling horizon must never collapse
+# into a constant column — neither through a mis-inferred bar span nor through a
+# window longer than the available history.
+# ---------------------------------------------------------------------------
+
+
+def test_infer_minutes_per_bar_accepts_datetime_and_epoch_ms():
+    # datetime64 closes (what read_json yields) and epoch-ms integers (what an aggregated/resampled
+    # frame carries) must infer the SAME spacing — otherwise the 1d/1m/1y horizons silently unscale.
+    day_ms = 86_400_000
+    as_int = pd.Series([1_600_000_000_000 + i * day_ms for i in range(10)])
+    as_dt = pd.to_datetime(as_int, unit="ms")
+    assert _infer_minutes_per_bar(as_dt) == 1440
+    assert _infer_minutes_per_bar(as_int) == 1440
+    hourly = pd.Series([1_600_000_000_000 + i * 3_600_000 for i in range(10)])
+    assert _infer_minutes_per_bar(hourly) == 60
+    assert _infer_minutes_per_bar(pd.Series([1_600_000_000_000])) == 1  # single bar -> no span
+
+
+def test_epoch_ms_frame_scales_windows_instead_of_blanking_every_horizon():
+    # Before: an int-ms frame inferred 1 minute per bar, so the 1d window became 1440 bars and every
+    # long-horizon feature was all-NaN -> constant 0 (six dead features on a daily frame).
+    p = _provider()
+    out, _, _ = p.process_df_simple(_df(40), "none", list(_COLUMNS))
+    assert out["price_z_score_1d"].nunique() > 1
+
+
+def _wavy_df(n=60):
+    # A non-monotone series: a monotonically rising price makes price_to_max legitimately 1.0 everywhere,
+    # which would mask (not prove) the dead-column behaviour under test.
+    df = _df(n)
+    df["price"] = [100.0 + 10.0 * np.sin(i / 3.0) + 0.2 * i for i in range(n)]
+    df["price_high"] = df["price"] * 1.01
+    df["price_low"] = df["price"] * 0.99
+    df["price_open"] = df["price"]
+    return df
+
+
+def test_horizon_longer_than_history_degrades_to_a_real_trailing_estimate():
+    # 60 daily bars cannot fill the 1-year window; the feature must still carry a real (trailing,
+    # shorter-sample) estimate rather than a dead constant that occupies observation space.
+    p = _provider()
+    out, _, _ = p.process_df_simple(_wavy_df(60), "none", list(_COLUMNS))
+    for col in ["price_z_score_1y", "price_to_avg_1y", "price_to_max_1y"]:
+        assert out[col].nunique() > 1, f"{col} is a dead constant column"
+
+
+def test_ratio_features_warm_up_at_parity_never_at_zero():
+    # A ratio's neutral is 1.0 (at the reference). Filling it with 0 asserts "price is 0x its average"
+    # — an extreme false value injected into the observation at every warm-up bar.
+    p = _provider()
+    out, _, _ = p.process_df_simple(_df(40), "none", list(_COLUMNS))
+    for col in ["price_to_avg_1y", "price_to_max_1y", "total_volume_to_max_1y"]:
+        assert out[col].iloc[0] == 1.0, f"{col} warm-up should be parity, got {out[col].iloc[0]}"
+        assert (out[col] != 0.0).all(), f"{col} must never claim a zero ratio"
+
+
+def test_rolling_features_stay_causal_under_the_degraded_window():
+    # min_periods relaxes how many PRIOR bars are needed; it must never reach forward. Corrupting the
+    # future must leave every earlier row byte-identical.
+    p = _provider()
+    base = _df(60)
+    out_clean, _, _ = p.process_df_simple(base.copy(), "none", list(_COLUMNS))
+    corrupted = base.copy()
+    corrupted.loc[30:, "price"] = corrupted.loc[30:, "price"] * 7.5
+    corrupted.loc[30:, "volume"] = corrupted.loc[30:, "volume"] * 3.0
+    out_dirty, _, _ = p.process_df_simple(corrupted, "none", list(_COLUMNS))
+    cols = [c for c in out_clean.columns if out_clean[c].dtype.kind == "f"]
+    pd.testing.assert_frame_equal(
+        out_clean.loc[:29, cols].reset_index(drop=True),
+        out_dirty.loc[:29, cols].reset_index(drop=True),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Stage 1 feature channels. Both default OFF so the observation is byte-identical to a
+# pre-Stage-1 run; each adds its columns INDEPENDENTLY of the with_indicators bundle.
+# ---------------------------------------------------------------------------
+
+_CAL_COLS = ["cal_day_of_week", "cal_day_of_month", "cal_month", "cal_turn_of_month"]
+_REGIME_COLS = ["volRegime10", "trendSlope10"]
+
+
+def test_calendar_channel_is_off_by_default():
+    out, _, _ = _provider().process_df_simple(_df(40), "none", list(_COLUMNS))
+    for c in _CAL_COLS:
+        assert c not in out.columns
+
+
+def test_calendar_channel_adds_bounded_columns_when_enabled():
+    out, _, _ = _provider(calendar_features=True).process_df_simple(_df(40), "none", list(_COLUMNS))
+    for c in _CAL_COLS:
+        assert c in out.columns, f"{c} missing"
+        assert out[c].between(-1.0, 1.0).all(), f"{c} escapes the [-1,1] observation bound"
+    # day-of-week must actually VARY across 40 consecutive daily bars (a constant would be a dead feature).
+    assert out["cal_day_of_week"].nunique() > 1
+
+
+def test_calendar_channel_is_independent_of_the_indicator_bundle():
+    # No curated indicators, but the calendar channel is still emitted.
+    out, _, _ = _provider(calendar_features=True, use_indicators=False).process_df_simple(
+        _df(40), "none", list(_COLUMNS)
+    )
+    assert "rsi10" not in out.columns
+    for c in _CAL_COLS:
+        assert c in out.columns
+
+
+def test_regime_channel_is_off_by_default():
+    out, _, _ = _provider().process_df_simple(_df(40), "none", list(_COLUMNS))
+    for c in _REGIME_COLS:
+        assert c not in out.columns
+
+
+def test_regime_channel_adds_the_vol_and_trend_lens_without_the_bundle():
+    out, _, _ = _provider(regime=True, use_indicators=False).process_df_simple(
+        _df(40), "none", list(_COLUMNS)
+    )
+    for c in _REGIME_COLS:
+        assert c in out.columns, f"{c} missing"
+        assert out[c].between(-1.0, 1.0).all()
+    # the rest of the curated bundle stays OFF — this is an isolated channel, not the bundle
+    assert "rsi10" not in out.columns
+    assert "choppiness30" not in out.columns
+
+
+def test_regime_channel_does_not_duplicate_the_bundle_columns():
+    # With the bundle already emitting volRegime10/trendSlope10, turning the channel on must not
+    # duplicate or overwrite them — the observation shape stays exactly the bundle's.
+    bundle, _, _ = _provider(use_indicators=True).process_df_simple(_df(40), "none", list(_COLUMNS))
+    both, _, _ = _provider(use_indicators=True, regime=True).process_df_simple(
+        _df(40), "none", list(_COLUMNS)
+    )
+    assert list(bundle.columns) == list(both.columns)
+
+
+def test_feature_channels_leave_the_default_observation_untouched():
+    # Obs-shape compatibility: with both levers off the column set is exactly what it was before Stage 1.
+    base, _, _ = _provider().process_df_simple(_df(40), "none", list(_COLUMNS))
+    cal, _, _ = _provider(calendar_features=True).process_df_simple(_df(40), "none", list(_COLUMNS))
+    reg, _, _ = _provider(regime=True).process_df_simple(_df(40), "none", list(_COLUMNS))
+    assert set(cal.columns) - set(base.columns) == set(_CAL_COLS)
+    assert set(reg.columns) - set(base.columns) == set(_REGIME_COLS)
+    assert set(base.columns) - set(cal.columns) == set()
+
+
+def test_feature_channel_levers_participate_in_the_cache_key():
+    # A cached frame is keyed by the params that SHAPE it. If a feature lever is absent from the key, every
+    # arm of a feature experiment silently reuses the baseline frame and the whole comparison is void — so
+    # the levers must change the key when ON, and leave it untouched when OFF (default runs keep their cache).
+    base = _provider()._feature_cache_params("get_raw_data", "none", list(_COLUMNS))
+    cal = _provider(calendar_features=True)._feature_cache_params("get_raw_data", "none", list(_COLUMNS))
+    reg = _provider(regime=True)._feature_cache_params("get_raw_data", "none", list(_COLUMNS))
+    both = _provider(calendar_features=True, regime=True)._feature_cache_params(
+        "get_raw_data", "none", list(_COLUMNS)
+    )
+    assert cal != base and reg != base and both != base
+    assert cal != reg and both != cal and both != reg
+    # OFF must not perturb the key, so pre-Stage-1 cache entries stay valid.
+    assert "calendar_features" not in base and "regime" not in base
+
+
+def test_feature_channels_reach_the_single_provider_path():
+    # A DEFAULT daily run (layers==['1d'] at the 1d base) is routed by data_factory to SingleDataProvider,
+    # which builds its frame through process_df — NOT process_df_simple. A channel wired into only one of
+    # the two paths silently never reaches the observation, and every arm of a feature experiment then
+    # returns the identical result.
+    p = _provider(calendar_features=True, regime=True)
+    out, *_ = p.process_df(_df_full(40), "only_price_percent", "none", "none", 0.004, 20)
+    for c in _CAL_COLS + _REGIME_COLS:
+        assert c in out.columns, f"{c} missing from the process_df (SingleDataProvider) path"
+    off, *_ = _provider().process_df(_df_full(40), "only_price_percent", "none", "none", 0.004, 20)
+    for c in _CAL_COLS + _REGIME_COLS:
+        assert c not in off.columns

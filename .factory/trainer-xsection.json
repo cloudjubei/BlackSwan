@@ -1,0 +1,64 @@
+{
+  "name": "blackswan-xsection",
+  "recordType": "blackswan-xsection",
+  "description": "The CROSS-SECTIONAL long/short screen (B1 §1) — a deliberately crude, deterministic ranking rule over a pre-registered multi-asset universe, run to FALSIFY the 3-4 week multi-asset env build cheaply. It asks 'will A outperform B?' rather than 'will this market go up?', because across 264 measured single-asset cells every apparent win was exposure reduction (mean beta 0.19, symmetric up/down capture), not directional skill. Long the top-k and short the bottom-k by trailing return, equal-weight, rebalanced every N bars, charged fees on turnover both ways. Benchmark for return_vs_hold_pct is the EQUAL-WEIGHT UNIVERSE BASKET, not a single asset. Produces no model; its cells are side-experiment evidence, kept in their own record type so they never mix with the single-asset RL run store.",
+  "run": ".venv/bin/python -m trainer.xsection --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "total_return_pct",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "return_vs_hold_pct",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "universe": {
+      "type": "choice",
+      "choices": ["macro", "stocks", "macro+stocks"],
+      "default": "macro+stocks",
+      "scope": "dataset",
+      "description": "The PRE-REGISTERED symbol universe ranked against itself. US-session instruments only — mixing 24/7 crypto onto a session calendar is the hardest alignment case and is deferred to §2 rather than fudged. Choosing symbols after seeing results is selection-on-test, so this list is fixed in docs/cross-sectional-plan.md."
+    },
+    "lookback": {
+      "type": "number",
+      "default": 90,
+      "description": "Trailing bars used to rank the universe (the momentum formation window)."
+    },
+    "k": {
+      "type": "number",
+      "default": 3,
+      "description": "How many symbols to hold on each side: long the top k, short the bottom k."
+    },
+    "rebalance_days": {
+      "type": "number",
+      "default": 21,
+      "description": "Bars between re-rankings. Turnover — and therefore cost — scales with this, which is the term that killed the single-asset signal edge."
+    },
+    "long_only": {
+      "type": "boolean",
+      "default": false,
+      "scope": "environment",
+      "description": "Drop the short leg (hold only the top k). The long/short book is NET FLAT by construction; long-only reintroduces the market beta the fork exists to remove, so this is the reference arm, not the thesis."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0002,
+      "scope": "environment",
+      "description": "Per-unit-of-turnover cost, charged on both entries and exits."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": ["stk-2022", "stk-2023", "stk-2024", "stk-2025", "stk-oos-2024"],
+      "default": "stk-2024",
+      "scope": "dataset",
+      "description": "Which out-of-sample span is ACCOUNTED. The ranking may look back into the train span for its formation window, but only the test window's P&L is reported."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the screen is fully deterministic, so seeds are not swept (three identical cells would fake replication)."
+    }
+  }
+}

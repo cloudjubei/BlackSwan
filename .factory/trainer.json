@@ -132,7 +132,7 @@
       "maxCiWidth": 30
     }
   },
-  "pipelineVersion": "6.0",
+  "pipelineVersion": "7.0",
   "pipelineChangelog": [
     {
       "version": "6.0",
@@ -720,6 +720,18 @@
       "default": "none",
       "scope": "dataset",
       "description": "GLOBAL context channels — series fused onto the traded asset's bar clock as RAW-LEVEL observation columns (the model derives its own features), leakage-safe (each value visible only from its release instant, forward-filled). none = price only (default, byte-identical to pre-context runs). rates = DFF/DGS10/DFII10/T10Y2Y (rates/curve/real-rate as their level) and macro_core = rates + UNRATE + CPI + payrolls: both need the FRED macro series mined to disk (macro/), a context run fails fast if absent. majors = BTC + ETH daily returns as context (price-source, works on klines already on disk — use for an ALT; degenerate if the traded asset is itself a major). market = GOLD + SPY + UUP daily returns (gold / equities / dollar — the KEYLESS macro-risk panel via yfinance, no FRED key). A context run fails fast if its series aren't mined. A context-trained checkpoint replays ONLY on assets exposing the SAME panel (part of the obs-signature). DATASET setting."
+    },
+    "calendar_features": {
+      "type": "boolean",
+      "default": false,
+      "scope": "dataset",
+      "description": "Stage-1 SEASONALITY channel: adds day-of-week / day-of-month / month / turn-of-month as observation columns, derived purely from the bar's own close timestamp (no external table, causal by construction). Independent of `projection` so the lens can be attributed on its own; off = observation byte-identical to a pre-Stage-1 run."
+    },
+    "regime": {
+      "type": "boolean",
+      "default": false,
+      "scope": "dataset",
+      "description": "Stage-1 REGIME channel: adds realized-volatility level + deviation-from-trend (volRegime10/trendSlope10, tanh-bounded) WITHOUT the rest of the curated indicator bundle, so the volatility lens can be tested in isolation. A no-op when projection=with_indicators (that bundle already emits the pair)."
     },
     "forward_horizon": {
       "type": "number",

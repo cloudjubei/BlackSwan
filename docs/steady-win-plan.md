@@ -43,7 +43,7 @@ is standing law.
 | **L5** | ✅ **FIXED** | ~~No reproducibility fingerprint~~. `summary._provenance_fingerprint` stamps `{gitCommit, gitDirty, configHash, dataVersion=hash(resolved file basenames+sizes), dataFiles, libVersions, trainFrom/To, testFrom/To}` into every run's `provenance` (best-effort, never breaks a run). Test: configHash stable across identical cfgs + changes on any lever + span recorded. |
 | **L6** | ✅ **FIXED** | ~~Same-bar fill~~. `EnvConfig.fill_mode` lever: `"close"` (DEFAULT — historical same-bar, corpus untouched) or `"next_open"` (decide at close, EXECUTE at next bar's OPEN via provider `get_open()`). Owner chose: next-open as a lever, use it for Stage 0. Tests: env selects close vs next-open + terminal fallback; Single/Multi `get_open` align with the raw open of the same bar. |
 | **L7** | ✅ **FIXED** | ~~No purge/embargo at the boundary~~. Clean-by-construction: train/test are SEPARATE, time-disjoint providers (disjointness pinned `test_walk_forward.py`), and the supervised label loop `range(0, timesteps-horizon+1)` keeps `step+horizon` INSIDE the train provider. Added a **mutation-proven** guard (`test_forward_horizon_label_stays_inside_train_provider`) pinning the tail-purge. Full purged+embargo **CV** is a prerequisite for future *in-sample CV* (not built) — deferred, not needed by the single split. |
-| **L8** | 🟡 **PARTIAL** | Feature-health **DONE**: `_dead_feature_flags` surfaces `dead_features:N` (constant/zero-variance obs entries — catches the known constant-0 `z_score`) on every run's `health`, +tests. **Deferred (risk-flagged):** root-fixing `z_score_1m/1y` changes the **obs shape** (breaks model/run compat); refactoring the blanket `fillna(0)` is **load-bearing** for the `[-1,1]` clamp — both need deliberate treatment, not a tail-of-turn rush. |
+| **L8** | ✅ **FIXED** | ~~Constant-0 `z_score` / blanket `fillna(0)`~~. Root cause was TWO defects, both fixed WITHOUT changing the obs shape (no column added/removed): (a) **dtype-fragile bar-span inference** — `pd.to_datetime` on epoch-**ms** integers read them as ns, collapsing `minutes_per_bar` to 1 so the 1d/1m/1y horizons never scaled and blanked every long window; now `_infer_minutes_per_bar` accepts datetime64 **or** epoch-ms. (b) **horizon longer than history** → all-NaN → constant fill; now `_rolling` carries `min_periods=min(window, MIN_ROLLING_OBS=20)` so the feature degrades to a real *trailing* (still backward-only) estimate. Blanket `fillna(0)` refactored to fill each family at its OWN neutral — ratios at **parity 1.0** (a 0 asserted "price is 0× its average", an extreme false reading at every warm-up bar); the trailing `fillna(0)` stays as the safety net for mean-centred families, and the `[-1,1]` clamp is untouched. Proof on REAL data (GOLD 2022 daily, 251 rows): `price_z_score_1y` / `price_to_avg_1y` / `price_to_max_1y` went constant-0 → 233/233/221 distinct values. Named indicators (Pi_Cycle 111/350/471) deliberately keep their published bar windows and stay flagged `dead_features` when a window can't support them — degrading them would fake the indicator. Tests: bar-span inference (datetime + ms + single-bar), horizon degradation, ratio warm-up parity, and a **causality guard** (corrupting the future leaves every earlier row byte-identical). `pipelineVersion` **6.0 → 7.0** (feature semantics changed ⇒ prior runs are incomparable by the engine's major-version rule). |
 
 ### Standing discipline (law, not backlog)
 
@@ -183,8 +183,68 @@ SELECTION**, not accumulation — the cheap, structurally-different channels the
    real (crypto only — neutral-fill on gold/stocks, so never read a flat volume feature as "no edge").
 4. **TDD** (mandatory): mirror `src/data/test_abstract_dataprovider.py` + `trainer/test_config_builder.py` — failing
    test first for each new lever/column.
-5. **Test "features > asset swap":** re-run Stage-0 baselines on survivors with each channel; keep only channels
-   that widen the gate margin.
+5. **Test "features > asset swap":** ~~re-run Stage-0 baselines with each channel~~ — **corrected protocol**: the
+   Stage-0 baselines (`momentum`/`ma_crossover`/`breakout`) read `env.get_price()` and NEVER read the observation
+   (`obs` is an unused parameter), so they cannot test a feature channel at all. A channel can only be measured by
+   an **obs-consuming** model; `supervised-gbm` is the cheap probe (~6 s/cell on daily), RL is the expensive one.
+   Stage 0 also produced no survivors, so the probe runs on its top-ranked universe (GOLD, SPY).
+
+### Stage 1 PRE-REGISTERED gate (written BEFORE any Stage-1 run — do not edit after results exist)
+
+- **Probe:** `supervised-gbm`, daily, `fill_mode=next_open`, `transaction_fee=0.0002`, pipelineVersion 7.0.
+- **Baseline projection is `standard` (lean), NOT `with_indicators`** — the curated bundle ALREADY emits
+  `volRegime10`/`trendSlope10` (`_add_curated_indicators`), so testing a `regime` channel on top of it would be a
+  guaranteed no-op. Starting lean and adding ONE channel at a time is what makes the attribution real (and matches
+  "feature SELECTION, not accumulation").
+- **Corpus:** arms {`baseline`(standard), `+calendar`, `+regime`, `+both`} × assets {GOLD, SPY} × windows
+  {stk-2022, stk-2023, stk-2024, stk-oos-2024} × seeds {0, 1, 2} = **96 gated cells**, plus a non-gated
+  **reference arm** `+indicators` (`projection=with_indicators`, 24 cells) to re-anchor the owner-validated
+  "more indicators did not help" finding under the post-L8 feature layer. 120 cells total.
+- **Primary metric:** `return_vs_hold_pct` per cell (the Stage-0 key field).
+- **A channel PASSES iff**, paired against the identical baseline cell (same asset × window × seed), ALL hold:
+  1. the mean paired improvement in `return_vs_hold_pct` is **> 0**, AND
+  2. it **increases** the number of cells clearing `return_vs_hold_pct > 0`, AND
+  3. condition 1 holds in **≥3 of the 4 windows** (the Stage-0 ≥3-window discipline).
+- **Decision rule:** escalate to RL only if ≥1 channel passes. If none passes, Stage 1 is a **NULL** and we take the
+  plan's honest fork (B1 cross-sectional / B2 signal model / broaden data) with four nulls behind us.
+- **Discard rule:** any run whose leakage suite is not green, or that lacks a provenance stamp, is discarded rather
+  than interpreted. This outranks the gate.
+
+### Stage 1 RESULT: NULL — neither channel passed (Aug 2026)
+
+Both levers BUILT (TDD, default-OFF so an existing observation is byte-identical): `calendar_features`
+(day-of-week / day-of-month / month / turn-of-month, derived purely from the bar's own close timestamp) and
+`regime` (realized-vol + deviation-from-trend WITHOUT the indicator bundle). 120 cells, 0 failures, ~3 min, run
+through the engine's side-experiment framework; arms persisted as `blackswan-run-experiment` records
+(`baseline 6df95f543c3a`, `calendar 333657f1b52a`, `regime fb93bb311e7f`, `both 381f045da9c3`,
+`indicators 6a44b957966a`) with the two gated channels registered as hypotheses (`10b6380703f9`, `dec5b562bf41`).
+Baseline: 6/24 cells beat buy-and-hold.
+
+| arm | mean paired Δ vs-hold | cells clearing (vs 6) | windows Δ>0 | gate |
+| --- | --- | --- | --- | --- |
+| `calendar` | −3.76 | 0 | 1/4 | **FAIL** (all three conditions) |
+| `regime` | **+1.97** | 6 (no increase) | 3/4 | **FAIL** (condition 2) |
+| `both` (ref) | −1.28 | 0 | 1/4 | — |
+| `indicators` (ref) | −0.43 | 0 | 2/4 | — |
+
+**Decision (per the pre-registration, goalposts unmoved): Stage 1 is a NULL → take the honest fork.**
+
+Notes worth carrying forward:
+- **`regime` is a genuine near-miss, not a pass.** It improved the mean (+1.97) in 3 of 4 windows, but converted
+  **zero additional cells** into buy-and-hold beaters — the mean is carried by one window (stk-oos-2024, +11.45).
+  That is precisely the "moves the average without broadening the win" pattern condition 2 exists to reject.
+- **The `indicators` reference arm re-confirms the owner-validated "more indicators did NOT help"** under the
+  post-L8 feature layer: 0/24 clearing vs the lean baseline's 6/24. The lean projection is not the bottleneck.
+- **Deviation from the plan's wording:** the FOMC-window flag was NOT built. No meeting-date table exists in the
+  repo, hand-writing ~72 historical dates from memory would inject unverified data into a measured experiment, and
+  deriving "a policy change happens tomorrow" from the on-disk `DFEDTARU` series would be **lookahead**. Shipped
+  turn-of-month instead (a documented calendar anomaly that is exactly derivable and causal). A real FOMC channel
+  needs a sourced meeting-date table first.
+- **Two silent-void bugs were found and fixed by the empirical check** (all four arms initially returned identical
+  numbers): the feature-cache key omitted the new levers (every arm reused the baseline frame), and the channels
+  were wired into `process_df_simple` only while a default daily run goes through `SingleDataProvider`/`process_df`.
+  Both are now pinned by tests — including a cache-key guard, since a lever missing from the key voids any future
+  feature experiment the same way.
 
 ## Stage 2. RL + diversified-trend on survivors (problem formulation, not more algos)
 
@@ -203,6 +263,102 @@ keepers (default `SAVE_CHECKPOINTS=False`, `config_builder.py:237`).
 5. **Read** via `diagnoseSearch`: robust-split verdict + reward-vs-scorecard alignment (BlackSwan's is near-zero →
    decide on the scorecard, never the raw reward).
 
+### Long/SHORT screen — RESULT: thesis REFUTED (do not spend RL compute here)
+
+Stage 2 named long-only as "the biggest structural gap" and shorting as the highest-EV next lever. **Screened and
+killed** (Aug 2026) — 144 deterministic cells (2 arms × 6 assets {GOLD,SPY,UUP,TLT,IEF,SHY} × 4 windows
+{stk-2022/23/24, stk-oos-2024} × 3 published rules {momentum, ma_crossover, breakout}), daily, next-open fill,
+2 bps, **pipelineVersion 7.0** (post-L8), 0 failures, ~4 min wall clock. Run through the ENGINE's side-experiment
+framework (`runSideExperimentCampaign`), persisted as two `blackswan-run-experiment` records
+(`b5379a2d63a9` long/SHORT, `29b290d04668` long-only) linked to hypothesis `346822171328` — **no RL run records
+created**, so the run store stays apples-to-apples pure.
+
+| window | L/S beats hold | long-only beats hold | mean vs-hold L/S | mean vs-hold LO | L/S beats LO |
+| --- | --- | --- | --- | --- | --- |
+| stk-2022 (bear) | 11/18 | **17/18** | **+12.56** | +9.16 | 10/18 |
+| stk-2023 (bull) | 0/18 | 5/18 | −10.53 | **−4.54** | 3/18 |
+| stk-2024 (bull) | 0/18 | 6/18 | −4.79 | **−5.59** | 9/18 |
+| stk-oos-2024 | 1/18 | 1/18 | −12.10 | **−12.81** | 8/18 |
+| **all** | **12/72** | **29/72** | −3.72 | −3.44 | **30/72** |
+
+**Verdict `disproved`** (auto, from experiment evidence alone — the hypothesis flipped `untested → disproved` with
+`transition.sources: ['experiment']` and ZERO RL runs, the A4 multi-source path proven live). Reading: shorting
+does **amplify** the bear window (mean vs-hold +12.56 vs +9.16) but with far higher variance (it beats hold in
+FEWER cells there, 11/18 vs 17/18), and it is destroyed in the bull windows (0/18 and 0/18). Net it is a coin-flip
+against its own baseline (30/72) and *worse* on both mean return (6.10 vs 6.37) and mean vs-hold (−3.72 vs −3.44).
+Enabling shorts does NOT convert the defensive-in-bear/lose-in-bull profile into an edge — it doubles down on the
+same beta-timing bet in both directions. Next lever must come from **breadth (more low-correlation markets) or
+risk-parity weighting**, not from the action space.
+
+**Registry hygiene finding (unfixed, needs a decision):** all 6 pre-existing hypotheses pin `use_indicators`, which
+is NOT a declared lever any more — the config builder resolves it to `projection: 'with_indicators'`. Those specs
+therefore match only PRE-rename runs and can never gather new evidence (the dead-pin pathology `hypothesisHygiene`
+exists to surface). Re-keying them changes their ids, so it is an owner call, not a silent migration.
+
+## Intraday OBSERVATION screen — the last untested axis
+
+Five nulls in, all at daily frequency. Frequency is the one axis that changes the physics rather than the
+costume, but it must be added the way the cost arithmetic permits, not the way it is usually imagined.
+
+**Trading faster is excluded a priori.** B2 measured the raw per-signal edge at ~0.05% against a ~0.04%
+round trip at 2 bps. Crypto costs ~10 bps, so a round trip is ~0.2% — 4× the entire measured edge. Rebalancing
+hourly would pay ~4.8%/day in fees. No model recovers that; screening it would be theatre.
+
+**So "intraday" here means OBSERVE fine, TRADE slow** — and BlackSwan already supports exactly that: `fidelity_set`
+sets what the model SEES (`fidelity_input`) independently of when it DECIDES (`fidelity_run`). `1h` and `1h+1d`
+both resolve to `fidelity_run=1d`. Holding the decision cadence at daily across every arm makes cost a constant
+and isolates the only variable worth testing: does finer observation improve the decision?
+
+**Venue: crypto, and only crypto.** It is the sole class with intraday on disk (1m for 9 symbols, 2022→2026;
+BTC from 2017) — equities/ETFs/commodities are `intervals=('1d',)` in the catalog, so equity intraday is a
+mining project with hard vendor limits, deferred until this screen justifies it. Crypto is also the only place
+`asset_volume_taker_base` is real, so the taker order-flow feature carries actual information here rather than
+the neutral fill it becomes on gold/stocks.
+
+### PRE-REGISTERED gate (written before any run — do not edit afterwards)
+
+- **Corpus:** arms {`1d` (baseline observation), `1h`, `1h+1d`} × assets {BTCUSDT, ETHUSDT, SOLUSDT} × windows
+  {alt-2024, alt-2025, alt-2026, alt-oos-2024} × seeds {0,1,2} = **108 cells**. `supervised-gbm`,
+  `projection=standard`, `transaction_fee=0.001` (real crypto cost), `fill_mode=next_open`,
+  **`fidelity_run=1d` in every arm** so cost is held constant.
+- **Primary metric:** `return_vs_hold_pct` (vs buy-and-hold that asset).
+- **An arm PASSES iff**, paired against the identical `1d` cell (same asset × window × seed), ALL hold:
+  1. mean paired improvement in `return_vs_hold_pct` > 0; 2. it increases the count of cells clearing
+  `return_vs_hold_pct > 0`; 3. condition 1 holds in **≥3 of the 4 windows**.
+- **Decision:** if an arm passes, escalate (RL at that fidelity, then consider mining equity intraday). If none
+  passes, finer observation does not help either, and with six nulls the honest campaign conclusion is that this
+  formulation family has no exploitable edge net of cost — report that rather than trying a seventh costume.
+
+### RESULT: NULL — neither arm passed (Aug 2026)
+
+**81 of 108 cells completed.** The 9 `alt-2026` cells in each arm FAILED, correctly: the L4 guard refused the
+window because only 6 of its 12 test months are mined (2026 is half elapsed) and running it would have silently
+truncated the span. That is the guard doing its job — but the corpus should have been checked for data
+completeness at pre-registration time, not discovered at run time. **Process lesson: verify the requested
+windows are fully mined BEFORE writing the corpus into a gate.** The window was NOT substituted after the fact —
+swapping in a replacement once results are visible is selection-on-test.
+
+Experiments `534dd1e8e108` (`1d` baseline), `f32dfefb7e4a` (`1h`), `9cc2b2513226` (`1h+1d`), hypothesis
+`3be0a28e488b`. Baseline: 12/27 cells clearing vs-hold, mean −45.46 (10 bps costs bleed everything).
+
+| arm | mean paired Δ | cells clearing (base 12) | windows Δ>0 | gate |
+| --- | --- | --- | --- | --- |
+| `1h` | **+15.73** | **9** | 2/4 (2/3 runnable) | **FAIL** (conditions 2, 3) |
+| `1h+1d` | **+12.71** | **3** | 2/4 (2/3 runnable) | **FAIL** (conditions 2, 3) |
+
+**The verdict does not hinge on the missing window:** condition 2 fails decisively (both arms clear FEWER cells
+than the daily baseline), and on the three runnable windows condition 3 is 2/3 — still short. Both arms lift the
+MEAN while clearing fewer cells, and the lift is carried by one window (alt-oos-2024: +45.54 / +38.61) — the
+identical "moves the average without broadening the win" signature the Stage-1 `regime` channel showed. Finer
+observation buys variance, not selectivity.
+
+**This is the sixth null, and the pre-registered decision rule applies: report the conclusion rather than trying
+a seventh costume.** Across single-asset direction, long-only breadth, long/short, features, cross-sectional and
+now intraday observation, the measured finding is consistent — in this universe, at costs that are real, apparent
+wins are exposure, not skill. Remaining untried axes are genuine DATA projects (equity intraday, which the
+catalog declares unavailable — `intervals=('1d',)` — and needs mining under hard vendor limits; or new asset
+classes), not further modelling on what is already on disk.
+
 ## Stage 3. Campaign to a champion (steady-win declaration)
 
 Escalate survivors: multi-seed, ALL walk-forward windows, cross-asset generalization (checkpoint-replay on held-out
@@ -213,6 +369,41 @@ condition the human approves against.
 
 **Honest fork:** if no config clears it, the finding is "no robust single-asset directional edge in this universe"
 → pivot to cross-sectional (B1), the signal model (B2), or broaden data (rates/commodities). A null is a result.
+
+### The fork, DECIDED on evidence already paid for (Aug 2026)
+
+Four nulls in (Stage 0 single-asset, Stage 2 long-only breadth, long/SHORT, Stage 1 features). Rather than guess,
+the 264 side-experiment cells already persisted were mined for the two lenses the summary emits — no new compute.
+
+**B2 (position-blind signal model) — DO NOT BUILD.** The plan's own precondition is "build only if the
+forward-horizon signal lens shows a generalisable per-signal edge". Measured over the 203 cells with >1% signal
+coverage: mean `signal_expectancy` **+0.050%** per signal at a **52.2%** hit rate (supervised-gbm +0.069% / 52.4%,
+ma_crossover +0.084% / 54.5%). A raw edge exists but it is ~0.05% against a ~0.04% round-trip cost at 2 bps — i.e.
+inside the cost floor, which is the already-`proven` hypothesis `e4ed1bb153b6` ("transaction costs erase the
+supervised-ML directional edge OOS"), now quantified. Not a project-worthy edge.
+
+**B3 (broaden data) — not the bottleneck.** It adds markets to the same formulation that shows no selectivity.
+
+**The measured root cause (this is the finding, not an opinion).** Across all 264 cells the beta lens says every
+apparent win is **exposure reduction, not skill**:
+
+| cohort | n | mean beta | up_capture | down_capture |
+| --- | --- | --- | --- | --- |
+| beats buy-and-hold | 53 | **0.19** | 0.20 | 0.19 |
+| does not | 211 | 0.52 | 0.51 | 0.55 |
+
+The winners win by being barely invested, and their capture is **symmetric** (0.20 up vs 0.19 down) — a genuine
+directional edge would capture materially more upside than downside. Only 103/264 cells capture more up than down,
+and the best asymmetry gap in the entire corpus is a trivial 0.10. There is **no directional selectivity anywhere
+in this universe**; "defensive-in-bear/lose-in-bull" was beta timing all along, now measured rather than inferred.
+
+**→ B1 (cross-sectional long/short) is the fork to take — planned in `docs/cross-sectional-plan.md`**, whose §1 is
+a 1–2 day deterministic screen with its own pre-registered gate that can kill the 3–4 week build before it starts. It is the only option that changes the QUESTION from
+"will this market go up?" (answered: no exploitable selectivity, 264 cells) to "will A outperform B?" — a relative
+bet that is beta-neutral by construction, attacking the exact failure mode measured above. It needs no new mining
+to start: `levers.asset` already carries 25 symbols (crypto + 10 stocks + GOLD/SPY/UUP/TLT/IEF/SHY). Caveat to
+carry in: cross-sectional edges are ALSO cost-sensitive, so the pre-registered-gate discipline applies from day one,
+and the `signal_expectancy`-vs-cost arithmetic above is the first thing to check on any candidate.
 
 ## Side-track (continuous) — improve BlackSwan + the tooling as we go
 

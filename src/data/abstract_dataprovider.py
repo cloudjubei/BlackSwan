@@ -13,6 +13,35 @@ from src.data import indicators as _indicators
 from src.data import feature_cache
 from trainer.context import context_columns, load_series_observations, resolve_context
 
+# Bars needed before a time-scaled rolling horizon emits a value. A horizon longer than the available
+# history (a 1-year window on a 1-year test split) would otherwise be all-NaN -> a constant fill -> a DEAD
+# feature that occupies observation space and skews every feature-importance read. Degrading to a shorter
+# trailing sample keeps the feature real and stays backward-looking (no lookahead).
+MIN_ROLLING_OBS = 20
+
+# The neutral value of a RATIO feature is parity (1.0 = at the reference), not 0.0 — a zero would assert
+# "price is 0x its average", an extreme false reading injected at every warm-up bar.
+RATIO_FEATURE_NEUTRAL = 1.0
+
+
+def _infer_minutes_per_bar(closes):
+    """Minutes between consecutive bar closes. Accepts datetime64 closes (what `read_json` yields) OR
+    epoch-millisecond integers (what an aggregated/resampled frame carries) — reading ms as ns collapses
+    the inference to 1 minute, which silently unscales every 1d/1m/1y horizon into a dead column."""
+    series = pd.Series(closes)
+    if not pd.api.types.is_datetime64_any_dtype(series):
+        series = pd.to_datetime(pd.to_numeric(series, errors="coerce"), unit="ms", errors="coerce")
+    span_ms = (series.astype("int64") // 10**6).diff().median()
+    if not pd.notna(span_ms) or span_ms <= 0:
+        return 1
+    return max(1, int(round(span_ms / 60000.0)))
+
+
+def _rolling(series, window):
+    """A trailing window that degrades to a shorter sample rather than blanking the whole column."""
+    return series.rolling(window, min_periods=min(window, MIN_ROLLING_OBS))
+
+
 class AbstractDataProvider(ABC):
     def __init__(self, config: DataConfig):
         super().__init__()
@@ -164,16 +193,77 @@ class AbstractDataProvider(ABC):
         result_df["trendSlope10"] = np.tanh((close / close.rolling(10).mean() - 1.0) * 20.0)
         return result_df
 
-    def get_data(self, paths, type, timestamp, indicator, buyreward_percent, buyreward_maxwait):
+    def _add_calendar_channel(self, result_df):
+        """Stage-1 SEASONALITY channel: day-of-week / day-of-month / month / turn-of-month, derived purely
+        from the bar's own close timestamp. Nothing is read ahead of the bar and no external table is
+        involved, so the channel is causal by construction. Scaled to [0,1] to sit inside the declared
+        Box(-1,1). Off by default — `calendar_features` is the isolating lever."""
+        if not getattr(self.config, "calendar_features", False):
+            return result_df
+        if 'timestamp_close' not in result_df.columns:
+            return result_df
+        closes = pd.to_datetime(result_df['timestamp_close'], unit='ms', errors='coerce') \
+            if not pd.api.types.is_datetime64_any_dtype(result_df['timestamp_close']) \
+            else pd.to_datetime(result_df['timestamp_close'])
+        days_in = closes.dt.days_in_month
+        result_df['cal_day_of_week'] = closes.dt.dayofweek / 6.0
+        result_df['cal_day_of_month'] = (closes.dt.day - 1) / (days_in - 1).clip(lower=1)
+        result_df['cal_month'] = (closes.dt.month - 1) / 11.0
+        # Turn-of-month: the last 2 and first 3 calendar days, the window the documented turn-of-month
+        # effect lives in. A pure calendar predicate — knowable in advance, never a peek at future prices.
+        result_df['cal_turn_of_month'] = (
+            (closes.dt.day <= 3) | (closes.dt.day >= days_in - 1)
+        ).astype(float)
+        return result_df
+
+    def _add_regime_channel(self, result_df):
+        """Stage-1 REGIME channel: realized-volatility level + deviation-from-trend, tanh-bounded — the same
+        pair the curated bundle emits, available WITHOUT the rest of it so the lens can be attributed on its
+        own. A no-op when the bundle already added them (never duplicated / overwritten)."""
+        if not getattr(self.config, "regime", False):
+            return result_df
+        if 'volRegime10' in result_df.columns and 'trendSlope10' in result_df.columns:
+            return result_df
+        if 'price' not in result_df.columns:
+            return result_df
+        close = pd.to_numeric(result_df['price'], errors='coerce')
+        returns = close.pct_change()
+        result_df['volRegime10'] = np.tanh(returns.rolling(10).std() * 20.0)
+        result_df['trendSlope10'] = np.tanh((close / close.rolling(10).mean() - 1.0) * 20.0)
+        return result_df
+
+    def _feature_cache_params(self, fn, timestamp, columns=None, **extra):
+        """The cache key for a built feature frame. EVERY config knob that SHAPES the frame must appear
+        here — a lever missing from the key makes each arm of a feature experiment silently reuse the
+        baseline frame, voiding the comparison. Off-by-default channels are omitted when off, so
+        pre-existing cache entries for default runs stay valid."""
         params = {
-            "fn": "get_data", "type": type, "timestamp": timestamp, "indicator": indicator,
-            "buyreward_percent": buyreward_percent, "buyreward_maxwait": buyreward_maxwait,
+            "fn": fn,
+            "timestamp": timestamp,
             "use_indicators": getattr(self.config, "use_indicators", False),
             "obs_squash": getattr(self.config, "obs_squash", "none"),
+            **extra,
         }
-        _ctx = self._context_cache_key()
-        if _ctx:
-            params["context"] = _ctx
+        if columns is not None:
+            params["columns"] = list(columns)
+        ctx = self._context_cache_key()
+        if ctx:
+            params["context"] = ctx
+        if getattr(self.config, "calendar_features", False):
+            params["calendar_features"] = True
+        if getattr(self.config, "regime", False):
+            params["regime"] = True
+        return params
+
+    def get_data(self, paths, type, timestamp, indicator, buyreward_percent, buyreward_maxwait):
+        params = self._feature_cache_params(
+            "get_data",
+            timestamp,
+            type=type,
+            indicator=indicator,
+            buyreward_percent=buyreward_percent,
+            buyreward_maxwait=buyreward_maxwait,
+        )
 
         def _build():
             dfs = [pd.read_json(path) for path in paths]
@@ -194,6 +284,10 @@ class AbstractDataProvider(ABC):
         result_df['taker_buy_ratio'] = (pd.to_numeric(result_df['asset_volume_taker_base'], errors='coerce') / pd.to_numeric(result_df['volume'], errors='coerce')).clip(lower=0, upper=1)
 
         result_df = self._add_curated_indicators(result_df)
+        # The Stage-1 channels must be emitted on BOTH build paths — a default daily run goes through
+        # SingleDataProvider/process_df, a stacked/resampled one through process_df_simple.
+        result_df = self._add_regime_channel(result_df)
+        result_df = self._add_calendar_channel(result_df)
 
         if type != "standard" and type != "solo_price" and type != "only_price":
             result_df['price_percent'] = pd.to_numeric(result_df['price'], errors='coerce').astype(float).pct_change()
@@ -353,14 +447,7 @@ class AbstractDataProvider(ABC):
         # asset_volume_taker_base carried through for the QW2 taker_buy_ratio feature. Indicators are
         # COMPUTED from this OHLCV at runtime (process_df_simple -> _add_curated_indicators), not read.
 
-        params = {
-            "fn": "get_raw_data", "timestamp": timestamp, "columns": list(columns),
-            "use_indicators": getattr(self.config, "use_indicators", False),
-            "obs_squash": getattr(self.config, "obs_squash", "none"),
-        }
-        _ctx = self._context_cache_key()
-        if _ctx:
-            params["context"] = _ctx
+        params = self._feature_cache_params("get_raw_data", timestamp, columns=columns)
 
         def _build():
             frames = [pd.read_json(path) for path in paths]
@@ -377,29 +464,29 @@ class AbstractDataProvider(ABC):
         timestamps = ((pd.to_datetime(result_df["timestamp_close"]).astype('int64') // 10**6) + 1).to_numpy()
 
         result_df = self._add_curated_indicators(result_df)
+        result_df = self._add_regime_channel(result_df)
+        result_df = self._add_calendar_channel(result_df)
 
         # The _1d/_1m/_1y windows below are fixed time horizons (1 day / 1 month / 1 year), but
         # the bars reaching this method may be 1m, 1h or 1d (single-layer or process_fidelity
         # aggregates). Infer minutes-per-bar from the spacing between consecutive bar closes and
         # scale the windows so the horizons hold at any fidelity. Without this, e.g. rolling(1440)
         # on 1h bars spans 60 days, leaving every row NaN -> fillna(0) -> a signal-less zero column.
-        close_ms = pd.to_datetime(result_df['timestamp_close']).astype('int64') // 10**6
-        bar_span_ms = close_ms.diff().median()
-        minutes_per_bar = max(1, int(round(bar_span_ms / 60000.0))) if pd.notna(bar_span_ms) else 1
+        minutes_per_bar = _infer_minutes_per_bar(result_df['timestamp_close'])
         w_1d = max(2, round(1440 / minutes_per_bar))
         w_1m = max(2, round(43200 / minutes_per_bar))
         w_1y = max(2, round(525600 / minutes_per_bar))
 
-        result_df['price_z_score_1d'] = (result_df['price'] - result_df['price'].rolling(w_1d).mean()) / result_df['price'].rolling(w_1d).std()
-        result_df['price_z_score_1m'] = (result_df['price'] - result_df['price'].rolling(w_1m).mean()) / result_df['price'].rolling(w_1m).std()
-        result_df['price_z_score_1y'] = (result_df['price'] - result_df['price'].rolling(w_1y).mean()) / result_df['price'].rolling(w_1y).std()
+        result_df['price_z_score_1d'] = (result_df['price'] - _rolling(result_df['price'], w_1d).mean()) / _rolling(result_df['price'], w_1d).std()
+        result_df['price_z_score_1m'] = (result_df['price'] - _rolling(result_df['price'], w_1m).mean()) / _rolling(result_df['price'], w_1m).std()
+        result_df['price_z_score_1y'] = (result_df['price'] - _rolling(result_df['price'], w_1y).mean()) / _rolling(result_df['price'], w_1y).std()
 
-        result_df['price_to_max_1d'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1d).max(), errors='coerce').astype(float)
-        result_df['price_to_max_1m'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1m).max(), errors='coerce').astype(float)
-        result_df['price_to_max_1y'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1y).max(), errors='coerce').astype(float)
-        result_df['price_to_avg_1d'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1d).mean(), errors='coerce').astype(float)
-        result_df['price_to_avg_1m'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1m).mean(), errors='coerce').astype(float)
-        result_df['price_to_avg_1y'] = pd.to_numeric(result_df['price'] / result_df['price'].rolling(window=w_1y).mean(), errors='coerce').astype(float)
+        result_df['price_to_max_1d'] = pd.to_numeric(result_df['price'] / _rolling(result_df['price'], w_1d).max(), errors='coerce').astype(float)
+        result_df['price_to_max_1m'] = pd.to_numeric(result_df['price'] / _rolling(result_df['price'], w_1m).max(), errors='coerce').astype(float)
+        result_df['price_to_max_1y'] = pd.to_numeric(result_df['price'] / _rolling(result_df['price'], w_1y).max(), errors='coerce').astype(float)
+        result_df['price_to_avg_1d'] = pd.to_numeric(result_df['price'] / _rolling(result_df['price'], w_1d).mean(), errors='coerce').astype(float)
+        result_df['price_to_avg_1m'] = pd.to_numeric(result_df['price'] / _rolling(result_df['price'], w_1m).mean(), errors='coerce').astype(float)
+        result_df['price_to_avg_1y'] = pd.to_numeric(result_df['price'] / _rolling(result_df['price'], w_1y).mean(), errors='coerce').astype(float)
 
         # adding data:
         # Pi_Cycle_Top_Signal  
@@ -414,14 +501,14 @@ class AbstractDataProvider(ABC):
         result_df['SMA350'] = result_df['price'].rolling(window=350).mean()
         result_df['SMA350_x2'] = result_df['SMA350'] * 2
         result_df['Pi_Cycle_Top'] = result_df['SMA111'] > result_df['SMA350_x2']
-        result_df['Pi_Cycle_Top_Ratio'] = (result_df['SMA111'] / result_df['SMA350_x2']).astype(float).fillna(0)
+        result_df['Pi_Cycle_Top_Ratio'] = (result_df['SMA111'] / result_df['SMA350_x2']).astype(float).fillna(RATIO_FEATURE_NEUTRAL)
         result_df['Pi_Cycle_Top_Signal'] = (result_df['Pi_Cycle_Top'] & ~result_df['Pi_Cycle_Top'].shift(1).fillna(False)).astype(int)
 
         result_df['SMA471'] = result_df['price'].rolling(window=471).mean()
         result_df['EMA150'] = result_df['price'].ewm(span=150, adjust=False).mean()
         result_df['SMA471_/2'] = result_df['SMA471'] / 2
         result_df['Pi_Cycle_Bottom'] = result_df['EMA150'] < result_df['SMA471_/2']
-        result_df['Pi_Cycle_Bottom_Ratio'] = (result_df['SMA471_/2'] / result_df['EMA150']).astype(float).fillna(0)
+        result_df['Pi_Cycle_Bottom_Ratio'] = (result_df['SMA471_/2'] / result_df['EMA150']).astype(float).fillna(RATIO_FEATURE_NEUTRAL)
         result_df['Pi_Cycle_Bottom_Signal'] = (result_df['Pi_Cycle_Bottom'] & ~result_df['Pi_Cycle_Bottom'].shift(1).fillna(False)).astype(int)
 
         result_df['total_volume'] = result_df['volume'] + result_df['asset_volume_quote']
@@ -435,9 +522,9 @@ class AbstractDataProvider(ABC):
 
 
         result_df['total_volume_percent'] = pd.to_numeric(result_df['total_volume'], errors='coerce').astype(float).pct_change()
-        result_df['total_volume_to_max_1d'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=w_1d).max(), errors='coerce').astype(float)
-        result_df['total_volume_to_max_1m'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=w_1m).max(), errors='coerce').astype(float)
-        result_df['total_volume_to_max_1y'] = pd.to_numeric(result_df['total_volume'] / result_df['total_volume'].rolling(window=w_1y).max(), errors='coerce').astype(float)
+        result_df['total_volume_to_max_1d'] = pd.to_numeric(result_df['total_volume'] / _rolling(result_df['total_volume'], w_1d).max(), errors='coerce').astype(float)
+        result_df['total_volume_to_max_1m'] = pd.to_numeric(result_df['total_volume'] / _rolling(result_df['total_volume'], w_1m).max(), errors='coerce').astype(float)
+        result_df['total_volume_to_max_1y'] = pd.to_numeric(result_df['total_volume'] / _rolling(result_df['total_volume'], w_1y).max(), errors='coerce').astype(float)
 
         result_df['price_percent'] = pd.to_numeric(result_df['price'], errors='coerce').astype(float).pct_change()
         result_df['price_high_percent'] = pd.to_numeric(result_df['price_high']/result_df['price'] - 1, errors='coerce').astype(float)
@@ -474,7 +561,14 @@ class AbstractDataProvider(ABC):
 
         result_df = self._add_context_columns(result_df, timestamps)
 
-        result_df = result_df.drop(columns=columns_to_drop).fillna(0).replace([np.inf, -np.inf], 0).reset_index(drop=True)
+        result_df = result_df.drop(columns=columns_to_drop)
+        # Fill each family at its OWN neutral before the blanket zero: a ratio's neutral is parity, so a
+        # warm-up bar reads "at the reference" instead of the extreme "zero times the reference". The
+        # trailing fillna(0) stays as the safety net for the mean-centred families (z-scores, pct changes).
+        ratio_cols = [c for c in result_df.columns if c.endswith(('_to_max_1d', '_to_max_1m', '_to_max_1y', '_to_avg_1d', '_to_avg_1m', '_to_avg_1y'))]
+        if ratio_cols:
+            result_df[ratio_cols] = result_df[ratio_cols].replace([np.inf, -np.inf], np.nan).fillna(RATIO_FEATURE_NEUTRAL)
+        result_df = result_df.fillna(0).replace([np.inf, -np.inf], 0).reset_index(drop=True)
         result_df = self._squash_observation_features(result_df)
 
         return result_df, prices, timestamps
