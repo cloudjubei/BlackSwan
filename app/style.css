@@ -1,0 +1,4733 @@
+:root {
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --surface-subtle: #f8fafc;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --ok: #16a34a;
+  --ok-soft: rgba(22, 163, 74, 0.12);
+  --bad: #dc2626;
+  --bad-soft: rgba(220, 38, 38, 0.12);
+  --warn: #d97706;
+  --warn-soft: rgba(217, 119, 6, 0.14);
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --surface: #111a2c;
+    --surface-subtle: #0e1626;
+    --text: #e2e8f0;
+    --muted: #8ea0b8;
+    --border: #24324a;
+    --accent: #3b82f6;
+    --accent-soft: rgba(59, 130, 246, 0.16);
+    --ok: #22c55e;
+    --ok-soft: rgba(34, 197, 94, 0.16);
+    --bad: #ef4444;
+    --bad-soft: rgba(239, 68, 68, 0.16);
+    --warn: #f59e0b;
+    --warn-soft: rgba(245, 158, 11, 0.18);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  /* App-shell: the body is exactly the viewport and never scrolls; only
+     `.app-scroll` scrolls, so overscroll bounces the content, not the header. */
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+/* ---- Buttons --------------------------------------------------------------- */
+/* One button language across the viewer, mirroring thefactory-ui's `.btn` system:
+   PRIMARY is a surface fill with a 2px accent border (not a solid accent block),
+   `.ghost-btn` is the neutral-bordered secondary, `.danger-btn` is the red-outline
+   destructive. Per-surface rules only add LAYOUT (flex/gap), never re-skin. */
+button,
+.ghost-btn,
+.danger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 2px solid var(--accent);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+button:hover {
+  background: var(--accent-soft);
+}
+button:active,
+.ghost-btn:active,
+.danger-btn:active {
+  transform: translateY(0.5px);
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+button:focus-visible,
+.ghost-btn:focus-visible,
+.danger-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.ghost-btn {
+  border-color: var(--border);
+}
+.ghost-btn:hover {
+  background: var(--surface-subtle);
+}
+.danger-btn {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.danger-btn:hover,
+.danger-btn.is-armed {
+  background: var(--bad);
+  color: #fff;
+}
+
+/* ---- Views (home hub ↔ project dashboard) ---------------------------------- */
+.view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.view[hidden] {
+  display: none;
+}
+
+.topbar {
+  flex: 0 0 auto;
+  z-index: 5;
+  background: var(--surface);
+}
+/* The right gutter on these non-scrolling top-row elements reserves room for
+   Overseer's activity-model chip, floated over the top-right of this surface,
+   so their content never sits under it. (The scrolling `.tabbar` uses an
+   `::after` spacer instead — see below.) */
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 160px 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.home-header h1 {
+  margin: 0;
+  font-size: 18px;
+}
+.header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+.header-actions .ghost-btn {
+  font-size: 13px;
+}
+.dash-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 160px 4px 16px;
+}
+.back-btn {
+  appearance: none;
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.back-btn:hover {
+  background: var(--accent-soft);
+}
+.dash-project-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+/* Global Refresh control: pushed to the right edge of the content area, so it sits just left of
+   Overseer's floated activity-model chip (the 160px gutter reserves that chip's space). */
+.dash-refresh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.dash-refresh .ghost-btn {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.dash-refresh-note {
+  font-size: 12px;
+  color: var(--muted, #888);
+  white-space: nowrap;
+}
+.dash-refresh-note.is-stale {
+  color: var(--warn, #d97706);
+  font-weight: 600;
+}
+.app-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Pill tabs ------------------------------------------------------------ */
+/* The `::after` spacer reserves room at the scroll end for Overseer's
+   activity-model chip (floated over the top-right of this surface); a real flex
+   item is reliable where some WebKit/WebView engines drop trailing padding. */
+.tabbar {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.tabbar::after {
+  content: '';
+  flex: 0 0 160px;
+}
+.tab-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+/* Per-tab glyph, inheriting the tab's colour; spaced from the label without
+   widening tabs that have no live spinner. */
+.tab-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+}
+.tab-icon svg {
+  display: block;
+}
+.tab-btn:hover {
+  background: var(--accent-soft);
+}
+.tab-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+/* A spinner slot on the active tab while the open project has a live activity;
+   empty (zero-width) otherwise so it never widens an inactive tab. */
+.tab-live {
+  display: inline-flex;
+  align-items: center;
+}
+.tab-live:not(:empty) {
+  margin-left: 6px;
+}
+
+.tab-main {
+  /* Full-width on every tab — use all available width rather than a centred 1100px column. */
+  flex: 1;
+  width: 100%;
+  padding: 20px 16px;
+}
+.tab-panel[hidden] {
+  display: none;
+}
+
+/* ---- Runs master-detail ----------------------------------------------------
+   The Runs tab uses the FULL width (no centred gutters) and a left LIST pane +
+   right DETAIL pane that each scroll in their own view, so the long run list
+   never scrolls the whole screen. When no run is selected the list spans the
+   full width; selecting one splits the panes. Narrow screens stack them. */
+.tab-main.is-fullwidth {
+  /* Full-bleed + a flex-height context so #tab-runs can fill the viewport and the
+     panes (not the page) own their scroll. Padding moves onto #tab-runs. */
+  max-width: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.tab-main.is-fullwidth > #tab-runs:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  flex: 1;
+  padding: 16px;
+}
+/* Every OTHER dashboard tab (Runs + xAI own their bespoke layouts) fills the viewport too, so its card
+   header stays put and only the marked `.tab-scroll` body scrolls — the shared sticky-header pattern. */
+.tab-main.is-fullwidth > .tab-panel:not([hidden]):not(#tab-runs):not(#tab-xai) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  flex: 1;
+  padding: 16px;
+}
+.tab-main.is-fullwidth > .tab-panel:not([hidden]):not(#tab-runs):not(#tab-xai) > .card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+/* The scrolling region: fills the leftover height and owns the scroll; the header / status / inline form
+   above it stay fixed (flex items keep their content height). Covers card tabs + the card-less Speed tab. */
+.tab-main.is-fullwidth > .tab-panel:not([hidden]) > .card > .tab-scroll,
+.tab-main.is-fullwidth > .tab-panel:not([hidden]) > .tab-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+/* In-body control rows (search / sort / filter) stick to the top of their scroll body so they never scroll
+   away — the card header handles the title + add/action buttons, these handle filtering. Scoped per body so
+   Models (which has BOTH a stats note and a filter row) sticks only the filter row and avoids overlap. */
+#hypotheses-body.tab-scroll > .model-stats-controls,
+#papers-body.tab-scroll > .paper-filter,
+#models-body.tab-scroll > .paper-filter {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+  padding-top: 2px;
+  padding-bottom: 6px;
+}
+.runs-md {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+.runs-md.has-detail {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+}
+.runs-md:not(.has-detail) .runs-md__detail {
+  display: none;
+}
+.runs-md__list,
+.runs-md__detail {
+  min-width: 0;
+  min-height: 0;
+}
+/* LIST pane: the card-head + toolbar stay put; only the table body scrolls (its <thead>
+   sticks). So filters/headers never scroll out of view. */
+.runs-md__list {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.runs-md__list > .card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+.runs-md__list > .card > .card-head,
+.runs-md__list > .card > #runs-sparkline,
+.runs-md__list > .card > #judge-status {
+  flex: 0 0 auto;
+}
+#runs-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#runs-body > .runs-toolbar,
+#runs-body > .setup-note-editor,
+#runs-body > .runs-pager,
+#runs-body > .runs-legend {
+  flex: 0 0 auto;
+}
+.runs-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 0 2px;
+}
+.runs-pager-info {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.runs-pager .ghost-btn {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+#runs-body > .table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+/* DETAIL pane: the visible detail/compare card fills the pane with a FIXED head + a scrolling inner
+   body, so the head stays put and only the content scrolls — no sticky overlap biting the card's
+   rounded top/bottom edges as it did before. */
+.runs-md__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+.runs-md__detail > .card:not([hidden]) {
+  margin-bottom: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.runs-md__detail > .card > .card-head {
+  flex: 0 0 auto;
+  padding-bottom: 10px;
+  background: var(--surface);
+}
+.runs-md__detail > .card > .card-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 900px) {
+  .runs-md.has-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .runs-md__list {
+    overflow: visible;
+  }
+  .runs-md__list > .card,
+  #runs-body,
+  #runs-body > .table-wrap {
+    overflow: visible;
+    min-height: 0;
+  }
+  .runs-md__detail,
+  .runs-md__detail > .card,
+  .runs-md__detail > .card > .card-scroll {
+    overflow: visible;
+    min-height: 0;
+  }
+}
+
+.app-banner {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+}
+.app-banner[hidden] {
+  display: none;
+}
+
+/* ---- Cards ----------------------------------------------------------------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+.card-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.card-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.head-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.card-sub {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.card h3 {
+  margin: 18px 0 6px;
+  font-size: 14px;
+}
+.empty-hint {
+  margin-top: 12px;
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ---- Sparkline -------------------------------------------------------------- */
+.sparkline-wrap {
+  margin: 12px 0 4px;
+  color: var(--accent);
+}
+.sparkline-wrap[hidden] {
+  display: none;
+}
+.sparkline {
+  display: block;
+  width: 100%;
+  height: 72px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.sparkline-range {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Runs table -------------------------------------------------------------- */
+.table-wrap {
+  margin-top: 12px;
+  overflow: auto;
+}
+.runs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.runs-table th,
+.runs-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.runs-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+/* Column headers stay visible while the rows scroll under them. */
+.runs-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+}
+.runs-table th.num,
+.runs-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.runs-table tbody tr {
+  cursor: pointer;
+}
+.runs-table tbody tr:hover {
+  background: var(--accent-soft);
+}
+.runs-table tbody tr.is-selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.runs-table .config-cell {
+  color: var(--muted);
+}
+.runs-table .when-cell {
+  color: var(--muted);
+  font-size: 12px;
+}
+.runs-table .ran-by {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.failure-detail {
+  margin: 8px 0 4px;
+}
+.failure-detail .log-tail {
+  margin-top: 6px;
+}
+.failure-detail .log-tail summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+.log-tail-pre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  max-height: 280px;
+  overflow: auto;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.runs-table .seed-unstable {
+  color: #d97706;
+  font-weight: 700;
+}
+.runs-table tbody tr.is-unstable {
+  box-shadow: inset 3px 0 0 #d97706;
+}
+.runs-table td.ledger-note {
+  white-space: normal;
+  max-width: 240px;
+  color: var(--text);
+  font-size: 12px;
+}
+.runs-table td.ledger-note.is-empty {
+  color: var(--accent);
+}
+.setup-note-editor {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 9px;
+  background: var(--accent-soft);
+}
+.setup-note-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.setup-note-text {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+.setup-note-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.runs-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 9px;
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+.runs-filter-bar button {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.runs-filter-bar button:hover {
+  background: none;
+}
+
+/* ---- Badges / pills ------------------------------------------------------------ */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge.is-ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+.badge.is-bad {
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+.badge.is-warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.badge.is-info {
+  color: var(--accent, #4a90d9);
+  background: var(--accent-soft, rgba(74, 144, 217, 0.15));
+}
+/* Run-detail: one block per named scorecard; the active card gets a green accent rail. */
+.scorecard-card {
+  margin: 0 0 14px;
+  padding-left: 10px;
+  border-left: 3px solid var(--border, #dddddd);
+}
+.scorecard-card.is-active {
+  border-left-color: var(--ok, #2e7d32);
+}
+/* Scorecards tab: list items + the gate/fitness editor rows. */
+.scorecard-list-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border, #dddddd);
+}
+.scorecard-list-item.is-active {
+  border-left: 3px solid var(--ok, #2e7d32);
+  padding-left: 8px;
+}
+.scorecard-editor .sc-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+.scorecard-editor .sc-name-label {
+  display: block;
+  margin: 4px 0 10px;
+}
+.scorecard-editor input[type='number'] {
+  width: 8em;
+}
+.scorecard-editor .sc-metric-input {
+  min-width: 11em;
+}
+.xai-noeffect-note {
+  margin: 0 0 8px;
+  color: var(--warn);
+}
+.badge.is-rejected {
+  color: var(--muted);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  text-decoration: line-through;
+}
+.score-chip {
+  min-width: 30px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.eval-chip {
+  min-width: 30px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.judge-none {
+  color: var(--muted);
+}
+/* Status DOT in the Run column (replaces the old text Status column). */
+.run-status-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  background: var(--muted);
+}
+.run-status-dot.is-ok {
+  background: var(--ok);
+}
+.run-status-dot.is-warn {
+  background: var(--warn);
+}
+.run-status-dot.is-bad {
+  background: var(--bad);
+}
+.run-status-dot.is-unknown {
+  background: var(--muted);
+  opacity: 0.5;
+}
+.badges-row {
+  margin: 6px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Carfinder-style live pill: spinner + status text. */
+.run-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.run-badge.is-running {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.run-badge.is-done {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+.run-badge.is-failed {
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+.run-badge.is-queued {
+  color: var(--muted);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+}
+.run-badge.is-shaky {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+/* The clickable device chip (measured CPU/MPS winner, or a "check device" trigger) — a button styled as a
+   badge: reset native chrome, show it's interactive. The measured state has no status class, so give it a
+   neutral surface; the unmeasured trigger carries .is-queued for its own look. */
+button.run-badge.model-device-chip {
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--text);
+}
+button.run-badge.model-device-chip:hover {
+  filter: brightness(1.15);
+  border-color: var(--accent);
+}
+.runs-live {
+  margin-top: 6px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.status-pill.is-running {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.status-pill.is-ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+.status-pill.is-bad {
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+.status-pill.is-warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+/* ---- Charts (hand-rolled SVG) ----------------------------------------------- */
+.chart-section {
+  margin-top: 18px;
+}
+.chart-section h3 {
+  margin: 0 0 8px;
+}
+.chart-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.chart-section-head h3 {
+  margin: 0;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.chart-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.chart-wrap {
+  padding: 8px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+/* 2-D matrix attribution (attention heatmap): fixed-cell grid, so don't stretch it to 100% like line/scatter
+   charts — let a wide grid scroll inside its wrapper instead of distorting square cells. Cell fills are inline
+   (from the pure Heatmap model); the thin stroke just separates cells and adapts to the theme surface. */
+.heatmap {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
+.heatmap-wrap {
+  overflow-x: auto;
+}
+.heatmap rect {
+  stroke: var(--surface-subtle);
+  stroke-width: 0.5;
+  shape-rendering: crispEdges;
+}
+.heatmap-legend {
+  display: block;
+  margin: 6px 0 0;
+}
+.heatmap-legend rect {
+  shape-rendering: crispEdges;
+}
+.chart-axis {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+.chart-tick {
+  fill: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.chart-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.chart-point {
+  fill: var(--accent);
+  fill-opacity: 0.85;
+}
+.chart-point:hover {
+  fill-opacity: 1;
+  r: 5;
+}
+.chart-cross path {
+  stroke: var(--bad);
+  stroke-width: 2;
+  fill: none;
+}
+.chart-ref {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+/* The "this run" highlight ring, shared by the 2-D and 3-D scatter maps. */
+.chart-focus-ring {
+  stroke: #1d4ed8;
+  stroke-width: 2.2;
+  pointer-events: none;
+}
+/* 3-D scatter (trade-off map with a 3rd axis): a faint wireframe cube + drop-lines for height, rotatable. */
+.chart3d-wrap {
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.chart3d-wrap.is-dragging {
+  cursor: grabbing;
+}
+.chart3d-svg {
+  display: block;
+}
+.chart3d-hint {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.chart3d-floor {
+  fill: var(--surface-subtle);
+  fill-opacity: 0.5;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.chart3d-edge {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-opacity: 0.7;
+}
+.chart3d-axis {
+  stroke: var(--muted);
+  stroke-width: 1.4;
+}
+.chart3d-axis-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.chart3d-drop {
+  stroke: var(--muted);
+  stroke-width: 0.8;
+  stroke-opacity: 0.25;
+}
+.chart3d-drop.is-frontier {
+  stroke: hsl(140, 70%, 42%);
+  stroke-opacity: 0.5;
+}
+.chart3d-point {
+  fill-opacity: 0.9;
+}
+.chart3d-point:hover {
+  fill-opacity: 1;
+}
+.xai-lb-row.is-focus {
+  outline: 2px solid #1d4ed8;
+  outline-offset: -2px;
+}
+.chart-multiples {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.chart-figure {
+  margin: 0;
+}
+.chart-figure figcaption {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+/* Price+action chart: buy/TP point up, sell/SL point down; coloured by kind. */
+.run-mark {
+  stroke: none;
+}
+.run-mark:hover {
+  fill-opacity: 0.7;
+}
+.run-mark-buy {
+  fill: var(--ok);
+}
+.run-mark-sell {
+  fill: var(--bad);
+}
+.run-mark-tp {
+  fill: var(--accent);
+}
+.run-mark-sl {
+  fill: #d97706;
+}
+.run-mark-legend {
+  margin-top: 6px;
+}
+.run-mark-key {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+}
+.run-mark-key.run-mark-buy {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+.run-mark-key.run-mark-sell {
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+.run-mark-key.run-mark-tp {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.run-mark-key.run-mark-sl {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.12);
+}
+.run-mark-short {
+  fill: #7c3aed;
+}
+.run-mark-cover {
+  fill: #0ea5e9;
+}
+.run-mark-trailing {
+  fill: #14b8a6;
+}
+/* Attempted (no-op) requests render hollow so they read as "tried, did not execute". */
+.run-mark-buy_attempt,
+.run-mark-sell_attempt,
+.run-mark-short_attempt,
+.run-mark-cover_attempt {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 1.5;
+}
+.run-mark-key.run-mark-short {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.12);
+}
+.run-mark-key.run-mark-cover {
+  color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.12);
+}
+.run-mark-key.run-mark-trailing {
+  color: #0d9488;
+  background: rgba(20, 184, 166, 0.14);
+}
+.run-mark-key.run-mark-buy_attempt,
+.run-mark-key.run-mark-sell_attempt,
+.run-mark-key.run-mark-short_attempt,
+.run-mark-key.run-mark-cover_attempt {
+  color: var(--muted);
+  background: transparent;
+  border: 1px dashed var(--border, #cbd5e1);
+}
+/* Report-card tables: exits, regimes, trade ledger. */
+.report-table {
+  width: 100%;
+  margin: 6px 0 12px;
+}
+.report-table thead th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  padding: 2px 8px;
+}
+.report-table th.num,
+.report-table td.num {
+  text-align: right;
+}
+.ledger-table {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.ledger-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 4px 0;
+}
+.chart-expand-btn {
+  margin-left: 6px;
+  vertical-align: middle;
+  font-size: 13px;
+}
+/* Expanded Price & actions popup: a large, horizontally scrollable, zoomable chart. */
+.chart-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+.chart-modal[hidden] {
+  display: none;
+}
+.chart-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.55);
+}
+.chart-modal__panel {
+  position: relative;
+  margin: 3vh auto;
+  width: min(96vw, 1500px);
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 50px rgba(2, 6, 23, 0.4);
+}
+.chart-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.chart-modal__tools {
+  display: flex;
+  gap: 6px;
+}
+.chart-modal__scroll {
+  overflow: auto;
+  padding: 10px 14px 16px;
+}
+/* Consolidate-models review modal: a narrower panel with one card per proposed merge group. */
+.consolidate-panel {
+  width: min(94vw, 640px);
+}
+.consolidate-help {
+  padding: 8px 14px 0;
+  margin: 0;
+}
+.consolidate-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-top: 12px;
+}
+.consolidate-group:first-child {
+  margin-top: 4px;
+}
+.consolidate-reason {
+  margin: 0 0 8px;
+  font-style: italic;
+  color: var(--muted, var(--text));
+}
+.consolidate-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.consolidate-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  background: var(--surface-2, transparent);
+}
+.consolidate-member.is-canonical {
+  background: var(--surface-3, rgba(99, 102, 241, 0.08));
+}
+.consolidate-member-name {
+  flex: 1;
+  min-width: 0;
+}
+.consolidate-canon,
+.consolidate-merge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.consolidate-keep {
+  color: var(--muted, var(--text));
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+.consolidate-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.consolidate-merge-btn {
+  padding: 5px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.consolidate-merge-btn:hover {
+  filter: brightness(1.07);
+}
+.consolidate-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--muted, var(--text));
+}
+/* Device chips — cpu (blue) / mps (gray) / cuda (green) — colour the benchmark "best" + the model-card chip. */
+.run-badge.device-chip-cpu {
+  background: rgba(59, 130, 246, 0.16);
+  color: #2f6fed;
+  border-color: rgba(59, 130, 246, 0.45);
+}
+.run-badge.device-chip-mps {
+  background: rgba(100, 116, 139, 0.2);
+  color: #6b7a90;
+  border-color: rgba(100, 116, 139, 0.45);
+}
+.run-badge.device-chip-cuda {
+  background: rgba(34, 197, 94, 0.16);
+  color: #1f9d52;
+  border-color: rgba(34, 197, 94, 0.5);
+}
+/* Device-benchmark table: clickable rows, the fastest per-device cell emphasised, a slow/timed-out one dimmed. */
+.device-row {
+  cursor: pointer;
+}
+.device-row:hover {
+  background: var(--accent-soft);
+}
+.device-table .device-cell.is-best {
+  font-weight: 600;
+  color: var(--text);
+}
+.device-table .device-cell.device-slow {
+  color: var(--muted, #94a3b8);
+  font-style: italic;
+}
+.device-timings-panel {
+  width: min(94vw, 460px);
+}
+.device-timings-meta {
+  padding: 8px 14px 0;
+  margin: 0;
+}
+.device-timings-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 14px 4px;
+}
+.chart-modal .run-mark-legend {
+  padding: 6px 14px 0;
+}
+.run-mark-key.run-mark-price {
+  color: var(--text);
+  background: transparent;
+  padding-left: 18px;
+  position: relative;
+}
+.run-mark-key.run-mark-price::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 14px;
+  height: 0;
+  border-top: 2px solid var(--accent);
+}
+.run-dataset {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12px;
+}
+/* Degenerate / failed runs are muted in the table so real results stand out. */
+.runs-table tr.is-degenerate-row td,
+.runs-table tr.is-failed-row td {
+  opacity: 0.5;
+}
+.runs-table tr.is-invalid-row td {
+  opacity: 0.5;
+  text-decoration: line-through;
+  text-decoration-color: rgba(220, 80, 80, 0.5);
+}
+.runs-table tr.is-selected td {
+  opacity: 1;
+}
+.run-rerun-hint {
+  font-style: italic;
+}
+/* ---- Results workbench (runs toolbar + sortable table) ------------------------ */
+.runs-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.runs-viewmode {
+  align-self: flex-start;
+}
+.runs-hidebad {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted, var(--text));
+  cursor: pointer;
+  white-space: nowrap;
+}
+/* #1 — collapsible panel for the lever/version dropdowns. Collapsed, only the dropdowns
+   with a non-default selection (.is-changed, highlighted) stay visible. */
+.runs-dropdowns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.runs-dropdowns-toggle {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.runs-dropdowns-toggle:hover {
+  color: var(--accent);
+}
+.runs-dropdowns-toggle .caret {
+  font-size: 10px;
+}
+.runs-dropdowns-count {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.runs-dropdowns-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.runs-dropdowns.is-collapsed .runs-filter-lever:not(.is-changed) {
+  display: none;
+}
+.runs-filter-lever.is-changed {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+/* #2 — always-visible filter row: text search, Hide bad, custom toggle chips. */
+.runs-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.runs-custom-toggles {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.filter-chip.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.filter-chip-cb {
+  cursor: pointer;
+  margin: 0;
+}
+.filter-chip-text {
+  user-select: none;
+}
+.filter-chip-x {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 1px;
+  opacity: 0.6;
+}
+.filter-chip-x:hover {
+  opacity: 1;
+  color: var(--bad);
+}
+.runs-add-toggle {
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 14px;
+}
+.runs-add-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+/* The add/edit custom-filter popup (reuses .chart-modal positioning). */
+.custom-rule-panel {
+  width: min(94vw, 460px);
+  margin: 12vh auto;
+}
+.custom-rule-form {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.custom-rule-form .card-sub {
+  margin: 0;
+}
+.custom-rule-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.custom-rule-row select,
+.custom-rule-row input {
+  font-size: 13px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+}
+.custom-rule-row #custom-rule-field {
+  flex: 1 1 160px;
+}
+.custom-rule-row #custom-rule-value {
+  width: 96px;
+}
+.custom-rule-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.ghost-btn.is-primary {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* The By value "Sweep <lever>" popup: a scrollable grid of recommended values to tick. */
+.xai-sweep-opts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px 12px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.xai-sweep-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+/* The By dataset / By environment regime slice toggle sits inline in the card head. */
+.head-actions .xai-axis-slice {
+  margin-right: 4px;
+}
+/* The Selection view's "← Back to <origin> · <what this is>" banner, above the runs table. */
+.runs-selection-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.runs-selection-label {
+  font-weight: 600;
+  font-size: 13px;
+}
+/* The Datasets / Environments add-edit-clone popup (reuses .chart-modal positioning). */
+.bundle-form-panel {
+  width: min(94vw, 540px);
+  margin: 8vh auto;
+}
+.bundle-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.versions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.version-card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.version-card.is-current {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.version-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  flex-wrap: wrap;
+}
+.version-card-head strong {
+  font-size: 15px;
+}
+.version-summary {
+  margin: 0 0 6px;
+  word-break: break-word;
+}
+.version-card .card-sub {
+  margin: 0;
+}
+/* Environments tab + the launch picker. */
+.environments-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Datasets / Environments render as the reusable Runs-style table. The trailing actions column hugs the
+   right edge and holds the per-row buttons (set-default / edit / delete / clone). */
+.bundle-table .bundle-name-cell {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.bundle-table .bundle-actions-col {
+  width: 1%;
+}
+.bundle-table .bundle-actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+.bundle-table .bundle-actions-cell .head-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+/* Lever CAPABILITY sections (Datasets/Environments): one feature card per lever, then named presets. */
+.launch-advanced > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.launch-advanced .launch-advanced-toggle {
+  margin: 10px 0 4px;
+}
+.advanced-lever-group {
+  margin-top: 12px;
+}
+.advanced-lever-group > h4 {
+  margin: 6px 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+.lever-caps {
+  margin: 0 0 14px;
+}
+.lever-caps-head {
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lever-caps-head .card-actions {
+  margin-left: auto;
+}
+.lever-cap-note {
+  margin: 8px 0 2px;
+}
+.lever-caps-grid {
+  display: grid;
+  /* min(320px, 100%) — a hard 320px floor overflows the ~296px of content width inside a padded card on a
+   * 360-390px phone; capping at 100% lets cards collapse to one full-width column instead. */
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.lever-cap-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.lever-cap-card.is-inactive {
+  opacity: 0.65;
+}
+.lever-cap-head {
+  margin: 0 0 4px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lever-cap-card .card-sub {
+  margin: 2px 0;
+}
+.lever-cap-depends {
+  color: var(--warn);
+}
+.lever-cap-values {
+  margin: 6px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.lever-cap-value {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.lever-cap-value.is-default {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+/* A6: an asset choice with no data on disk — greyed, still visible (mineable from the Data tab). */
+.lever-cap-value.is-dataless {
+  opacity: 0.5;
+  border-style: dashed;
+}
+.lever-cap-count {
+  color: var(--muted);
+}
+.bundle-presets-head {
+  margin: 12px 0 6px;
+}
+/* THE standard create-story/feature button — accent-tinted so the "work on this" verb reads the same
+   everywhere (papers gaps/improvements, proposed models, components). */
+.story-btn {
+  color: var(--accent);
+}
+/* Env form: inactive levers greyed; dependent levers greyed while their control makes them inert. */
+.env-field-inactive,
+.env-field-inert {
+  opacity: 0.55;
+}
+.lever-dep-note {
+  color: var(--warn);
+  font-size: 11px;
+}
+.papers-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.paper-seed-banner {
+  padding: 8px 10px;
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.paper-autofill-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.paper-research-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.paper-research-row .form-actions {
+  align-items: flex-end;
+}
+.field.paper-research-count {
+  max-width: 7rem;
+}
+.paper-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.paper-link-row select {
+  flex: 1 1 180px;
+  min-width: 140px;
+}
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(12px);
+  z-index: 1100;
+  max-width: 360px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  color: var(--text, inherit);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+.app-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.app-toast.is-clickable {
+  cursor: pointer;
+  pointer-events: auto;
+  text-decoration: underline dotted;
+}
+.app-toast.is-clickable.is-visible {
+  pointer-events: auto;
+}
+/* Papers sort control sits at the end of its filter row (the shared .sort-control has no margin). */
+.paper-filter .sort-control {
+  margin-left: auto;
+}
+.paper-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.paper-card h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.paper-hyps {
+  margin: 8px 0 4px;
+}
+.paper-hyp-list {
+  margin: 4px 0;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.paper-hyp-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.paper-hyp-title {
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.paper-subform {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.paper-claim {
+  margin: 8px 0 6px;
+}
+.paper-note {
+  margin: 6px 0 0;
+  font-style: italic;
+}
+/* Models tab — category groups + per-card link sections (reuse paper-card/paper-hyp-list styling). */
+.model-group {
+  margin: 0 0 18px;
+}
+.model-group-h {
+  margin: 12px 0 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #888);
+}
+.model-links,
+.paper-models,
+.model-flavors {
+  margin: 8px 0 4px;
+}
+.model-status-field {
+  margin: 8px 0;
+  max-width: 280px;
+}
+/* Models — the all-runs stats control row + per-flavor run counts. */
+.model-stats-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.model-stats-stale {
+  font-size: 12px;
+  color: var(--warn, #d97706);
+  font-weight: 600;
+}
+.flavor-runs {
+  font-size: 11px;
+  color: var(--muted, #888);
+}
+.flavor-runs.is-empty {
+  opacity: 0.55;
+}
+/* The building blocks a flavor is composed of — linked chips under the flavor row. */
+.flavor-components {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 2px;
+}
+.block-chip-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #888);
+  margin-right: 2px;
+}
+.block-chip {
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--text, #222);
+  background: var(--chip-bg, rgba(127, 127, 127, 0.12));
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+  border-radius: 10px;
+  padding: 1px 8px;
+  cursor: pointer;
+  line-height: 1.5;
+}
+button.block-chip:hover {
+  border-color: var(--accent, #6366f1);
+  color: var(--accent, #6366f1);
+}
+.block-chip.is-missing {
+  opacity: 0.6;
+  cursor: default;
+  border-style: dashed;
+}
+.model-used-by {
+  margin: 8px 0 4px;
+}
+.paper-cvm {
+  margin: 6px 0;
+}
+.paper-suggest {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--warn);
+}
+.paper-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+.paper-chip {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.12));
+  color: var(--muted);
+}
+.paper-chip.is-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+/* A linked-paper / linked-hypothesis chip is clickable — show the pointer + an affordance on hover. */
+.paper-chip[data-action] {
+  cursor: pointer;
+}
+.paper-chip[data-action]:hover {
+  text-decoration: underline;
+  color: var(--accent);
+}
+/* The expanded-hypothesis evidence block: the basis line + the matching-runs table. */
+.hyp-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+}
+.hyp-basis {
+  margin: 0;
+}
+.hyp-claimed {
+  margin: 0;
+  font-style: italic;
+}
+/* The "how it's judged" rule + the "verdict reflects last Refresh" hint under a hypothesis's basis. */
+.hyp-criteria {
+  margin: 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+}
+.hyp-stale-note {
+  margin: 0;
+  color: var(--warn);
+}
+.hyp-runs {
+  font-size: 12px;
+}
+.hyp-runs th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  padding-right: 12px;
+}
+.hyp-runs td {
+  padding-right: 12px;
+}
+.paper-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.paper-filter-btn {
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.paper-filter-btn.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.paper-search-text {
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: inherit;
+  background: transparent;
+  min-width: 180px;
+}
+.paper-search-text:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+/* The one-line rationale under a paper's verdict badge — explains how its hypotheses rolled up. */
+.paper-verdict-why {
+  font-style: italic;
+}
+/* "Proposed improvements" — the functionality to build to test a paper's uncovered claims (under Coverage
+   gaps). Each row leads with a small kind tag (model / data / metric / env / capability). */
+.paper-proposed-improvements {
+  margin-top: 6px;
+}
+.paper-proposed-improvements ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.paper-proposed-improvements li {
+  margin: 2px 0;
+}
+.improvement-kind {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+/* A proposed improvement the user marked "not applicable": kept for reference, visibly de-emphasised. */
+.paper-proposed-improvements li.improvement-inapplicable {
+  opacity: 0.55;
+}
+.paper-proposed-improvements li.improvement-inapplicable strong {
+  text-decoration: line-through;
+}
+.improvement-inapplicable-tag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.improvement-toggle {
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 0 5px;
+  margin-left: 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.improvement-toggle:hover {
+  color: var(--fg);
+  border-color: var(--muted);
+}
+/* A hypothesis's importance-weight chip (⚖ 1…5) shown beside its verdict badge. */
+.hyp-weight-chip {
+  font-size: 11px;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: 999px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.paper-assumptions {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 4px 0;
+}
+.paper-assumptions legend {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 4px;
+}
+.env-picker .env-pick {
+  align-items: flex-start;
+}
+.env-picker .env-pick .card-sub {
+  margin-left: 6px;
+}
+.preset-bundles {
+  margin: 4px 0 8px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--accent, #6366f1);
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+  border-radius: 4px;
+}
+.preset-bundles-note {
+  margin: 0 0 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.preset-bundle-row {
+  align-items: center;
+  gap: 6px;
+}
+.preset-bundle-tag {
+  flex: none;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--accent, #6366f1);
+  background: var(--accent-soft, rgba(99, 102, 241, 0.14));
+}
+.compare-version-warn {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+/* Icon-only buttons (close ×, clone, mark-unrunnable, add +, delete) — text lives in the
+   tooltip/aria-label. ~28px square to match the app's compact controls. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.icon-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.icon-btn.icon-btn-danger:hover {
+  color: var(--bad);
+  border-color: var(--bad);
+  background: var(--bad-soft);
+}
+.icon-btn.icon-btn-accept {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+.icon-btn.icon-btn-accept:hover {
+  background: var(--ok-soft);
+}
+.icon-btn.icon-btn-reject {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+.icon-btn.icon-btn-reject:hover {
+  background: var(--bad-soft);
+}
+.icon-btn svg {
+  display: block;
+}
+.runs-filter-lever,
+.runs-filter-text {
+  font-size: 12px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+}
+.runs-filter-text {
+  min-width: 160px;
+}
+.runs-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.runs-th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.runs-th:hover {
+  color: var(--accent);
+}
+.delta-pos {
+  color: var(--ok);
+  font-weight: 600;
+}
+.delta-neg {
+  color: var(--bad);
+  font-weight: 600;
+}
+.run-compare-cb {
+  cursor: pointer;
+  vertical-align: middle;
+}
+/* Many compared runs would bleed past the card — scroll the table horizontally instead. */
+.compare-table-wrap {
+  overflow-x: auto;
+  margin: 4px 0 10px;
+}
+.compare-table {
+  min-width: 0;
+  width: auto;
+}
+.compare-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* The colour-coded run id chip in the comparison header — its colour is reused for the
+   run's curve in the chart below. */
+.compare-table .cmp-id {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.compare-table .cmp-section th {
+  padding-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+.runs-legend {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.mixed-dataset-banner {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 12px;
+  border-radius: 4px;
+}
+.robustness-block {
+  margin: 10px 0 14px;
+}
+.robustness-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+/* Hovering any element with `data-help` shows it; give plain triggers a help cursor
+   (buttons + form controls keep their own). */
+[data-help]:not(button):not(select):not(input):not(label) {
+  cursor: help;
+}
+.app-tooltip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 320px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 400;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+.app-tooltip[hidden] {
+  display: none;
+}
+.activity-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.activity-settings .field {
+  flex: 1 1 200px;
+  max-width: 320px;
+}
+/* ---- Activity two-lane layout ----------------------------------------------
+   Experiments (campaigns + evaluations) on the left, Tasks (judge / propose /
+   paper import) on the right. The tasks column is collapsible and shows an
+   empty view when its lane is idle. Stacks on narrow screens. */
+/* A12: the History-popup launcher above the live activity columns. */
+.activity-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 12px;
+}
+.activity-toolbar .ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.activity-history-table th > div:first-child {
+  font-weight: 600;
+}
+.activity-history-err {
+  color: var(--bad);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-top: 2px;
+}
+.activity-history-hl > * {
+  background: var(--accent-soft);
+}
+.activity-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.activity-col {
+  min-width: 0;
+}
+.activity-col-tasks {
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+}
+.activity-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  margin-bottom: 10px;
+}
+.activity-col-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.activity-col-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.activity-col-toggle .twisty {
+  color: var(--muted);
+  font-size: 11px;
+  width: 12px;
+}
+@media (max-width: 900px) {
+  .activity-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .activity-col-tasks {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+}
+/* When the idle Tasks column is collapsed, let Experiments reclaim the row; the Tasks column
+   shrinks to its content (toggle + budget control). Wide screens only — narrow screens stack. */
+@media (min-width: 901px) {
+  .activity-cols.tasks-collapsed {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+.runs-viewmode {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.runs-view-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.runs-view-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.setup-row {
+  cursor: pointer;
+}
+.setup-row:hover td {
+  background: var(--accent-soft);
+}
+
+/* ---- Run detail "Analyze this run" one-click row ------------------------------ */
+.analyze-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.analyze-row__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-right: 2px;
+}
+.analyze-row #run-analyze-status {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+}
+
+/* ---- By dataset / By environment comparison view ------------------------------ */
+.cmp-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.cmp-locks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.cmp-lock-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cmp-lock-key {
+  white-space: nowrap;
+}
+.cmp-agg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cmp-agg-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.cmp-agg-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.cmp-th {
+  cursor: pointer;
+}
+/* Pooled by-dataset/by-environment "rank by criterion" control row (below the standard Runs filter bar). */
+.cmp-rank-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 8px 0 4px;
+}
+.cmp-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cmp-rank-dir {
+  font-size: 12px;
+  padding: 3px 8px;
+}
+/* Robustness verdict badge (xAI "this config across datasets/environments" tab) + the this-run marker. */
+.cmp-verdict {
+  display: inline-block;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+.cmp-verdict.is-robust {
+  color: hsl(140, 70%, 32%);
+  background: hsl(140, 70%, 42%, 0.12);
+  border-color: hsl(140, 70%, 42%, 0.4);
+}
+.cmp-verdict.is-mixed {
+  color: hsl(38, 80%, 38%);
+  background: hsl(38, 90%, 50%, 0.12);
+  border-color: hsl(38, 90%, 50%, 0.4);
+}
+.cmp-verdict.is-weak {
+  color: hsl(0, 65%, 45%);
+  background: hsl(0, 70%, 50%, 0.1);
+  border-color: hsl(0, 70%, 50%, 0.35);
+}
+.xai-here {
+  color: #1d4ed8;
+  font-weight: 600;
+  font-size: 11px;
+}
+/* Two-line dataset/environment row in the xAI By-dataset/By-environment tabs: bold name, config beneath. */
+.cmp-axis-name {
+  font-size: 13px;
+}
+.cmp-axis-config {
+  font-size: 11px;
+  margin-top: 1px;
+  word-break: break-word;
+}
+.xai-axis-runs-btn {
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+/* Immediate tab-switch loading state (painted before an async render's awaited reads resolve). */
+.tab-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 16px;
+}
+.cmp-full {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.cmp-stat.cmp-min,
+.cmp-stat.cmp-max {
+  font-size: 11px;
+  opacity: 0.65;
+}
+.cmp-stat.cmp-avg {
+  font-weight: 600;
+}
+
+/* ---- Run detail --------------------------------------------------------------- */
+.kv-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 260px;
+}
+.kv-table th,
+.kv-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.kv-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+.kv-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+pre.json {
+  margin: 6px 0 0;
+  padding: 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 12px;
+  overflow-x: auto;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+.verdict-rejected {
+  margin: 8px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--bad);
+  border-radius: 9px;
+  background: var(--bad-soft);
+  font-size: 14px;
+  font-weight: 600;
+}
+.verdict-why {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+/* ---- Forms (Launch) ------------------------------------------------------------- */
+.lever {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.lever legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.lever-type {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 11px;
+}
+.lever-na-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
+.lever.is-na {
+  opacity: 0.5;
+}
+.lever.is-na .lever-na-note {
+  color: var(--warn);
+  font-style: normal;
+}
+.lever-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 560px) {
+  .lever-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.field > span {
+  font-weight: 600;
+}
+.field em {
+  color: var(--muted);
+  font-weight: 400;
+  font-style: normal;
+}
+.field input,
+.field select,
+.field textarea {
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.field select[multiple] {
+  padding: 5px;
+}
+.field textarea {
+  resize: vertical;
+}
+/* Click-to-add recommended/observed sweep values under a numeric lever's sweep input. */
+.sweep-suggests {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.sweep-suggest {
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.sweep-suggest:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.sweep-suggest.is-added {
+  color: #fff;
+  background: var(--accent, #2563eb);
+  border-color: var(--accent, #2563eb);
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  padding: 4px 0;
+}
+.check-row input {
+  accent-color: var(--accent);
+}
+.launch-target input,
+.launch-target select {
+  max-width: 240px;
+}
+.field .field-hint {
+  font-size: 12px;
+}
+.launch-summary {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.form-actions.activity-confirm {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.form-actions.activity-confirm > .card-sub {
+  flex: 1 1 100%;
+  margin: 0;
+}
+.form-status {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.form-status.is-error {
+  color: var(--bad);
+}
+.form-status[hidden] {
+  display: none;
+}
+
+/* Carfinder-style inline spinner: top-transparent ring in the current colour. */
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: trainer-spin 0.7s linear infinite;
+}
+@keyframes trainer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Activity --------------------------------------------------------------------- */
+/* One card-within-the-card per concurrently-running activity. */
+.activity-block {
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+}
+.activity-block:last-of-type {
+  margin-bottom: 0;
+}
+.activity-block .activity-status-row:first-child {
+  margin-top: 0;
+}
+.activity-kind {
+  font-weight: 600;
+}
+.activity-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.activity-phase {
+  font-size: 14px;
+  font-weight: 600;
+}
+.activity-id {
+  color: var(--muted);
+  font-size: 12px;
+}
+.activity-eta {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.activity-best {
+  margin: 10px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.activity-best code {
+  background: var(--surface-subtle);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+.build-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+.build-progress-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.build-progress-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 400ms ease;
+}
+.build-progress-bar span.is-indeterminate {
+  width: 30%;
+  animation: trainer-indeterminate 1.2s ease-in-out infinite alternate;
+}
+@keyframes trainer-indeterminate {
+  from {
+    margin-left: 0;
+  }
+  to {
+    margin-left: 70%;
+  }
+}
+.build-progress-label {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The within-run sub-progress for the running experiment: the item's key +
+   phase with a spinner and an elapsed timer, above its own (real or
+   indeterminate) bar — nested under the campaign total bar. */
+.inflight-runs {
+  margin: 8px 0 4px;
+}
+.inflight-head {
+  margin: 0 0 2px;
+  font-weight: 600;
+}
+.current-item {
+  margin: 6px 0 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 9px;
+  background: var(--surface-subtle);
+}
+.current-item .build-progress {
+  margin: 6px 0 0;
+}
+.current-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.current-item-head code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface);
+}
+.current-item-elapsed {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Settled-campaign failures: a collapsible "N runs failed" list of {key, error}. */
+.run-failures {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--bad);
+  border-radius: 9px;
+  background: var(--bad-soft);
+  font-size: 13px;
+}
+.run-failures > summary {
+  color: var(--bad);
+  font-weight: 700;
+  cursor: pointer;
+}
+.run-failures-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text);
+}
+.run-failures-list li {
+  margin: 2px 0;
+  word-break: break-word;
+}
+.run-failures-list code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface);
+}
+.run-failure-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.run-failure-text {
+  word-break: break-word;
+  min-width: 0;
+}
+.run-failure-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent, #2563eb);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-btn:hover {
+  background: none;
+  opacity: 0.8;
+}
+.run-failures-empty {
+  margin: 10px 0 0;
+}
+
+/* ---- Activity queue --------------------------------------------------------- */
+.queue-section {
+  margin-top: 18px;
+}
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-subtle);
+  font-size: 13px;
+}
+.queue-chip {
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.queue-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue-remove {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.queue-remove:hover {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+.queue-move {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.queue-move svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+.queue-move:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.queue-move:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ---- Hypotheses ----------------------------------------------------------------- */
+.hypothesis-form {
+  margin-top: 14px;
+}
+.hypothesis-form-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.hypothesis-group {
+  margin-top: 18px;
+}
+.hypothesis-group h3 {
+  margin: 0 0 8px;
+}
+.group-count {
+  color: var(--muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+/* Hypotheses render as full-width, collapsible rows so each claim has room for all its detail. */
+.hypothesis-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hypothesis-card {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+}
+/* Verdict views as accordion sections: each header always visible; the open one scrolls internally. */
+.hypothesis-section {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-bottom: 8px;
+}
+.hypothesis-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+}
+.hypothesis-section-head::-webkit-details-marker {
+  display: none;
+}
+.hypothesis-section-head::before {
+  content: '▸';
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform 0.12s ease;
+}
+.hypothesis-section[open] > .hypothesis-section-head::before {
+  transform: rotate(90deg);
+}
+.hypothesis-section-body {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+}
+/* In the full-height tab the outer #hypotheses-body owns the scroll, so sections flow naturally instead of
+   each capping at 60vh with its own nested scrollbar. */
+#hypotheses-body.tab-scroll .hypothesis-section-body {
+  max-height: none;
+  overflow-y: visible;
+}
+/* Collapsible card summaries (hypotheses + papers) share the chevron + flex-row layout. */
+.hypothesis-summary,
+.paper-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.hypothesis-summary::-webkit-details-marker,
+.paper-summary::-webkit-details-marker {
+  display: none;
+}
+/* Phones: the summary row (badge + run chip + title + 5 icon buttons) exceeds ~360px and the body clips
+ * overflow — without wrapping, the right-most actions (override/dismiss/delete) are unreachable. Wrapping
+ * drops .card-actions to its own line; slightly larger buttons make them comfortably tappable. */
+@media (max-width: 767px) {
+  .hypothesis-summary,
+  .paper-summary {
+    flex-wrap: wrap;
+  }
+  .hypothesis-summary .card-actions,
+  .paper-summary .card-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .card-btn {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+.hypothesis-summary::before,
+.paper-summary::before {
+  content: '▸';
+  color: var(--muted);
+  font-size: 11px;
+  flex: 0 0 auto;
+  transition: transform 0.12s ease;
+}
+.hypothesis-card[open] > .hypothesis-summary::before,
+.paper-card[open] > .paper-summary::before {
+  transform: rotate(90deg);
+}
+.hyp-title,
+.paper-summary-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hyp-running {
+  display: inline-flex;
+  align-items: center;
+}
+/* Registry-health banner above the verdict sections: judged/blocked/starved chips + the issue census. */
+.hyp-hygiene-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+.hyp-hygiene-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.hyp-hygiene-hint {
+  margin: 4px 0 10px;
+}
+.hyp-hygiene-line {
+  margin: 2px 0 6px;
+}
+/* The "what more running would decide this" block on a starved hypothesis, with its one-click launch. */
+.hyp-coverage {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.06));
+}
+.hyp-coverage .ghost-btn {
+  margin-top: 6px;
+}
+/* The action-button group, pushed to the right edge of a card summary. */
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+/* Uniform icon action buttons (run / edit / delete / the verb+hypothesis combos). Same height; tooltips
+ * via the global data-help callout. `.combo` holds two small glyphs ("<verb> a hypothesis"). */
+.card-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.card-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--surface-subtle);
+}
+.card-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.card-btn.combo {
+  min-width: 40px;
+}
+/* The ⚖ glyph in the Re-weigh button — sized to sit beside the inline hypothesis icon. */
+.card-btn-glyph {
+  font-size: 14px;
+  line-height: 1;
+}
+.card-btn-danger:hover:not(:disabled) {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+.hypothesis-body,
+.paper-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+/* Run-count chip on a hypothesis (clickable → its runs); "is-low" flags too few runs to judge. */
+.run-count-chip {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.run-count-chip:hover {
+  border-color: var(--accent);
+}
+.run-count-chip.is-low {
+  border-color: #f59e0b;
+  color: #b45309;
+}
+/* Linked-hypothesis count chip on a paper; "is-empty" highlights a paper with none. */
+.hyp-count-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.hyp-count-chip.is-empty {
+  border-color: #f59e0b;
+  color: #b45309;
+}
+/* "N proposals" — hypotheses blocked on an unimplemented model. */
+.hyp-count-chip.is-proposed {
+  border-color: #6366f1;
+  color: #4338ca;
+  background: #eef2ff;
+}
+/* Provenance chip on an auto-discovered research draft (verify verdict + confidence). */
+.paper-research-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid #5eae8f;
+  border-radius: 999px;
+  background: #e8f5ef;
+  color: #216e51;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
+}
+/* The {passed/total} claim fraction carried INSIDE a multi-claim paper's status chip (no separate chip). */
+.paper-claims-frac {
+  margin-left: 5px;
+  padding-left: 5px;
+  border-left: 1px solid currentColor;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  opacity: 0.85;
+}
+/* The thesis (paper claim) a hypothesis tests — shown on flat hypothesis rows + the standalone card. */
+.hyp-thesis-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 auto;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface-2, #f8fafc);
+  font-size: 11px;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The per-paper verdict explainer: the proven÷decided formula + the threshold ladder. */
+.paper-verdict-explain {
+  margin: 4px 0 8px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--border);
+  background: var(--surface-2, #f8fafc);
+  border-radius: 4px;
+}
+.paper-verdict-formula {
+  font-variant-numeric: tabular-nums;
+}
+.paper-verdict-ladder {
+  margin-top: 2px;
+  opacity: 0.8;
+}
+/* Multi-thesis breakdown: one bordered section per distinct paper thesis. */
+.paper-theses-intro {
+  margin: 4px 0 6px;
+  font-weight: 600;
+}
+.paper-thesis {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.paper-thesis-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.paper-thesis-label {
+  font-weight: 600;
+}
+.paper-thesis .paper-verdict-explain {
+  border-left: none;
+  background: transparent;
+  padding: 0;
+  margin: 2px 0 6px;
+}
+/* The min-runs-to-judge setting in the Hypotheses tab header. */
+.min-runs-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.min-runs-field input {
+  width: 56px;
+}
+.hyp-head-actions {
+  align-items: center;
+}
+/* The hypothesis-glyph that sits left of the tab label. */
+.tab-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.hypothesis-card.is-muted,
+.hypothesis-card.is-dismissed {
+  opacity: 0.55;
+}
+.hypothesis-transitions {
+  margin: 6px 0;
+  font-size: 12px;
+}
+.hypothesis-transitions summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.hypothesis-transitions ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+.hypothesis-override {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.hypothesis-rationale {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.hypothesis-campaign {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+.hypothesis-campaign .card-sub {
+  margin: 0;
+}
+.spec-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+.spec-list code {
+  background: var(--surface);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+.hypothesis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+/* ---- Home (hub) ------------------------------------------------------------- */
+.project-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.project-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+}
+.project-card h3 {
+  margin: 0;
+  padding-right: 64px;
+  font-size: 14px;
+}
+.project-card-corner {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.card-spinner {
+  display: inline-flex;
+  color: var(--accent);
+}
+.new-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.new-badge.header-badge {
+  margin-left: 10px;
+  vertical-align: 2px;
+}
+.project-dir {
+  margin: 0;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+.project-status {
+  margin: 0;
+  font-size: 13px;
+}
+.project-status.is-muted {
+  color: var(--muted);
+}
+.project-status.is-error {
+  color: var(--bad);
+}
+.project-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+/* ---- Compute Runners (home panel) ------------------------------------------- */
+.runners-panel[hidden] {
+  display: none;
+}
+.runners-panel .head-actions button {
+  white-space: nowrap;
+}
+.status-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: 0;
+  background: var(--muted);
+}
+.status-dot.is-online {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-soft);
+}
+.status-dot.is-offline {
+  background: var(--muted);
+  opacity: 0.6;
+}
+/* Data mine tab: on-disk (ready) / gaps / available-to-download status dots + the catalog table. */
+.status-dot.is-ready {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-soft);
+}
+.status-dot.is-gaps {
+  background: var(--warn);
+}
+.status-dot.is-avail {
+  background: var(--muted);
+  opacity: 0.5;
+}
+.muted {
+  color: var(--muted);
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+/* Related-data (asset-linkage) chips — a one-click mine of a driver series, rationale on hover. */
+.link-chip {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 1px 7px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.link-chip:hover {
+  border-color: var(--accent, #6366f1);
+  color: var(--text-primary, inherit);
+}
+/* Guided data discovery: the problem form + the proposed-source cards. */
+.discover-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.discover-form textarea,
+.discover-form input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.discover-form button {
+  align-self: flex-start;
+}
+.datasource-card {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+/* Cross-test robustness: the runs-table chip, matrix cells, and launch controls. */
+.xt-chip.is-robust {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.xt-chip.is-mixed {
+  background: rgba(217, 119, 6, 0.12);
+  color: var(--warn);
+}
+.xt-chip.is-weak {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--bad);
+}
+.xt-chip.is-none {
+  color: var(--muted);
+}
+.xt-cell.is-robust {
+  color: var(--ok);
+}
+.xt-cell.is-weak {
+  color: var(--bad);
+}
+.xt-cell.is-none {
+  color: var(--muted);
+}
+.xt-assets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.xt-assets .xt-asset {
+  white-space: nowrap;
+}
+/* Continue-training (extra-train) dataset picker in the run-detail section. */
+.ct-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 6px 0 4px;
+}
+.ct-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ct-field select,
+.ct-field input {
+  min-width: 120px;
+}
+.ct-field input[type='number'] {
+  width: 72px;
+  min-width: 0;
+}
+.runner-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.runner-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+}
+.runner-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.runner-card h4 {
+  margin: 0;
+  font-size: 14px;
+}
+.runner-status {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+.runner-queued {
+  color: var(--accent);
+  font-weight: 700;
+}
+.runner-meta {
+  margin: 2px 0 0;
+}
+.runner-id {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+.runner-id code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+.runner-copy-id {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.runner-copy-id:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.runner-actions {
+  display: flex;
+  gap: 8px;
+}
+/* ---- Runner pairing sub-panel ----------------------------------------------- */
+.runner-pairing {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+}
+.runner-pairing[hidden] {
+  display: none;
+}
+.runner-pairing h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.runner-pin {
+  margin: 12px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+}
+.runner-pin.is-expired {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.runner-countdown-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+.runner-countdown {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.runner-countdown strong {
+  color: var(--text);
+}
+.runner-countdown.is-expired {
+  color: var(--bad);
+  font-weight: 700;
+}
+.runner-commands {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.runner-commands pre {
+  margin: 0;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
+}
+.runner-commands .ghost-btn {
+  align-self: flex-start;
+  font-size: 13px;
+}
+
+.page-foot {
+  padding: 14px 16px 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* xAI tab — vertical stack of cards, compact contrast/recommendation rows. */
+.xai-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.xai-contrast {
+  margin: 0.25rem 0 1rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border);
+}
+.xai-rec {
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.xai-rec:last-child {
+  border-bottom: none;
+}
+.xai-narrative {
+  margin: 0.25rem 0 0.5rem;
+  line-height: 1.5;
+  max-width: 70ch;
+  white-space: pre-wrap;
+}
+
+.xai-note {
+  margin: 0 0 0.6rem;
+}
+.xai-note summary {
+  cursor: pointer;
+}
+.xai-flash {
+  animation: xaiFlash 1.6s ease-out;
+}
+@keyframes xaiFlash {
+  0%,
+  30% {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+.xai-abl {
+  margin: 0.2rem 0 0.8rem;
+  padding-left: 1.2rem;
+}
+.xai-abl-step {
+  margin: 0.15rem 0;
+}
+.xai-heat td {
+  text-align: center;
+  min-width: 3.5em;
+}
+/* Interaction cells that have actual runs drill into the Runs tab on click. */
+.xai-cell-link {
+  cursor: pointer;
+}
+.xai-cell-link:hover {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: -2px;
+}
+/* A combination that can't occur (a conditional lever is inert here) — shown as a muted "n/a", not a guess. */
+.xai-cell-na {
+  color: var(--muted);
+  font-style: italic;
+  background: var(--surface-subtle);
+  opacity: 0.65;
+}
+/* The acquisition ("climb toward the optimum") recommendation badge — accented to stand out. */
+.badge.xai-rec-climb {
+  background: rgba(34, 197, 94, 0.18);
+  color: #15803d;
+  font-weight: 600;
+}
+.badge.xai-rec-llm {
+  background: rgba(139, 92, 246, 0.18);
+  color: #6d28d9;
+  font-weight: 600;
+}
+/* xAI scope switch: segmented "All runs | Current run" toggle. */
+.xai-scope-switch {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.xai-scope-btn {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.xai-scope-btn.active {
+  background: var(--accent, #2563eb);
+  color: #fff;
+  font-weight: 600;
+}
+/* The currently-scoped environment row in the Compare-environments table. */
+.xai-env-current {
+  background: rgba(37, 99, 235, 0.1);
+  font-weight: 600;
+}
+/* xAI tabbed shell: a collapsible left icon-rail (like the main nav) + the active tab's content. */
+/* xAI is a full-height, own-scroll tab (like Runs): the rail + active view fill the viewport and scroll
+   WITHIN themselves, not the page. */
+.tab-main.is-fullwidth > #tab-xai:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  flex: 1;
+  padding: 16px;
+}
+#tab-xai .xai-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.xai-shell {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+.xai-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  width: 176px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-y: auto;
+}
+.xai-rail-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.xai-rail-controls .xai-scope-switch {
+  width: 100%;
+}
+.xai-rail-controls .xai-scope-btn {
+  flex: 1;
+}
+.xai-rail-sel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.xai-rail-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+.xai-shell.rail-collapsed .xai-rail {
+  width: auto;
+}
+.xai-shell.rail-collapsed .xai-rail-controls {
+  display: none;
+}
+.xai-rail-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.xai-rail-btn:hover {
+  background: rgba(127, 127, 127, 0.12);
+}
+.xai-rail-btn.active {
+  background: var(--accent, #2563eb);
+  color: #fff;
+}
+.xai-rail-ico {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+.xai-shell.rail-collapsed .xai-rail-lbl {
+  display: none;
+}
+.xai-rail-toggle {
+  margin-top: auto;
+  opacity: 0.65;
+}
+.xai-tab-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Group tabs (Research / Ecosystem) -------------------------------------
+   Two top-level tabs each collapse several former tabs behind a left rail — the
+   same pattern as the xAI rail. The group container itself gets the generic
+   `.tab-main.is-fullwidth > .tab-panel` fill rules (padding + column flex); the
+   shell lays out rail + content in a row, and the active member sub-panel fills
+   the content column (header fixed, marked body scrolls) exactly like a
+   standalone tab. `activeTabId` stays the leaf id — the rail only navigates. */
+.group-shell {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.group-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  width: 176px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-y: auto;
+}
+.group-rail-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.group-shell.rail-collapsed .group-rail {
+  width: auto;
+}
+.group-shell.rail-collapsed .group-rail-lbl {
+  display: none;
+}
+.group-rail-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.group-rail-btn:hover {
+  background: rgba(127, 127, 127, 0.12);
+}
+.group-rail-btn.active {
+  background: var(--accent, #2563eb);
+  color: #fff;
+}
+.group-rail-ico {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+.group-rail-toggle {
+  margin-top: auto;
+  opacity: 0.65;
+}
+.group-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The active member sub-panel fills the content area (mirrors the standalone-tab rules, which don't reach it
+   here because it's no longer a direct child of `.tab-main`). */
+.group-content > .tab-panel:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  flex: 1;
+}
+.group-content > .tab-panel:not([hidden]) > .card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+.group-content > .tab-panel:not([hidden]) > .card > .tab-scroll,
+.group-content > .tab-panel:not([hidden]) > .tab-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Shared scope header (env + criterion + direction + Re-run, or the focused run) above every view. */
+.xai-scope-header {
+  flex: 0 0 auto;
+  padding: 0;
+  margin-bottom: 0.85rem;
+  overflow: hidden;
+}
+.xai-scope-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.xai-scope-toggle:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+.xai-scope-toggle[aria-expanded='false'] .xai-collapse-chevron {
+  transform: rotate(-90deg);
+}
+.xai-scope-header:not(.is-collapsed) .xai-scope-toggle {
+  border-bottom: 1px solid var(--border);
+}
+.xai-scope-body {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.9rem;
+  padding: 12px 14px;
+}
+.xai-scope-toggle ~ .xai-scope-body {
+  padding-top: 11px;
+}
+.xai-scope-header.is-collapsed .xai-scope-body {
+  display: none;
+}
+.xai-scope-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.xai-scope-tag {
+  font-weight: 600;
+  font-size: 0.82em;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.xai-scope-value,
+.xai-scope-value-inline {
+  font-family: var(--mono, ui-monospace, monospace);
+  background: rgba(127, 127, 127, 0.12);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.xai-scope-value-inline {
+  font-weight: 600;
+}
+.xai-scope-spacer {
+  flex: 1 1 auto;
+}
+/* A view: a sticky header over a body that scrolls within the view (not the page). */
+.xai-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.xai-view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex: 0 0 auto;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.xai-view-head h3 {
+  margin: 0;
+}
+.xai-view-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.xai-view-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 0.8rem;
+}
+.xai-help-btn {
+  font-weight: 700;
+}
+.xai-help-btn.active {
+  background: var(--accent, #2563eb);
+  color: #fff;
+}
+.xai-help-callout {
+  flex: 0 0 auto;
+  border: 1px solid var(--accent, #2563eb);
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.06);
+  padding: 0.6rem 0.8rem;
+  margin-top: 0.6rem;
+}
+.xai-help-callout p {
+  margin: 0;
+  font-size: 0.92em;
+}
+/* Shared dropdown component — one consistent select look across the app (xAI, Papers/Models/Hypotheses
+   sorts, …). Apply class="app-select" (or wrap a select in .app-select). */
+select.app-select,
+.app-select > select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 5px 28px 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--surface, transparent);
+  color: inherit;
+  font: inherit;
+  line-height: 1.3;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 4.5 6 7.5 9 4.5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+select.app-select:hover,
+.app-select > select:hover {
+  border-color: var(--accent, #2563eb);
+}
+select.app-select:focus-visible,
+.app-select > select:focus-visible {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 1px;
+}
+/* A labelled sort control: "Sort <select>". */
+.sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+/* Trade-off (Pareto) map: the X/Y metric + direction pickers. */
+.xai-pareto-pickers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.7rem;
+}
+/* Map sub-tabs (Parallel / PCA / Trade-off) in the view header. */
+.xai-map-tab {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  background: transparent;
+  cursor: pointer;
+}
+.xai-map-tab.active {
+  background: var(--accent, #2563eb);
+  color: #fff;
+  font-weight: 600;
+}
+/* Reusable collapsible card — a big, full-width header bar (chevron + title + collapsed summary) over a
+   hideable body, modelled on the Overseer StoryDetailsView "Overview" card. */
+.xai-collapse-card {
+  padding: 0;
+  overflow: hidden;
+}
+.xai-collapse-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 16px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.xai-collapse-head:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+.xai-collapse-head:focus-visible {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: -2px;
+}
+.xai-collapse-head.is-static {
+  cursor: default;
+  opacity: 0.7;
+}
+.xai-collapse-head.is-static:hover {
+  background: transparent;
+}
+.xai-collapse-headtext {
+  flex: 1;
+  min-width: 0;
+}
+.xai-collapse-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.xai-collapse-chevron {
+  flex: 0 0 auto;
+  font-size: 13px;
+  opacity: 0.65;
+  transition: transform 160ms ease;
+}
+.xai-collapse-head:hover .xai-collapse-chevron {
+  opacity: 1;
+}
+.xai-collapse-head[aria-expanded='false'] .xai-collapse-chevron {
+  transform: rotate(-90deg);
+}
+.xai-collapse-summary {
+  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  display: none;
+}
+.xai-collapse-card.is-collapsed .xai-collapse-summary {
+  display: block;
+}
+.xai-collapse-body {
+  padding: 0 16px 14px 44px;
+}
+.xai-collapse-card.is-collapsed .xai-collapse-body {
+  display: none;
+}
+.xai-collapse-body.is-empty-note {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 13px;
+}
+/* Auto-generated "what this map shows" conclusions under the parallel / PCA maps. */
+.xai-conclusions {
+  margin-top: 0.85rem;
+  border-left: 3px solid var(--accent, #2563eb);
+  padding: 0.1rem 0 0.1rem 0.75rem;
+}
+.xai-conclusions ul {
+  margin: 0.3rem 0 0;
+  padding-left: 1.1rem;
+}
+.xai-conclusions li {
+  margin: 0.15rem 0;
+}
+/* Environments: keep a 100+ list scannable. */
+.xai-env-controls {
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.4rem 0;
+}
+.xai-env-search {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 200px;
+}
+.xai-env-scroll {
+  max-height: 52vh;
+  overflow: auto;
+}
+/* A favourited run's star, in the run-detail header. */
+.icon-btn.is-fav {
+  color: #f5a623;
+}
+/* Top-configs leaderboard rows open the run on click. */
+.xai-lb-row {
+  cursor: pointer;
+}
+.xai-lb-row:hover {
+  background: rgba(127, 127, 127, 0.1);
+}
+/* Each environment row scopes the analysis on click (like a Runs row). */
+.xai-env-row {
+  cursor: pointer;
+}
+.xai-env-row:hover {
+  background: rgba(127, 127, 127, 0.1);
+}
+/* Parallel-coordinates configuration map. */
+.xai-pc {
+  max-width: 100%;
+  height: auto;
+}
+.xai-pc-axis-line {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.xai-pc-axis {
+  font-size: 10px;
+  fill: var(--muted);
+}
+.xai-pc-tick {
+  font-size: 9px;
+  fill: var(--muted);
+}
+/* Interactive parallel map: a line highlights on hover (and is clickable to open the run). */
+.xai-pc-line {
+  cursor: pointer;
+  transition:
+    stroke-width 80ms ease,
+    opacity 80ms ease;
+}
+.xai-pc-line:hover {
+  stroke-width: 3.5;
+  opacity: 1;
+}
+/* Clickable per-axis value ticks: click one to filter the configs to that value. */
+.xai-pc-pick {
+  fill: rgba(120, 120, 120, 0.5);
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 0.5;
+  cursor: pointer;
+}
+.xai-pc-pick:hover {
+  fill: var(--accent, #2563eb);
+}
+.xai-pc-pick.is-picked {
+  fill: var(--accent, #2563eb);
+  stroke: #fff;
+  stroke-width: 1;
+}
+/* fANOVA per-lever effect tags: inert (drop), interactive (coupled), direct (plain). */
+.fanova-inert {
+  color: var(--muted);
+  font-style: italic;
+}
+.fanova-interactive {
+  color: #b45309;
+  font-weight: 600;
+}
+.xai-coupling {
+  margin: 4px 0 10px;
+  padding-left: 18px;
+}
+.xai-coupling li {
+  margin: 2px 0;
+}
+
+/* A3.4 — the AI companion's strategy card, pinned above the Diagnosis body (the human sees the AI's plan). */
+#companion-strategy {
+  flex: 0 0 auto;
+}
+#companion-strategy:empty {
+  display: none;
+}
+.companion-empty {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  background: var(--surface-subtle);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.companion-card {
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+}
+.companion-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.companion-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.companion-when {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.companion-summary {
+  margin: 0 0 10px;
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.companion-section {
+  margin-top: 8px;
+}
+.companion-section-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.companion-items {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text);
+}
+.companion-items li {
+  margin: 2px 0;
+  line-height: 1.45;
+}
+
+/* A4.3 — the champion "declare steady" verdict card (single source: rendered from the engine's -diagnosis record). */
+#champion-verdict {
+  flex: 0 0 auto;
+}
+#champion-verdict:empty {
+  display: none;
+}
+.champion-card {
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: var(--radius);
+}
+.champion-card.is-steady {
+  border-left-color: var(--ok);
+}
+.champion-card.is-not-steady {
+  border-left-color: var(--bad);
+}
+.champion-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.champion-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.champion-card.is-steady .champion-title {
+  color: var(--ok);
+}
+.champion-card.is-not-steady .champion-title {
+  color: var(--bad);
+}
+.champion-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.champion-when {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.champion-gates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.champion-gate {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  line-height: 1.4;
+}
+.champion-mark {
+  width: 1.2em;
+  flex: 0 0 auto;
+  font-weight: 700;
+  text-align: center;
+}
+.champion-gate.pass .champion-mark {
+  color: var(--ok);
+}
+.champion-gate.fail .champion-mark {
+  color: var(--bad);
+}
+.champion-gate.skip {
+  color: var(--muted);
+}
+.champion-gate-label {
+  color: var(--text);
+}
+.champion-gate-detail {
+  color: var(--muted);
+  font-size: 12px;
+}

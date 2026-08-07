@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Model Trainer</title>
+    <!--
+      Load the viewer's CSS + JS with a per-load cache-bust. index.html is always
+      fetched fresh (its URL carries a one-time viewToken), but an embedding iframe
+      can otherwise hold a STALE copy of these stable-named subresources across
+      reloads — so every edit to app.js / style.css takes effect immediately.
+    -->
+    <script>
+      ;(function () {
+        var v = '?v=' + Date.now()
+        document.write(
+          '<link rel="stylesheet" href="style.css' +
+            v +
+            '">' +
+            '<scr' +
+            'ipt src="bridge.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="boot.config.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="boot.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="xai.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="scorecard.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="trainerCapabilities.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="hypothesis.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="models.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="runExport.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="bundleTable.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="datasets.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="data.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="crossTest.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="continueTrain.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="heatmap.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="activityHistory.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="comparison.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="exploration.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="paging.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="diagnostics.js' +
+            v +
+            '" defer></scr' +
+            'ipt>' +
+            '<scr' +
+            'ipt src="app.js' +
+            v +
+            '" defer></scr' +
+            'ipt>',
+        )
+      })()
+    </script>
+  </head>
+  <body>
+    <!-- Home — the hub: registered training projects -->
+    <div id="view-home" class="view">
+      <div class="topbar">
+        <header class="home-header">
+          <h1>Model Trainer</h1>
+          <div class="header-actions">
+            <button type="button" id="runners-toggle" class="ghost-btn" aria-expanded="false">
+              Compute Runners
+            </button>
+          </div>
+        </header>
+      </div>
+      <div class="app-scroll">
+        <main class="tab-main">
+          <p id="app-banner" class="app-banner" role="status" hidden></p>
+
+          <!-- Compute Runners — remote machines that run training jobs (toggled from the header) -->
+          <section id="runners-panel" class="card runners-panel" aria-labelledby="runners-h" hidden>
+            <div class="card-head card-head-row">
+              <div>
+                <h2 id="runners-h">Compute Runners</h2>
+                <p class="card-sub">
+                  Remote machines that run training jobs. Use a runner by entering its id in a
+                  campaign&rsquo;s &ldquo;Run on&rdquo; field.
+                </p>
+              </div>
+              <div class="head-actions">
+                <button type="button" id="runner-pair-btn">Pair a new runner</button>
+              </div>
+            </div>
+            <p id="runners-status" class="form-status" role="status" hidden></p>
+            <div id="runner-pairing" class="runner-pairing" hidden></div>
+            <div id="runners-body" class="runners-body"></div>
+          </section>
+
+          <section class="card" aria-labelledby="projects-h">
+            <div class="card-head">
+              <h2 id="projects-h">Training projects</h2>
+              <p class="card-sub">
+                Each project is a directory with a <code>.factory/trainer.json</code> manifest.
+              </p>
+            </div>
+            <p id="projects-status" class="form-status" role="status" hidden></p>
+            <div id="home-projects" class="home-projects"></div>
+          </section>
+
+          <section class="card" aria-labelledby="project-add-h">
+            <div class="card-head">
+              <h2 id="project-add-h">Add training project</h2>
+              <p class="card-sub">
+                Point at a directory relative to this project&rsquo;s checkout, or an absolute path.
+              </p>
+            </div>
+            <form id="project-add-form" class="project-add-form" autocomplete="off">
+              <div class="lever-grid">
+                <label class="field"
+                  ><span>Name</span>
+                  <input type="text" name="name" placeholder="e.g. CartPole" />
+                </label>
+                <label class="field"
+                  ><span>Directory</span>
+                  <input type="text" name="dir" placeholder="examples/cartpole or /absolute/path" />
+                </label>
+                <label class="field"
+                  ><span
+                    >Manifest file <em>(optional — for a second line in the same repo)</em></span
+                  >
+                  <input type="text" name="manifestRelPath" placeholder=".factory/trainer.json" />
+                </label>
+              </div>
+              <div class="form-actions">
+                <button type="submit" id="project-save-btn">Add project</button>
+              </div>
+              <p id="project-form-error" class="form-status" role="alert" hidden></p>
+            </form>
+          </section>
+        </main>
+
+        <footer class="page-foot">
+          <span>Model Trainer — hub</span>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Project dashboard -->
+    <div id="view-dashboard" class="view" hidden>
+      <div class="topbar">
+        <div class="dash-head">
+          <button type="button" id="back-btn" class="back-btn" aria-label="Back to projects">
+            &larr;
+          </button>
+          <span id="dash-project-name" class="dash-project-name"></span>
+          <div class="dash-refresh" id="dash-refresh"></div>
+        </div>
+        <nav class="tabbar" id="tabbar" role="tablist" aria-label="Sections"></nav>
+      </div>
+
+      <div class="app-scroll">
+        <main class="tab-main">
+          <!-- Runs (completed training runs, best first) -->
+          <section id="tab-runs" class="tab-panel" role="tabpanel" hidden>
+            <div class="runs-md" id="runs-md">
+              <div class="runs-md__list">
+                <section class="card" aria-label="Runs">
+                  <div class="card-head card-head-row">
+                    <div>
+                      <p class="card-sub runs-live" id="runs-live" hidden></p>
+                      <p class="card-sub" id="judge-last" hidden></p>
+                    </div>
+                    <div class="head-actions">
+                      <button type="button" id="judge-btn" disabled>Judge</button>
+                      <button type="button" id="runs-delete-selected" class="danger-btn" disabled>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                  <p id="judge-status" class="form-status" role="status" hidden></p>
+                  <div id="runs-sparkline" class="sparkline-wrap" hidden></div>
+                  <div id="runs-body" class="runs-body"></div>
+                </section>
+              </div>
+              <div class="runs-md__detail">
+                <section class="card" id="run-detail" aria-label="Run detail" hidden></section>
+                <section class="card" id="run-compare" aria-label="Compare runs" hidden></section>
+              </div>
+            </div>
+          </section>
+
+          <!-- Ecosystem group: Data / Datasets / Environments / Scorecards / Versions behind a left rail. -->
+          <section id="tab-ecosystem" class="tab-panel group-panel" role="tabpanel" hidden>
+            <div class="group-shell" id="ecosystem-shell">
+              <nav class="group-rail" id="ecosystem-rail" aria-label="Ecosystem views"></nav>
+              <div class="group-content">
+          <!-- Versions (pipeline version changelog + how runs fared per version) -->
+          <section id="tab-versions" class="tab-panel" role="tabpanel" hidden>
+            <section class="card" aria-labelledby="versions-h">
+              <div class="card-head">
+                <h2 id="versions-h">Pipeline versions</h2>
+                <p class="card-sub">
+                  Each version is a snapshot of how data is fed + scored. A BREAKING version makes
+                  prior runs' scores incomparable; runs are tagged with the version they ran under.
+                </p>
+              </div>
+              <div id="versions-body" class="versions-body tab-scroll"></div>
+            </section>
+          </section>
+
+          <!-- Data mine (what market data is available to download + on-demand download) -->
+          <section id="tab-data" class="tab-panel" role="tabpanel" hidden>
+            <section class="card" aria-labelledby="data-h">
+              <div class="card-head card-head-row">
+                <div>
+                  <h2 id="data-h">Data mine</h2>
+                  <p class="card-sub">
+                    The market data this project can train on — crypto, US stocks, commodities and FX.
+                    Green is on disk; grey is available to download. Hit <em>Download</em> to mine an
+                    instrument (or a whole class) on demand so you can run tests on it.
+                  </p>
+                </div>
+                <div class="head-actions">
+                  <button
+                    type="button"
+                    class="ghost-btn"
+                    data-action="refresh-catalog"
+                    title="Re-scan the catalog + on-disk coverage"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+              <div id="data-body" class="environments-body tab-scroll"></div>
+            </section>
+            <section class="card" aria-labelledby="data-discover-h">
+              <div class="card-head">
+                <h2 id="data-discover-h">Discover more data</h2>
+                <p class="card-sub">
+                  Describe a problem and an LLM researches what data could help — proposals (source,
+                  coverage, cost, licence, how to acquire) appear below to review and add to the mine.
+                </p>
+              </div>
+              <div class="discover-form">
+                <textarea
+                  id="data-problem"
+                  rows="2"
+                  placeholder="e.g. single-asset crypto price is too noisy to carry a learnable edge"
+                ></textarea>
+                <input
+                  id="data-goal"
+                  type="text"
+                  placeholder="optional narrower goal (e.g. macro context for regime detection)"
+                />
+                <button type="button" class="ghost-btn" data-action="discover">Discover</button>
+              </div>
+              <div id="data-discovered" class="tab-scroll"></div>
+            </section>
+          </section>
+
+          <!-- Datasets (named data bundles — asset / walk-forward window / fidelity stack — to run models against) -->
+          <section id="tab-datasets" class="tab-panel" role="tabpanel" hidden>
+            <section class="card" aria-labelledby="datasets-h">
+              <div class="card-head card-head-row">
+                <div>
+                  <h2 id="datasets-h">Datasets</h2>
+                  <p class="card-sub">
+                    A named set of <em>dataset</em> settings (asset, walk-forward window, fidelity
+                    stack — e.g. 1h vs 1h+1d) — which data a model trains and tests on, not the
+                    model itself. Run a model against several to see how it holds up across
+                    datasets.
+                  </p>
+                </div>
+                <div class="head-actions">
+                  <button
+                    type="button"
+                    id="dataset-add-toggle"
+                    class="icon-btn"
+                    title="Add dataset"
+                    aria-label="Add dataset"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <p id="datasets-status" class="form-status" role="status" hidden></p>
+              <div id="datasets-body" class="environments-body tab-scroll"></div>
+            </section>
+          </section>
+
+          <!-- Scorecards (named gates+fitness definitions of "good"; the active one drives the Runs table) -->
+          <section id="tab-scorecards" class="tab-panel" role="tabpanel" hidden>
+            <section class="card" aria-labelledby="scorecards-h">
+              <div class="card-head card-head-row">
+                <div>
+                  <h2 id="scorecards-h">Scorecards</h2>
+                  <p class="card-sub">
+                    A named definition of <em>good</em> — <strong>gates</strong> (accept/reject
+                    predicates over a run's metrics) + <strong>fitness</strong> (ranking metrics),
+                    separate from the training reward. The <strong>active</strong> card drives the
+                    Runs table's Success badge, filter and sort; every card is shown in a run's
+                    detail. Tune the bar without re-running anything.
+                  </p>
+                </div>
+                <div class="head-actions">
+                  <button
+                    type="button"
+                    id="scorecard-add-toggle"
+                    class="icon-btn"
+                    title="New scorecard"
+                    aria-label="New scorecard"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <p id="scorecards-status" class="form-status" role="status" hidden></p>
+              <div id="scorecards-body" class="environments-body tab-scroll"></div>
+            </section>
+          </section>
+
+          <!-- Environments (named market-mechanic bundles — fee / TP-SL — to run models against) -->
+          <section id="tab-environments" class="tab-panel" role="tabpanel" hidden>
+            <section class="card" aria-labelledby="environments-h">
+              <div class="card-head card-head-row">
+                <div>
+                  <h2 id="environments-h">Environments</h2>
+                  <p class="card-sub">
+                    A named set of <em>environment</em> settings (fees, take-profit / stop-loss) —
+                    the market a model trades in, not the model itself. Run a model against several
+                    to see how it holds up across regimes.
+                  </p>
+                </div>
+                <div class="head-actions">
+                  <button
+                    type="button"
+                    id="environment-add-toggle"
+                    class="icon-btn"
+                    title="Add environment"
+                    aria-label="Add environment"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <p id="environments-status" class="form-status" role="status" hidden></p>
+              <div id="environments-body" class="environments-body tab-scroll"></div>
+            </section>
+          </section>
+              </div>
+            </div>
+          </section>
+
+          <!-- Research group: Papers / Hypotheses / Models / Speed behind a left rail. -->
+          <section id="tab-research" class="tab-panel group-panel" role="tabpanel" hidden>
+            <div class="group-shell" id="research-shell">
+              <nav class="group-rail" id="research-rail" aria-label="Research views"></nav>
+              <div class="group-content">
+          <!-- Hypotheses (LLM-proposed + human experiment backlog) -->
+          <section id="tab-hypotheses" class="tab-panel" role="tabpanel" hidden>
+            <section class="card" aria-labelledby="hypotheses-h">
+              <div class="card-head card-head-row">
+                <div>
+                  <h2 id="hypotheses-h">Hypotheses</h2>
+                  <p class="card-sub">
+                    Claims that runs prove or disprove — each verdict (untested / proven /
+                    disproved) auto-derives from the runs matching its spec and re-checks as new
+                    runs land.
+                  </p>
+                  <p class="card-sub" id="propose-last" hidden></p>
+                </div>
+                <div class="head-actions hyp-head-actions">
+                  <label
+                    class="min-runs-field"
+                    data-help="Minimum matching runs before a hypothesis is judged proven or disproved — with fewer it stays untested (a single run can't prove a claim). Launch more runs to reach it."
+                  >
+                    <span>Min runs</span>
+                    <input type="number" id="hypothesis-min-runs" min="1" step="1" />
+                  </label>
+                  <button
+                    type="button"
+                    id="hypotheses-consolidate-btn"
+                    class="ghost-btn"
+                    title="Fold hypotheses that share the same main parameters into one wider hypothesis (unioning their sweeps) — no LLM, deterministic. Repoints paper/model links and per-paper weights; conflicting manual verdicts are left untouched."
+                  >
+                    Consolidate
+                  </button>
+                  <button
+                    type="button"
+                    id="propose-btn"
+                    class="card-btn combo"
+                    aria-label="Propose experiments"
+                  ></button>
+                  <button
+                    type="button"
+                    id="hypothesis-add-toggle"
+                    class="card-btn combo"
+                    aria-label="Add hypothesis"
+                  ></button>
+                </div>
+              </div>
+              <p id="hypotheses-status" class="form-status" role="status" hidden></p>
+              <div id="hypotheses-body" class="hypotheses-body tab-scroll"></div>
+            </section>
+          </section>
+
+          <!-- Papers / Library (approaches to prove out or falsify) -->
+          <section id="tab-papers" class="tab-panel" role="tabpanel" hidden>
+            <section class="card" aria-labelledby="papers-h">
+              <div class="card-head card-head-row">
+                <div>
+                  <h2 id="papers-h">Papers / Library</h2>
+                  <p class="card-sub">
+                    Approaches to prove out or falsify — a container of the testable hypotheses it
+                    makes (extract them from the link, add your own, or link existing ones). Its
+                    verdict rolls up from those hypotheses; it "holds up" only when one beats
+                    buy-and-hold out-of-sample, net of fees.
+                  </p>
+                </div>
+                <div class="head-actions">
+                  <button
+                    type="button"
+                    id="paper-add-toggle"
+                    class="icon-btn"
+                    title="Add approach"
+                    aria-label="Add approach"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <p id="papers-status" class="form-status" role="status" hidden></p>
+              <div id="papers-body" class="papers-body tab-scroll"></div>
+            </section>
+          </section>
+
+          <!-- Models (the catalog of model architectures — linked to papers, runs, hypotheses) -->
+          <section id="tab-models" class="tab-panel" role="tabpanel" hidden>
+            <section class="card" aria-labelledby="models-h">
+              <div class="card-head card-head-row">
+                <div>
+                  <h2 id="models-h">Models</h2>
+                  <p class="card-sub">
+                    The model architectures this project can train — each linked to the papers that
+                    introduce or improve it, the runs that train it, and the hypotheses that test
+                    it. Status (proposed / implemented / failing) rolls up from its runs. Discuss a
+                    model with the AI to implement, improve, or fix it.
+                  </p>
+                </div>
+                <div class="head-actions">
+                  <button
+                    type="button"
+                    id="models-consolidate-btn"
+                    class="ghost-btn"
+                    title="Ask the LLM to find near-duplicate models (often the same model proposed from several papers) and review merging each group into one canonical model, the rest folded in as flavors"
+                  >
+                    Consolidate
+                  </button>
+                  <button
+                    type="button"
+                    id="models-scan-btn"
+                    class="ghost-btn"
+                    title="Scan the project for declared models not yet in the catalog and add them (heuristic + LLM)"
+                  >
+                    Scan Project
+                  </button>
+                </div>
+              </div>
+              <p id="models-status" class="form-status" role="status" hidden></p>
+              <div id="models-body" class="papers-body tab-scroll"></div>
+            </section>
+          </section>
+
+          <!-- Speed — per-model device benchmark + run durations -->
+          <section id="tab-speed" class="tab-panel" role="tabpanel" hidden>
+            <div id="speed-body" class="tab-scroll"></div>
+          </section>
+              </div>
+            </div>
+          </section>
+
+          <!-- Launch (sweep / fixed lever values → a training campaign) -->
+          <section id="tab-launch" class="tab-panel" role="tabpanel" hidden>
+            <section class="card" aria-labelledby="launch-h">
+              <div class="card-head">
+                <h2 id="launch-h">Launch a campaign</h2>
+                <p class="card-sub">
+                  Sweep lever values or fix them — every combination runs once per seed.
+                </p>
+              </div>
+              <form id="launch-form" class="launch-form tab-scroll" autocomplete="off"></form>
+            </section>
+          </section>
+
+          <!-- Activity (the current / last campaign) -->
+          <section id="tab-activity" class="tab-panel" role="tabpanel" hidden>
+            <section class="card" aria-label="Activity">
+              <div id="activity-body" class="activity-body tab-scroll"></div>
+            </section>
+          </section>
+
+          <!-- xAI — model internals + cross-run config effects + the experiment recommender -->
+          <section id="tab-xai" class="tab-panel" role="tabpanel" hidden>
+            <div id="xai-body" class="xai-body"></div>
+          </section>
+          <section id="tab-exploration" class="tab-panel" role="tabpanel" hidden>
+            <div id="exploration-body" class="tab-scroll"></div>
+          </section>
+          <section id="tab-diagnosis" class="tab-panel" role="tabpanel" hidden>
+            <div id="companion-strategy"></div>
+            <div id="champion-verdict"></div>
+            <div id="diagnosis-body" class="tab-scroll"></div>
+          </section>
+        </main>
+
+        <footer class="page-foot">
+          <span id="foot-label">Trainer viewer</span>
+        </footer>
+      </div>
+
+      <!-- Add/edit forms open as modals (like Datasets/Environments), not inline at the top of the tab. -->
+      <div id="hypothesis-modal" class="chart-modal" hidden>
+        <div class="chart-modal__backdrop" data-hyp-form-cancel></div>
+        <div class="chart-modal__panel bundle-form-panel" role="dialog" aria-label="Add hypothesis">
+          <div class="chart-modal__head">
+            <strong>Add a hypothesis</strong>
+            <button
+              type="button"
+              class="icon-btn"
+              data-hyp-form-cancel
+              title="Close"
+              aria-label="Close"
+            >
+              &#10005;
+            </button>
+          </div>
+          <div class="chart-modal__scroll">
+            <form id="hypothesis-form" class="hypothesis-form" autocomplete="off"></form>
+          </div>
+        </div>
+      </div>
+
+      <div id="paper-modal" class="chart-modal" hidden>
+        <div class="chart-modal__backdrop" data-paper-form-cancel></div>
+        <div class="chart-modal__panel bundle-form-panel" role="dialog" aria-label="Add approach">
+          <div class="chart-modal__head">
+            <strong>Add an approach / paper</strong>
+            <button
+              type="button"
+              class="icon-btn"
+              data-paper-form-cancel
+              title="Close"
+              aria-label="Close"
+            >
+              &#10005;
+            </button>
+          </div>
+          <div class="chart-modal__scroll">
+            <form id="paper-form" class="hypothesis-form" autocomplete="off"></form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
