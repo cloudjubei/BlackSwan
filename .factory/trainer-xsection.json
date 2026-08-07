@@ -23,7 +23,7 @@
       ],
       "default": "macro+stocks",
       "scope": "dataset",
-      "description": "The PRE-REGISTERED symbol universe ranked against itself. US-session instruments only \u2014 mixing 24/7 crypto onto a session calendar is the hardest alignment case and is deferred to \u00a72 rather than fudged. Choosing symbols after seeing results is selection-on-test, so this list is fixed in docs/cross-sectional-plan.md."
+      "description": "The PRE-REGISTERED symbol universe ranked against itself. US-session instruments only \u2014 mixing 24/7 crypto onto a session calendar is the hardest alignment case and is deferred to \u00a72 rather than fudged. Choosing symbols after seeing results is selection-on-test, so this list is fixed and never tuned on results."
     },
     "lookback": {
       "type": "number",

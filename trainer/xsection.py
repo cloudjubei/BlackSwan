@@ -33,9 +33,9 @@ from trainer.summary import (
 )
 from trainer.walk_forward import resolve_walk_forward_window
 
-# The screen's universe is PRE-REGISTERED (docs/cross-sectional-plan.md): choosing symbols after seeing
-# results is selection-on-test. US-session instruments only — mixing 24/7 crypto onto a session calendar is
-# the hardest alignment case and is deliberately deferred to §2 rather than fudged here.
+# The screen's universe is PRE-REGISTERED and never tuned on results: choosing symbols after seeing them is
+# selection-on-test. US-session instruments only — mixing 24/7 crypto onto a session calendar is the hardest
+# alignment case and is deliberately deferred to the multi-asset env rather than fudged here.
 UNIVERSES = {
     "macro": ["GOLD", "SPY", "UUP", "TLT", "IEF", "SHY"],
     "stocks": ["NVDA", "MSFT", "AAPL", "GOOGL", "AMZN", "META", "AVGO", "TSLA", "JPM", "WMT"],
