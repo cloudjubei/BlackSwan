@@ -1,0 +1,59 @@
+{
+  "name": "blackswan-roll-basket",
+  "recordType": "blackswan-roll-basket",
+  "description": "The POOLED energy-basket index-roll probe — the power-recoverable follow-up to the single-asset WTI roll null. The WTI roll was a scope-limited null: single-asset WTI discarded ~sqrt(24) of Mou (2011)'s POOLED ~24-commodity t-stat, so it could not adjudicate the basket. This probe trades the SAME monthly M1-M2 roll spread across the EIA ENERGY complex (crude WTI + NY-Harbor heating oil + RBOB gasoline + Henry-Hub natural gas) as an EQUAL-WEIGHT PORTFOLIO: each month is the mean of the per-leg spread-trade returns, so diversification lowers the portfolio return variance and lifts the t-stat — the mechanism behind Mou's t~4-5. roll_frontrun SHORTS each leg's spread into the roll (Mou's direction), roll_fade LONGS it (the algebraic-mirror control). Market-neutral, so no buy-and-hold benchmark; the decider is the DSR-deflated portfolio Sharpe (objective = oos_sharpe). Reuses trainer/roll.py's per-commodity machinery wholesale (all four leakage guards mutation-proven there); the ONE new surface is the equal-weight aggregation, which EXCLUDES a leg with no trade that month rather than zero-filling it. SCOPE HONESTY: this is the ENERGY sub-basket (GSCI's largest weight), NOT Mou's full 24-commodity pool; power is bounded by sqrt(4) and reduced by cross-energy correlation, and the crash super-contango tail that drove the WTI null (2008, 2020) is a COMMON energy factor pooling cannot diversify away — so a null here strengthens the refutation for energy but does not fully adjudicate Mou (metals/ags need paid data). Deterministic and model-free (the seed is contract-only). DATA: eia-energy/<SYMBOL>.json mined by scripts/fetch_energy.py (needs a free EIA_API_KEY).",
+  "run": ".venv/bin/python -m trainer.roll_basket --config-json {configPath} --summary-out {summaryOut}",
+  "objective": { "name": "oos_sharpe", "direction": "max" },
+  "hypothesisBenchmark": { "metric": "oos_sharpe", "threshold": 0, "direction": "max" },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "signal": {
+      "type": "choice",
+      "choices": ["roll_frontrun", "roll_fade"],
+      "default": "roll_frontrun",
+      "description": "roll_frontrun SHORTS each leg's M1-M2 spread into the roll (Mou's direction); roll_fade LONGS it (the algebraic-mirror control, gross_fade = -gross_frontrun per leg, zero independent power). An unknown value is refused."
+    },
+    "basket": {
+      "type": "choice",
+      "choices": ["energy4"],
+      "default": "energy4",
+      "scope": "dataset",
+      "description": "Which pooled basket of commodities is traded as an equal-weight portfolio. energy4 = crude + heating oil + RBOB gasoline + natural gas (the free EIA energy complex, GSCI's largest weight). Metals/ags legs would need paid data."
+    },
+    "entry_bday": {
+      "type": "number",
+      "default": 3,
+      "range": [1, 4],
+      "description": "The business day of the month at whose settlement each leg's spread is ENTERED — before the GSCI day-5 roll start. Business day k = the k-th trading date present in that leg's settlement data."
+    },
+    "exit_bday": {
+      "type": "number",
+      "default": 10,
+      "range": [6, 12],
+      "description": "The business day at whose settlement each leg's spread is EXITED — at/after the GSCI day-9 roll end. Must exceed entry_bday; a leg-month with fewer trading days than exit_bday is not traded and is excluded from that month's portfolio average."
+    },
+    "roll_schedule": {
+      "type": "choice",
+      "choices": ["gsci"],
+      "default": "gsci",
+      "description": "Descriptive label for the index roll window the entry/exit days straddle (GSCI = business days 5-9)."
+    },
+    "transaction_cost": {
+      "type": "number",
+      "default": 0.0003,
+      "scope": "environment",
+      "description": "Per-leg fee, charged on both contracts of every commodity at entry and again at exit. Conservative (four legged crossings per leg-trade); an exchange-listed calendar spread trades as one instrument at ~2-4 bps."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": ["roll-2006-2011", "roll-2016-2025"],
+      "default": "roll-2006-2011",
+      "description": "Which span is ACCOUNTED (the roll strategy is a fixed rule with no training leg). roll-2006-2011 reproduces Mou's era; roll-2016-2025 is the post-publication out-of-sample. A real edge must clear the DSR-deflated portfolio Sharpe in BOTH."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the backtest is fully deterministic, so seeds are not swept."
+    }
+  }
+}

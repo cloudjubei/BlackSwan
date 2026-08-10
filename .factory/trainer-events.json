@@ -1,0 +1,94 @@
+{
+  "name": "blackswan-events",
+  "recordType": "blackswan-events",
+  "description": "The MACRO-EVENT probe — event-CONDITIONED trading (the B2 line, exogenous triggers). The intraday probe measured UNCONDITIONAL short-horizon direction as null; this asks a narrower, genuinely exogenous question: in the window right after a SCHEDULED macro release (CPI, jobs, retail, PCE, GDP), does the crypto reaction PERSIST (event_drift) or REVERSE (event_fade) far enough to clear the ~0.2% round trip? A scheduled release is external information the price could not have fully priced a bar earlier, so if any short-horizon drift is real anywhere, the minutes after a release are where it should live. The probe trades ONLY in event windows (few trades/day), the 'recognise the condition, trade only then' discipline — so unlike the continuous probes its cost is low. It reuses the shared point-in-time release timing (pit_fusion: release date + the series' publish wall-clock, DST-aware) and the intraday backtest mechanics, so every existing gate/lens/scorecard reads an event cell unchanged. Guards pinned before any number is emitted: (a) an event fires at the series' real RELEASE datetime, NEVER the reference period it describes (refPeriod-stamping is the classic macro look-ahead); only GENUINE discrete releases are events — the daily rate series (DFEDTARU/DFF/DGS10/...) are excluded since a value every calendar day is not a market event; coincident releases across series collapse to one event; (b) the reaction bar is the FIRST decision bar at/after the release, its return is known at that bar's close and the position is applied to the NEXT bars, never the reaction bar's own return; event times are fixed by the macro calendar and never depend on price. NOTE: because the strategy is in-market only briefly, return_vs_hold_pct is structurally biased against it in a trending year; the EXPOSURE-NEUTRAL decider is signal_expectancy (per-trade edge net of cost) alongside oos_sharpe. Deterministic and model-free (the seed is contract-only).",
+  "run": ".venv/bin/python -m trainer.events --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "return_vs_hold_pct",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT"
+      ],
+      "default": "BTCUSDT",
+      "scope": "dataset",
+      "description": "Which crypto instrument's 1m price is resampled, traded and benchmarked. return_vs_hold_pct and beta/up/down capture are measured against THIS asset over the same span. The macro events themselves are asset-independent (US macro releases)."
+    },
+    "bar": {
+      "type": "choice",
+      "choices": [
+        15,
+        30,
+        60,
+        240
+      ],
+      "default": 60,
+      "scope": "dataset",
+      "description": "Decision-bar width in minutes: the 1m series is resampled up to this cadence and the post-release reaction is measured on these bars. A smaller bar catches the immediate reaction (and a tighter hold); a larger bar a slower one."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": [
+        "event_drift",
+        "event_fade"
+      ],
+      "default": "event_drift",
+      "description": "The reading of the post-release reaction. event_drift RIDES the first post-release bar's move (information persists); event_fade FADES it (overreaction correction). The reaction bar is the first decision bar at/after the release; its move is ridden/faded and the position applied to the NEXT bars. An unknown value is refused, so a typo can never file one arm's result under the other's label."
+    },
+    "event_group": {
+      "type": "choice",
+      "choices": [
+        "cpi",
+        "jobs",
+        "macro_all"
+      ],
+      "default": "macro_all",
+      "scope": "dataset",
+      "description": "Which scheduled releases are events. cpi = CPI NSA+SA (~12 unique/yr); jobs = payrolls + jobless claims + unemployment (~60/yr); macro_all = those plus retail sales, core PCE, GDP (~90/yr). Only GENUINE discrete releases — the daily rate series are excluded. Coincident releases across series collapse to one event. FOMC is deferred (needs a real meeting calendar, not a daily rate print)."
+    },
+    "hold_bars": {
+      "type": "number",
+      "default": 4,
+      "range": [
+        1,
+        200
+      ],
+      "description": "How many decision bars a position is held after the reaction bar, then flat. The position earns bars b+1..b+hold_bars (never the reaction bar's own return), and a new event inside the hold window is ignored. Sweeps the horizon over which any post-release drift would have to persist to clear cost."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.001,
+      "scope": "environment",
+      "description": "Per-side fee, charged on turnover at entry and again at exit, so a round trip costs ~(1-fee)^2 ≈ 0.2% at the default. Because the probe trades only a few times per WEEK, realized_cost_bps is low — the cost floor is not the enemy here, the per-trade edge is."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "alt-2024",
+        "alt-2025",
+        "2024",
+        "2025",
+        "alt-2026"
+      ],
+      "default": "alt-2024",
+      "scope": "dataset",
+      "description": "Which out-of-sample span is ACCOUNTED. Only events (and bars) inside the test window enter the metrics; the month before it is a formation lookback for an event opening just before the span. alt-2024 and alt-2025 are the two fully-mined crypto windows shared by all three assets, both fully covered by the macro release history."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the backtest is fully deterministic, so seeds are not swept (identical cells would fake replication)."
+    }
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "name": "blackswan-funding",
+  "recordType": "blackswan-funding",
+  "description": "The FUNDING-RATE probe — the first line in the project to trade on a NON-PRICE stream. Every prior line (RL, supervised, deterministic momentum/breakout, cross-section, risk-parity, intraday) read only PRICE and found no directional edge that clears cost. Perpetual funding is different in kind: the periodic long/short payment that tethers the perp to spot is a POSITIONING/SENTIMENT gauge the spot price series does not contain — extreme-positive funding means longs are crowded (paying shorts), extreme-negative means shorts are crowded. This backtest asks the honest question: does conditioning an 8h-cadence directional trade on a funding EXTREME — fading it (funding_contrarian) or riding it (funding_momentum) — beat buy-and-hold NET of the ~0.2% crypto round trip, walk-forward? It reuses the intraday backtest mechanics verbatim (resample 1m->8h bars, hold-then-flat positions, both-way fees, per-trade edge, trades_per_day), so every existing gate, lens and scorecard reads a funding cell unchanged. Three lookahead traps are pinned before any number is emitted: (a) funding joins price by TIMESTAMP on the 8h grid with a tolerance — sub-second jitter is kept, the off-cycle 4h fundings binance inserts under stress sit mid-8h-bar and are DROPPED (a decision at an 8h close never observed them); (b) 'is this funding extreme?' is judged against the funding distribution known strictly BEFORE the bar (a whole-sample quantile would fabricate the signal); (c) the position implied by the funding that settled at bar t is applied to bars t+1.. — never bar t's own interval — and positions never read price at all, only the funding signal does. Deterministic and model-free (the seed is contract-only). The decision cadence IS the funding cadence, so the 8h bar width is fixed, not swept. funding_coverage is emitted so a broken join surfaces as a metric, not a silent all-flat book.",
+  "run": ".venv/bin/python -m trainer.funding --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "return_vs_hold_pct",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT"
+      ],
+      "default": "BTCUSDT",
+      "scope": "dataset",
+      "description": "Which crypto perpetual's funding is read and whose 1m OHLCV is traded and benchmarked. The buy-and-hold return_vs_hold_pct and the beta/up/down capture are measured against THIS asset over the same span. Funding history for BTC/ETH/SOL is mined to binance-funding/<asset>-funding.json (8h settlements back to 2022-01)."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": [
+        "funding_contrarian",
+        "funding_momentum"
+      ],
+      "default": "funding_contrarian",
+      "description": "The reading of a funding extreme. funding_contrarian FADES it — short a crowded-long (high-funding) extreme, long a crowded-short (low-funding) extreme — on the thesis that crowded positioning mean-reverts. funding_momentum RIDES it, on the thesis that funding reflects genuine, persistent demand. A bar fires only when the funding that settled at its close is at/above the funding_pct quantile (or at/below 1-funding_pct) of the PAST-ONLY funding distribution. An unknown value is refused, so a typo can never file one arm's result under the other's label."
+    },
+    "funding_pct": {
+      "type": "number",
+      "default": 0.8,
+      "range": [
+        0.5,
+        0.999
+      ],
+      "description": "The quantile of the TRAILING (expanding, past-only) funding distribution at/above which the settled funding is a crowded-long extreme (and at/below 1-this a crowded-short extreme). Computed only from funding observed at prior bars — a whole-sample quantile would be a silent lookahead that fabricates extremes. Higher values demand a rarer funding to trade."
+    },
+    "hold_bars": {
+      "type": "number",
+      "default": 1,
+      "range": [
+        1,
+        60
+      ],
+      "description": "How many 8h decision bars a position is held after entry, then flat. The position earns bars t+1..t+hold_bars (never the funding-settlement bar's own interval), and a new funding extreme inside the hold window is ignored. hold_bars=1 is a single 8h horizon; larger values test whether the positioning edge persists across days."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.001,
+      "scope": "environment",
+      "description": "Per-side fee, charged on turnover at entry and again at exit, so a round trip costs ~(1-fee)^2 ≈ 0.2% at the default — the crypto cost floor this probe is measured against. At the 8h cadence a continuously-traded book pays this up to 3x/day, so the funding edge must be large AND selective to clear it."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "alt-2024",
+        "alt-2025",
+        "2024",
+        "2025",
+        "alt-2026"
+      ],
+      "default": "alt-2024",
+      "scope": "dataset",
+      "description": "Which out-of-sample span is ACCOUNTED. Only the test window's 8h bars enter the metrics and the benchmark; the month before it is loaded solely to warm the past-only funding distribution. alt-* windows suit the altcoins whose 1m history (and mined funding) starts in 2022; the plain windows suit BTC. alt-2024 and alt-2025 are the two fully-mined crypto windows shared by all three assets."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the backtest is fully deterministic, so seeds are not swept (identical cells would fake replication)."
+    }
+  }
+}

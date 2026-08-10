@@ -1,0 +1,59 @@
+{
+  "name": "blackswan-roll",
+  "recordType": "blackswan-roll",
+  "description": "The commodity index-ROLL ('Goldman roll') probe — the first NON-CRYPTO, non-price-derived probe, and the first to pass the counterparty test with a genuinely NAMED price-insensitive forced flow. Passive long-only commodity-index funds (S&P GSCI, Bloomberg BCOM) mechanically roll their front-month longs into the next contract on a FIXED, PUBLISHED schedule (GSCI = business days 5-9 each month), price-INSENSITIVELY and fully TELEGRAPHED — the over-paying counterparty that structurally cannot stop, the one thing 'model Apple and predict its price' lacks. The trade is a MARKET-NEUTRAL WTI M1-M2 calendar spread held across the roll window: roll_frontrun SHORTS the spread into the roll (Mou 2011's direction — anticipating the index selling nearby / buying deferred), roll_fade LONGS it (betting the effect over-arbitraged and reversed). Because it is delta-neutral there is NO buy-and-hold benchmark and the exposure-bias trap that dogged majority-beats-hold does not apply; the honest decider is the strategy's own per-trade Sharpe, DSR-deflated for the sweep (objective = oos_sharpe). Reuses the trainer summary primitives so every gate/DSR aggregation reads a roll cell unchanged. Leakage traps pinned in test_roll.py: the spread is built from RAW per-contract settlements (M1 and M2 of the actual contracts), NEVER a back-adjusted continuous series (a continuous roll bakes the effect in — a look-ahead machine); a month missing either leg on its entry/exit day is DROPPED, never forward-filled; entry business-day < exit business-day is enforced; each month's return reads ONLY its own entry+exit settlements. PRE-REGISTERED EXPECTATION: reproduce Mou in roll-2006-2011, refute-via-decay in roll-2016-2025 (post-publication crowding + diversified/dynamic-roll indices) — a §D reproduce-and-refute artifact either way. Deterministic and model-free (the seed is contract-only). DATA: WTI contract settlements M1..M4 daily from EIA (RCLC1..RCLC4), mined to eia-wti/<asset>.json by scripts/fetch_wti.py (needs a free EIA_API_KEY).",
+  "run": ".venv/bin/python -m trainer.roll --config-json {configPath} --summary-out {summaryOut}",
+  "objective": { "name": "oos_sharpe", "direction": "max" },
+  "hypothesisBenchmark": { "metric": "oos_sharpe", "threshold": 0, "direction": "max" },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": ["WTI"],
+      "default": "WTI",
+      "scope": "dataset",
+      "description": "Which commodity's front/second futures settlements drive the calendar spread. WTI = the single largest energy weight in the S&P GSCI, so the passive-index roll flow is largest and most detectable; HO/RB/NG/ags are follow-ups only if WTI survives."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": ["roll_frontrun", "roll_fade"],
+      "default": "roll_frontrun",
+      "description": "roll_frontrun SHORTS the M1-M2 spread into the roll (Mou's direction: the index sells nearby / buys deferred, so the nearby cheapens); roll_fade LONGS it (the mirror control — the effect over-arbitraged and reversed). Pre-registering both prevents post-hoc direction cherry-picking. An unknown value is refused."
+    },
+    "entry_bday": {
+      "type": "number",
+      "default": 3,
+      "range": [1, 4],
+      "description": "The business day of the month (1 = first trading date) at whose settlement the spread is ENTERED — before the GSCI day-5 roll start. Business day k = the k-th trading date present in the settlement data (weekends/holidays are absent by construction), so the roll calendar is deterministic and known ahead."
+    },
+    "exit_bday": {
+      "type": "number",
+      "default": 10,
+      "range": [6, 12],
+      "description": "The business day of the month at whose settlement the spread is EXITED — at/after the GSCI day-9 roll end. Must exceed entry_bday (a spread cannot be entered after it is exited); a month with fewer trading days than exit_bday is not traded."
+    },
+    "roll_schedule": {
+      "type": "choice",
+      "choices": ["gsci"],
+      "default": "gsci",
+      "description": "Descriptive label for the index roll window the entry/exit days straddle (GSCI = business days 5-9). The entry_bday/exit_bday levers are the actual computation; this records which index's telegraphed schedule is being front-run."
+    },
+    "transaction_cost": {
+      "type": "number",
+      "default": 0.0003,
+      "scope": "environment",
+      "description": "Per-leg fee, charged on BOTH contracts (M1 and M2) at entry and again at exit (four leg-transactions per round trip). WTI calendar spreads are very liquid, so this is a fraction of a percent; even so the per-trade edge must clear it."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": ["roll-2006-2011", "roll-2016-2025"],
+      "default": "roll-2006-2011",
+      "description": "Which span is ACCOUNTED (the roll strategy is a fixed rule with no training leg). roll-2006-2011 reproduces Mou's documented era; roll-2016-2025 is the post-publication out-of-sample. A real edge must clear the DSR-deflated Sharpe in BOTH; the pre-registered base case is in-sample-only (reproduce then decay)."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the backtest is fully deterministic, so seeds are not swept (identical cells would fake replication)."
+    }
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "name": "blackswan-liquidation",
+  "recordType": "blackswan-liquidation",
+  "description": "The LIQUIDATION-CASCADE probe — the mechanically-asymmetric line. A liquidation cascade is FORCED deleveraging: an exchange market-closes blown-up leveraged positions regardless of price, so a long cascade dumps aggressive SELLS (price craters on a volume spike with one-sided taker selling) and a short squeeze mirrors it. The bet is that this flow is NON-informational (the seller has no choice), so the dislocation OVER-shoots and REVERTS: buy the forced-sell crash, short the forced-buy squeeze. Unlike a scheduled release (priced in instantly) or contemporaneous flow, a cascade is a MECHANICAL asymmetry — the class the price/funding/order-flow/event nulls do NOT cover. Real historical liquidation feeds are not freely available, so the cascade is DETECTED from a proxy already on disk: a decision bar whose (1) move clears k_move*trailing-vol, (2) volume clears a past-only spike quantile, and (3) taker imbalance is extreme ON THE SAME SIDE as the move (the forced aggressor flow that caused it). ALL THREE are required — any one alone is just a volatile bar (already measured null by the vol-breakout and order-flow probes). cascade_reversion FADES the cascade (the thesis); cascade_momentum RIDES it (the control). Reuses the order-flow bar aggregation and the intraday backtest mechanics, so every existing gate/lens/scorecard reads a cascade cell unchanged. Guards pinned before any number: the compound gate is a real AND (two of three never fires); the flow must CONFIRM the move's side; every threshold (trailing vol, volume-spike quantile, imbalance-extreme quantile) is past-only; the cascade detected at bar t applies to bars t+1.. (the AFTERMATH) never bar t's own dislocation return. NOTE the detector is a PROXY, not verified liquidations; and the book is sparse, so signal_expectancy (per-trade edge net of cost) is the exposure-neutral decider alongside the gate. Deterministic and model-free (the seed is contract-only).",
+  "run": ".venv/bin/python -m trainer.liquidation --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "return_vs_hold_pct",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+      "default": "BTCUSDT",
+      "scope": "dataset",
+      "description": "Which crypto instrument's 1m price+volume+taker-split is aggregated, and whose price is traded and benchmarked. return_vs_hold_pct and beta/up/down capture are measured against THIS asset."
+    },
+    "bar": {
+      "type": "choice",
+      "choices": [15, 30, 60],
+      "default": 15,
+      "scope": "dataset",
+      "description": "Decision-bar width in minutes: the 1m series is aggregated up to this cadence and the cascade is detected on these bars. Cascades are fast, so a tight bar catches the dislocation and its immediate aftermath; a wider bar smooths it."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": ["cascade_reversion", "cascade_momentum"],
+      "default": "cascade_reversion",
+      "description": "cascade_reversion FADES a detected cascade (long a forced-sell crash, short a forced-buy squeeze) — the mechanical-overshoot thesis. cascade_momentum RIDES it — the control. An unknown value is refused, so a typo can never file one arm's result under the other's label."
+    },
+    "k_move": {
+      "type": "number",
+      "default": 3.0,
+      "range": [1.0, 20.0],
+      "description": "The move gate: a bar is a cascade candidate only when |return| > k_move * trailing vol (through the prior bar). Higher k demands a more violent dislocation (rarer, more clearly forced)."
+    },
+    "vol_pct": {
+      "type": "number",
+      "default": 0.9,
+      "range": [0.5, 0.999],
+      "description": "The volume-spike gate: the bar's volume must be at/above this quantile of the PAST-ONLY volume distribution (forced market orders spike volume). A whole-sample quantile would be a silent lookahead."
+    },
+    "flow_pct": {
+      "type": "number",
+      "default": 0.8,
+      "range": [0.5, 0.999],
+      "description": "The flow gate: the bar's taker imbalance must be in this tail of the PAST-ONLY imbalance distribution, ON THE SAME SIDE as the move (a down cascade needs aggressive selling, an up cascade aggressive buying) — the forced aggressor flow that caused the dislocation."
+    },
+    "vol_window": {
+      "type": "number",
+      "default": 20,
+      "range": [2, 500],
+      "description": "Bars of trailing returns behind the realized-vol estimate that scales the move gate. Past-only; the warm-up before it is defined is simply left flat."
+    },
+    "hold_bars": {
+      "type": "number",
+      "default": 4,
+      "range": [1, 200],
+      "description": "How many decision bars the reversion/momentum position is held after the cascade bar, then flat. The position earns bars t+1..t+hold_bars (never the cascade bar's own dislocation return); a new cascade inside the hold window is ignored. Sweeps the horizon over which the overshoot would have to revert to clear cost."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.001,
+      "scope": "environment",
+      "description": "Per-side fee, charged on turnover at entry and again at exit, so a round trip costs ~(1-fee)^2 ≈ 0.2% at the default. Because cascades are rare the book is sparse, so realized_cost_bps is moderate — the per-trade edge is the question."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": ["alt-2024", "alt-2025", "2024", "2025", "alt-2026"],
+      "default": "alt-2024",
+      "scope": "dataset",
+      "description": "Which out-of-sample span is ACCOUNTED. Only bars/cascades inside the test window enter the metrics; the month before it is a formation lookback for the vol/volume/imbalance distributions. alt-2024 and alt-2025 are the two fully-mined crypto windows shared by all three assets."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the backtest is fully deterministic, so seeds are not swept (identical cells would fake replication)."
+    }
+  }
+}

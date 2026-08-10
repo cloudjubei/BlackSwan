@@ -1,0 +1,61 @@
+{
+  "name": "blackswan-attention",
+  "recordType": "blackswan-attention",
+  "description": "The ATTENTION probe — the first SENTIMENT/attention stream (B3), a cheap calibration. Wikipedia daily pageviews for an asset's article (Bitcoin/Ethereum/Solana) proxy retail ATTENTION — free, no-key, per-asset, daily, mined to wiki-pageviews/<asset>.json. It asks whether an attention SURGE (pageviews in the top tail of their own past) predicts the next day's move — ride it (attention_momentum: FOMO continues) or fade it (attention_reversion: the hype day is a local top). The well-known trap is that attention tracks VOLATILITY, not direction; this measures whether any tradeable direction survives cost. Reuses the shared signal_extremes past-only core and the intraday backtest mechanics, so every existing gate/lens/scorecard reads an attention cell unchanged. The one surface new here is the pageview JOIN, which carries the publication-lag trap pinned before any number: Wikimedia publishes a day's count only AFTER that day, so a crypto bar dated D reads pageviews[D - lag_days] (lag_days>=1) — never day D's own unpublished count — making the traded return two days after the pageview day. The extreme is past-only, the position applies to the next bar, positions never read price. NOTE: sparse book, so signal_expectancy (per-trade edge net of cost) is the exposure-neutral decider alongside the gate. Deterministic and model-free (the seed is contract-only).",
+  "run": ".venv/bin/python -m trainer.attention --config-json {configPath} --summary-out {summaryOut}",
+  "objective": { "name": "oos_sharpe", "direction": "max" },
+  "hypothesisBenchmark": { "metric": "return_vs_hold_pct", "threshold": 0, "direction": "max" },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+      "default": "BTCUSDT",
+      "scope": "dataset",
+      "description": "Which crypto instrument's price is traded/benchmarked and whose Wikipedia article's pageviews drive the signal (BTC->Bitcoin, ETH->Ethereum, SOL->Solana). return_vs_hold_pct and capture are measured against THIS asset."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": ["attention_momentum", "attention_reversion"],
+      "default": "attention_momentum",
+      "description": "attention_momentum RIDES an attention surge (long a top-tail pageview day, on the FOMO-continues thesis); attention_reversion FADES it (short a surge, on the hype-day-is-a-local-top thesis). A bar fires only when its lagged pageviews are at/above the attention_pct quantile (or at/below 1-this) of the PAST-ONLY distribution. An unknown value is refused."
+    },
+    "attention_pct": {
+      "type": "number",
+      "default": 0.9,
+      "range": [0.5, 0.999],
+      "description": "The quantile of the TRAILING (expanding, past-only) pageview distribution at/above which the day is an attention SURGE (and at/below 1-this an attention lull). Computed only from pageviews observed at prior bars — a whole-sample quantile would be a silent lookahead. Higher demands a rarer surge."
+    },
+    "hold_bars": {
+      "type": "number",
+      "default": 2,
+      "range": [1, 60],
+      "description": "How many daily bars a position is held after a surge, then flat. The position earns bars t+1..t+hold_bars (never the surge bar's own return), and a new surge inside the hold window is ignored."
+    },
+    "lag_days": {
+      "type": "number",
+      "default": 1,
+      "range": [1, 5],
+      "scope": "dataset",
+      "description": "Publication lag: a bar dated D reads pageviews[D - lag_days]. lag_days=1 is the minimum safe lag (a day's count is published only after that day); larger values test robustness to slower publication / conservative timing. The traded return is (lag_days + 1) days after the pageview day."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.001,
+      "scope": "environment",
+      "description": "Per-side fee, charged on turnover at entry and again at exit (~0.2% round trip at the default). Because surges are rare the book is sparse, so realized_cost_bps is moderate — the per-trade edge is the question."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": ["alt-2024", "alt-2025", "2024", "2025", "alt-2026"],
+      "default": "alt-2024",
+      "scope": "dataset",
+      "description": "Which out-of-sample span is ACCOUNTED. Only the test window's daily bars enter the metrics; the month before it is a formation lookback for the past-only pageview distribution. alt-2024 (crypto BULL) and alt-2025 (crypto BEAR) are the decisive pair — a real attention-direction edge must hold in BOTH, not flip sign with the regime."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the backtest is fully deterministic, so seeds are not swept (identical cells would fake replication)."
+    }
+  }
+}

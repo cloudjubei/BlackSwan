@@ -1,0 +1,61 @@
+{
+  "name": "blackswan-regime",
+  "recordType": "blackswan-regime",
+  "description": "The MACRO-REGIME probe — a long-or-flat TIMING overlay (the B4 world-model line). Every prior line sought a per-trade directional edge and found none: public, price-derived, scheduled and mechanical information is all priced in. This asks a different question — can a SLOW macro regime estimate (rates easing/tightening, the yield curve, the jobless-claims trend) time crypto EXPOSURE (hold in risk-on, sit in cash in risk-off) and beat buy-and-hold by dodging drawdowns? It is an allocation overlay, not a per-trade signal, so it is judged on RISK-ADJUSTED return: sharpe_vs_hold (the overlay's per-step OOS Sharpe minus buy-and-hold's), because in a bull year ANY de-risking loses to hold on raw return — the value is drawdown avoidance. The honest bar is beating hold on Sharpe across a BULL and a BEAR window at once: a real regime signal must stay invested in the 2024 bull AND go flat in the 2025 bear. Macro values are joined POINT-IN-TIME (pit_fusion: known only from their release instant, DST-aware, never the reference period) — the whole leakage game. It reuses the intraday backtest (position 1.0 = held, 0.0 = cash; the switch fee is charged on turnover), so every existing lens reads a regime cell unchanged. regime_overlay is the thesis; regime_inverse (hold in risk-OFF) is the control that should FAIL if the signal carries real directional content. Guards pinned before any number: the rule is PAST-ONLY (as-of value at t vs the as-of value `lookback` days earlier, both known by t); the macro value at a day is the latest RELEASED by it; and the regime decided at day t sets exposure for day t+1's return, never day t's own. Deterministic and model-free (the seed is contract-only).",
+  "run": ".venv/bin/python -m trainer.regime --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "sharpe_vs_hold",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+      "default": "BTCUSDT",
+      "scope": "dataset",
+      "description": "Which crypto instrument's daily price the overlay times and is benchmarked against. sharpe_vs_hold, return_vs_hold_pct and drawdown are all measured against a fee-charged buy-and-hold of THIS asset over the same span. The macro regime itself is asset-independent (US macro/rates)."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": ["regime_overlay", "regime_inverse"],
+      "default": "regime_overlay",
+      "description": "regime_overlay HOLDS crypto in risk-on and sits in CASH in risk-off (the thesis). regime_inverse is the mirror control (hold in risk-OFF), which should LOSE if the macro signal carries real directional content. An unknown value is refused, so a typo can never file one arm's result under the other's label."
+    },
+    "rule": {
+      "type": "choice",
+      "choices": ["rates_easing", "curve_steepening", "claims_falling", "risk_composite"],
+      "default": "risk_composite",
+      "description": "The regime rule, read from RELEASED macro series (never price), voting risk-on from a past-only trend. rates_easing: the 10Y yield (DGS10) has fallen over the lookback (easing -> risk-on). curve_steepening: the 10Y-2Y spread (T10Y2Y) has risen (steepening out of inversion -> risk-on). claims_falling: initial jobless claims (ICSA) have fallen (labour firming -> risk-on). risk_composite: at least two of the three agree."
+    },
+    "lookback": {
+      "type": "number",
+      "default": 63,
+      "range": [5, 504],
+      "description": "Daily bars behind the trend comparison — value[t] vs value[t-lookback], both point-in-time. 63 ~ one quarter, 126 ~ six months. Longer lookbacks make the regime slower and lower-turnover."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.001,
+      "scope": "environment",
+      "description": "Per-side fee, charged on turnover at every risk-on<->off switch, so a full in-then-out cycle costs ~(1-fee)^2 ≈ 0.2%. Because macro regimes are persistent the overlay switches only a handful of times a year, so realized_cost_bps is small."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": ["alt-2024", "alt-2025", "2024", "2025", "alt-2026"],
+      "default": "alt-2024",
+      "scope": "dataset",
+      "description": "Which out-of-sample span is ACCOUNTED. The full training span is loaded so the trend + as-of macro are warm at the test start; only the test window's daily bars enter the metrics. alt-2024 (a crypto BULL) and alt-2025 (a crypto BEAR) together are the decisive pair — a real regime overlay must beat hold on Sharpe in BOTH."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the backtest is fully deterministic, so seeds are not swept (identical cells would fake replication)."
+    }
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "name": "blackswan-orderflow",
+  "recordType": "blackswan-orderflow",
+  "description": "The ORDER-FLOW (taker-imbalance) probe — the second NON-PRICE stream in the project, and the cheapest possible one: the aggressor split is ALREADY in the on-disk 1m klines (asset_volume_taker_base = the volume where the taker was the buyer), so no data is mined. Per bar the signed imbalance is (2*taker_buy - volume)/volume in [-1,+1] — net aggressive buying above 0, net selling below. This backtest asks whether conditioning a directional trade on an EXTREME of that imbalance beats buy-and-hold NET of the ~0.2% crypto round trip: flow_momentum RIDES the extreme (informed aggressor flow persists), flow_contrarian FADES it (aggressors overpay the spread and get run over). It reuses the intraday backtest mechanics and the shared past-only extreme core (signal_extremes), so every existing gate, lens and scorecard reads a flow cell unchanged. Guards pinned before any number is emitted: (a) imbalance is built from ONLY a bar's own minutes (no straddle) and is the SIGNED aggressor ratio — all-buy=+1, all-sell=-1, balanced=0, zero-volume=None; (b) the imbalance measured over bar t is known at t's close and the position it implies is applied to bars t+1.. never bar t's own return, and positions never read price at all; (c) 'is this imbalance extreme?' is judged against the PAST-ONLY imbalance distribution (a whole-sample quantile would fabricate the signal). Deterministic and model-free (the seed is contract-only). flow_coverage is emitted so a broken aggregation surfaces as a metric, not a silent all-flat book.",
+  "run": ".venv/bin/python -m trainer.orderflow --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "return_vs_hold_pct",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT"
+      ],
+      "default": "BTCUSDT",
+      "scope": "dataset",
+      "description": "Which crypto instrument's 1m taker-split is aggregated and whose price is traded and benchmarked. return_vs_hold_pct and beta/up/down capture are measured against THIS asset over the same span."
+    },
+    "bar": {
+      "type": "choice",
+      "choices": [
+        15,
+        30,
+        60,
+        240
+      ],
+      "default": 60,
+      "scope": "dataset",
+      "description": "Decision-bar width in minutes: the 1m taker-split is aggregated up to this cadence and the imbalance + every trade decision is taken on these bars. Smaller bars fire more often (raising trades_per_day) and pay the cost floor more often — the central tension. Bar widths that divide the day evenly keep aggregation exact across month boundaries."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": [
+        "flow_momentum",
+        "flow_contrarian"
+      ],
+      "default": "flow_momentum",
+      "description": "The reading of a taker-imbalance extreme. flow_momentum RIDES it — long a net-buying extreme, short a net-selling extreme — on the thesis that aggressive (informed) flow persists. flow_contrarian FADES it, on the thesis that aggressors overpay the spread and get run over. A bar fires only when its imbalance is at/above the flow_pct quantile (or at/below 1-flow_pct) of the PAST-ONLY imbalance distribution. An unknown value is refused, so a typo can never file one arm's result under the other's label."
+    },
+    "flow_pct": {
+      "type": "number",
+      "default": 0.9,
+      "range": [
+        0.5,
+        0.999
+      ],
+      "description": "The quantile of the TRAILING (expanding, past-only) imbalance distribution at/above which a bar is a net-buying extreme (and at/below 1-this a net-selling extreme). Computed only from imbalance observed at prior bars — a whole-sample quantile would be a silent lookahead. Higher values demand a rarer, more lopsided flow (fewer trades)."
+    },
+    "hold_bars": {
+      "type": "number",
+      "default": 1,
+      "range": [
+        1,
+        200
+      ],
+      "description": "How many decision bars a position is held after entry, then flat. The position earns bars t+1..t+hold_bars (never the signal bar's own return), and a new extreme inside the hold window is ignored."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.001,
+      "scope": "environment",
+      "description": "Per-side fee, charged on turnover at entry and again at exit, so a round trip costs ~(1-fee)^2 ≈ 0.2% at the default — the crypto cost floor this probe is measured against."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "alt-2024",
+        "alt-2025",
+        "2024",
+        "2025",
+        "alt-2026"
+      ],
+      "default": "alt-2024",
+      "scope": "dataset",
+      "description": "Which out-of-sample span is ACCOUNTED. Only the test window's bars enter the metrics and the benchmark; the month before it is loaded solely to warm the past-only imbalance distribution. alt-* windows suit the altcoins whose 1m history starts in 2022; alt-2024 and alt-2025 are the two fully-mined crypto windows shared by all three assets."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the backtest is fully deterministic, so seeds are not swept (identical cells would fake replication)."
+    }
+  }
+}

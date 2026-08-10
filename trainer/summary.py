@@ -708,7 +708,10 @@ def _provenance_fingerprint(cfg, stored_cfg):
         _, _, meta = resolve_walk_forward_window(cfg)
         fp["trainFrom"], fp["trainTo"] = meta.get("train_from"), meta.get("train_to")
         fp["testFrom"], fp["testTo"] = meta.get("test_from"), meta.get("test_to")
-    except Exception:
+    except (Exception, SystemExit):
+        # A consumer whose walk_forward_window this crypto resolver doesn't know (e.g. the roll probe's
+        # roll-YYYY windows) makes it SystemExit; a best-effort provenance stamp must never abort a run, so
+        # its train/test span is simply omitted rather than crashing the summary.
         pass
     try:
         import trainer.config_builder as cb
@@ -729,7 +732,9 @@ def _provenance_fingerprint(cfg, stored_cfg):
         sig = sorted((os.path.basename(p), os.path.getsize(p)) for p in paths if os.path.exists(p))
         fp["dataVersion"] = hashlib.sha256(repr(sig).encode()).hexdigest()[:16]
         fp["dataFiles"] = len(sig)
-    except Exception:
+    except (Exception, SystemExit):
+        # build_data_config resolves the walk_forward_window too, so a non-crypto window makes it SystemExit;
+        # the dataVersion is best-effort and must not abort the run.
         pass
     try:
         import importlib.metadata as _im

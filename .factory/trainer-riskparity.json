@@ -1,0 +1,84 @@
+{
+  "name": "blackswan-riskparity",
+  "recordType": "blackswan-riskparity",
+  "description": "The CROSS-CLASS RISK-PARITY screen (Probe A) — the one portfolio curve this program never scored. It answers a plain allocation question the directional and sizing arms never asked: does a vol-scaled, periodically-rebalanced, LONG-ONLY diversified basket across asset classes (gold, long/intermediate Treasuries, the dollar, equities, crypto) beat simply buy-and-holding the equal-weight basket, NET of realized cost? The EXPECTATION IS PRE-REGISTERED AND NEGATIVE: a long-only diversified book is a long-BETA book — it cannot be net-flat the way the cross-sectional fork is, so it moves with the risk-on/risk-off tape and is NOT expected to out-return the basket. This screen MEASURES that rather than assuming it. READ THE RIGHT LENS: the objective is oos_sharpe (risk parity earns its keep by being STEADIER than naive weighting, not by out-returning it) and the honest reads are sharpe_vs_hold and drawdown_vs_hold_pct (both signed so better-than-hold is POSITIVE). return_vs_hold_pct is the hypothesis benchmark (threshold 0) precisely so a clean NO is recorded, not so a YES is hoped for; it is context, not a verdict. mean_exposure reports the deployed book (~1 for a fully-invested basket) so a cash-heavy cell — whose Sharpe would be meaningless — is detectable. inverse_vol is the risk-parity approximation (w_i proportional to 1/v_i, normalized); equal_weight is the reference arm and, at rebalance_days=1 fee-free, IS the basket benchmark. Deliberately crude, published, deterministic, no training; reuses the cross-sectional screen's align/mask/backtest/basket primitives verbatim and emits the same summary.py metric vocabulary so every gate, lens and scorecard reads it unchanged. Produces no model; its cells are side-experiment evidence, kept in their own record type so they never mix with the single-asset RL run store.",
+  "run": ".venv/bin/python -m trainer.riskparity --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "return_vs_hold_pct",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "universe": {
+      "type": "choice",
+      "choices": [
+        "cross-class",
+        "macro"
+      ],
+      "default": "cross-class",
+      "scope": "dataset",
+      "description": "The PRE-REGISTERED cross-class basket held long-only. 'cross-class' = GOLD, TLT, IEF, UUP, SPY, BTCUSDT, ETHUSDT; 'macro' drops ETH (whose on-disk history begins 2022-01) so the universe does not silently shrink on the deeper 2018+ windows. GOLD resolves to commodities/, SPY/TLT/IEF/UUP to etfs/, crypto to binance/. Choosing symbols after seeing results is selection-on-test, so this list is fixed and never tuned on results."
+    },
+    "vol_window": {
+      "type": "number",
+      "default": 20,
+      "range": [
+        2,
+        120
+      ],
+      "description": "Bars of trailing daily returns in each symbol's realized-vol estimate (population stdev, over the symbol's own observations, using returns up to and INCLUDING the decision bar). Must be >= 2: a stdev needs at least two returns, and a window of 1 zeroes every vol and inverts to an infinite weight — refused rather than run so an inverse_vol cell can never silently collapse into equal_weight. 20 is roughly a trading month; shorter reacts faster and churns more, longer is calmer."
+    },
+    "weighting": {
+      "type": "choice",
+      "choices": [
+        "inverse_vol",
+        "equal_weight"
+      ],
+      "default": "inverse_vol",
+      "scope": "environment",
+      "description": "How the fully-invested long book is split over the tradeable set. 'inverse_vol' sizes each leg proportional to 1/v_i and normalizes to sum 1 — the risk-parity approximation this probe exists to score, so each leg contributes roughly equal risk. 'equal_weight' sizes 1/n and is the reference arm; at rebalance_days=1 with no fee it reproduces the equal-weight basket benchmark bar for bar. True equal-risk-contribution is deliberately NOT implemented — inverse-vol is the accepted proxy and an ERC solver would be over-engineering for a screen whose job is to be cheap and legible. An unrecognised value is refused, not defaulted, so a typo can never file one arm's result under the other's label."
+    },
+    "rebalance_days": {
+      "type": "number",
+      "default": 21,
+      "range": [
+        1,
+        63
+      ],
+      "description": "Bars between re-weightings; the book is held constant in between. Turnover — and therefore cost — scales with how often the weights are refreshed, and cost is the term that killed several earlier arms of this campaign. A continuously re-weighted risk-parity book trades every bar and pays for it."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0002,
+      "range": [
+        0,
+        0.01
+      ],
+      "scope": "environment",
+      "description": "Per-unit-of-turnover cost, charged on both the increase and the decrease of each leg's weight, and charged once on the buy-and-hold basket benchmark so the two curves are netted the same way. Liquid equity/ETF/gold ~0.0002 (2bps); crypto ~0.001."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "stk-2022",
+        "stk-2023",
+        "stk-2024",
+        "stk-2025",
+        "stk-oos-2024"
+      ],
+      "default": "stk-2024",
+      "scope": "dataset",
+      "description": "Which out-of-sample span is ACCOUNTED. The vol estimator may look back into the train span for its formation window, but only the test window's P&L is reported. The 'cross-class' universe (with ETH) needs a test year of 2022 or later; 'macro' runs on all of these windows."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the screen is fully deterministic (no training, no sampling), so seeds are not swept; three identical cells would fake replication."
+    }
+  }
+}

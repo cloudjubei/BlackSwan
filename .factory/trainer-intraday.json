@@ -1,0 +1,115 @@
+{
+  "name": "blackswan-intraday",
+  "recordType": "blackswan-intraday",
+  "description": "The INTRADAY conditional-edge backtest — the first line in the project to decide at intraday frequency (every daily line so far decided once per day and found no directional skill, only exposure reduction). It asks a sharper question: in the minutes/hours after a recognisable CONDITION — a volatility-spike breakout, or a high-vol regime — does a short-horizon directional trade capture a move large enough to clear the crypto round trip (~0.2%)? The round-trip fee is the ENEMY here: at intraday cadence the cost floor is paid over and over, so an edge that does not clear it PER TRADE is worse than doing nothing. This backtest exists to MEASURE that clearance honestly (watch signal_expectancy against the cost, and trades_per_day for liveness), not to manufacture a win, which is why its two silent-lookahead traps are pinned before any number is emitted: (a) a position applied to bar t's return is decided ONLY from data at/before t-1 (a breakout detected from bar t's return and its trailing vol is applied to bars t+1..t+hold_bars, never bar t's own), and (b) 'is this a high-vol bar?' is judged against the TRAILING, past-only vol distribution — labelling a bar high-vol from the WHOLE-sample quantile is a classic lookahead that fabricates the result. Deterministic and model-free (the seed is contract-only). Reuses summary.py's equity statistics verbatim (per-step oos_sharpe, drawdown, beta/up/down capture, and the fee-charged buy-and-hold benchmark) so every existing gate and lens reads an intraday cell unchanged; its cells are side-experiment evidence kept in their own record type so they never mix with the single-asset RL run store.",
+  "run": ".venv/bin/python -m trainer.intraday --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "return_vs_hold_pct",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "ADAUSDT",
+        "XRPUSDT"
+      ],
+      "default": "BTCUSDT",
+      "scope": "dataset",
+      "description": "Which crypto instrument's 1-minute OHLCV is traded and benchmarked. The buy-and-hold return_vs_hold_pct is measured against THIS asset over the same span, and beta/up_capture/down_capture are computed against it."
+    },
+    "bar": {
+      "type": "choice",
+      "choices": [
+        15,
+        30,
+        60,
+        240
+      ],
+      "default": 60,
+      "scope": "dataset",
+      "description": "Decision-bar width in minutes: the 1m series is resampled up to this cadence and every signal, hold and trade decision is taken on these bars. Smaller bars trade more often (raising trades_per_day) but pay the cost floor more often too — the central tension this probe measures. Bar widths that divide the day evenly keep resampling exact across month boundaries."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": [
+        "breakout_momentum",
+        "regime_momentum",
+        "regime_reversion"
+      ],
+      "default": "breakout_momentum",
+      "description": "The CONDITION traded. breakout_momentum: a breakout fires at bar t when |return_t| exceeds breakout_k * trailing vol (through t-1); while flat it takes the sign of that return for the next hold_bars bars, ignoring further breakouts until flat again. regime_momentum: while a high-vol REGIME holds (trailing vol at/above the regime_pct quantile of the past-only vol distribution) and flat, it enters the sign of the last bar's return for hold_bars. regime_reversion: same regime gate, opposite entry sign (fade the last move). An unknown value is refused rather than defaulted, so a typo can never file one signal's result under another's label."
+    },
+    "vol_window": {
+      "type": "number",
+      "default": 20,
+      "range": [
+        2,
+        500
+      ],
+      "description": "Bars of trailing returns behind the realized-vol estimate (population std). It sets both the breakout threshold's scale and the regime gate's per-bar vol; it is past-only, so the warm-up before it is defined is simply left flat."
+    },
+    "breakout_k": {
+      "type": "number",
+      "default": 2.0,
+      "range": [
+        0.1,
+        20
+      ],
+      "description": "Breakout sensitivity: a bar fires only when |return| > breakout_k * trailing vol. Higher k demands a bigger surprise (fewer, larger breakouts). Used by breakout_momentum only."
+    },
+    "regime_pct": {
+      "type": "number",
+      "default": 0.8,
+      "range": [
+        0.5,
+        0.999
+      ],
+      "description": "The quantile of the TRAILING (expanding, past-only) vol distribution at/above which a bar is in the high-vol regime. Computed only from vol observed up to the prior bar — using the whole-sample quantile would be a silent lookahead that fabricates regime hits. Used by regime_momentum / regime_reversion only."
+    },
+    "hold_bars": {
+      "type": "number",
+      "default": 4,
+      "range": [
+        1,
+        200
+      ],
+      "description": "How many decision bars a position is held after entry, then flat. The position earns bars t+1..t+hold_bars (never the signal bar's own return), and new signals inside the hold window are ignored."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.001,
+      "scope": "environment",
+      "description": "Per-side fee, charged on turnover at entry and again at exit, so a round trip costs ~(1-fee)^2 ≈ 0.2% at the default — the crypto cost floor this whole probe is measured against."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2024",
+        "2025",
+        "2026",
+        "alt-2024",
+        "alt-2025",
+        "alt-2026",
+        "oos-2025"
+      ],
+      "default": "alt-2024",
+      "scope": "dataset",
+      "description": "Which out-of-sample span is ACCOUNTED. Only the test window's bars enter the metrics and the benchmark; the month before it is loaded solely to warm the trailing vol / regime distribution. alt-* windows suit altcoins whose 1m history starts in 2022; the plain windows suit deep-history assets like BTC."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the backtest is fully deterministic, so seeds are not swept (identical cells would fake replication)."
+    }
+  }
+}
