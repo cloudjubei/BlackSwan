@@ -139,6 +139,42 @@ Sharpe must be discounted for the number of trials that produced it. Nearly ever
   clear multiplicity** (per-config t ≈1.5). Its inverse (chase divergence) is disproved-negative.
 - **Current status.** Decayed on equities. On free data it is one of our two **open threads** — see §9.
 
+## 8a. Lucca & Moench (2015), the Pre-FOMC Announcement Drift — **DISPROVED**
+
+- **Claim.** US equity returns are large and significant in the ~24h before scheduled FOMC announcements.
+- **Why it should work.** Anticipatory risk-premium / information-processing around the highest-stakes
+  scheduled macro event.
+- **Why the paper concluded it.** 1994–2011 intraday S&P data — a large, significant pre-announcement mean.
+- **What went wrong / what we found.** Kurov, Wolfe & Gilbert (2021, "The Disappearing Pre-FOMC Announcement
+  Drift") show it decayed after publication. Our exposure-balanced pre-FOMC spread confirms it: **SPY t_win
+  −0.50** (decayed), and the **24/7 crypto window (BTC) is null** (t_win −0.74) — the first cost+DSR test of
+  the crypto pre-FOMC window, and it shows nothing.
+- **Current status.** Decayed on equities, absent in crypto.
+
+## 8b. Lou, Polk & Skouras (2019), Overnight vs Intraday Returns — **DISPROVED (uncapturable)**
+
+- **Claim.** (Nearly) all of the equity premium is earned *overnight* (close→open); the intraday component is
+  flat-to-negative.
+- **Why it should work.** Clientele / demand effects concentrate buying pressure at particular times of day.
+- **What we found.** The stylized fact is real **gross** (the SPY/BTC overnight component is positive in
+  several years), but the tradeable long-overnight/short-intraday spread pays **two flips per day**
+  (~2,500 bps/yr on SPY, ~3,640 on BTC) and is **annihilated net** — t_win **−3.11 (SPY) / −2.58 (BTC)**. A
+  measurement fact about *when* returns accrue, not a capturable edge.
+- **Current status.** Real gross stylized fact, uncapturable net of the mandatory daily round-trip.
+
+## 8c. Commodity Carry / Basis — Gorton-Rouwenhorst / Boons-Prado / Bakshi-Gao-Rossi — **DISPROVED (energy)**
+
+- **Claim.** Long backwardated / short contango commodities (the carry / roll-yield premium) is the strongest,
+  most-defended commodity factor; basis and basis-momentum span the commodity cross-section.
+- **What we found (energy subset, via on-disk EIA term structure).** The **carry factor is strongly negative**
+  on energy 2012–2023 (t_win **−6.79, 0/12 windows positive**) — it reversed in the post-2014 persistent-
+  contango regime. And the **value residual is *not* a repackaged carry premium**: it keeps positive alpha over
+  carry (t +1.48) and is negatively correlated with it (−0.26), answering the Boons-Prado / Bakshi-Gao-Rossi
+  concern for the energy subset. This *partially closes the Baltussen carry gap* — carry does not rescue his
+  premium either.
+- **Scope.** Energy only (4 contracts); metals/grains term structure is data-gated (paid) — the full-basket
+  carry-spanning remains the one outstanding replication.
+
 ## 9. What actually survived (weakly): commodity mean-reversion — **INCONCLUSIVE**
 
 The two threads we could **not** cleanly kill — cross-sectional *reversal* (§3's mirror) and *pairs* (§8) —
@@ -154,6 +190,26 @@ are the **same weak effect** seen two ways. The "try harder" decomposition local
 - **Why it stays inconclusive, not a survivor:** the commodities-only strength rests on *post-hoc*
   sub-universe selection, a small 7-asset cross-section, and heavy concentration in ~2 grain markets — a
   small-capacity, hard-to-scale residual, not a bankable edge.
+
+**Spanning + capacity characterization** (Baltussen's *value* factor — 5yr commodity reversal — is a third
+expression of the same residual). On commodities-only across 13 windows:
+- **Real-direction and market-neutral.** Value carries **significant alpha over the commodity basket**
+  (t = +2.12, market-beta only +0.21) — it is not basket exposure. Its raw commodities-only strength is
+  t_win **+2.37** (11/13 windows, annualized +0.63).
+- **Small but real capacity.** The cost-breakeven ladder (Novy-Marx-Velikov-style) shows it survives to
+  ~20–40 bps/side (t_win 2.13 @20 bps, 1.89 @40, 1.41 @80) — a small-capacity effect on a 7-name cross-section.
+- **Not distinct from momentum, and not multiplicity-clean.** Value loads −0.47 on 1-yr momentum (corr −0.52);
+  its alpha over *momentum + basket jointly* is **insignificant** (+0.058/yr, t 0.78) — it is roughly the
+  mirror of the (null) commodity-momentum factor. corr(value 5yr, reversal 1yr) = +0.52 ⇒ distinct horizons of
+  **one** mean-reversion family. And the best t (+2.37) is below the Harvey-Liu-Zhu multiple-testing bar (t>3),
+  from a post-hoc-selected sub-universe.
+- **Verdict.** The lone survivor is the **known, low-capacity commodity value / long-run-reversal premium** —
+  real-direction, market-neutral, cost-surviving to moderate costs, but sub-multiplicity-significant and ~half
+  anti-momentum. *Exactly the small, hard-to-arbitrage residual limits-to-arbitrage predicts is the last thing
+  standing — but a documented factor (AMP 2013), not a novel or bankable edge.*
+- **The one remaining test is data-gated.** Proving the residual is *not* a known carry/basis risk premium
+  (Boons-Prado basis-momentum; Bakshi-Gao-Rossi average/basis/momentum) needs 2nd-nearby **term-structure**
+  data not in the free panel — the outstanding replication.
 
 ---
 

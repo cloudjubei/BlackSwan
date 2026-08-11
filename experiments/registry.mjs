@@ -245,6 +245,69 @@ export const PROBES = {
     ],
   },
 
+  // --- PRE-FOMC ANNOUNCEMENT DRIFT (Lucca-Moench 2015; Kurov 2021 "disappearing") ---------------------
+  fomc: {
+    type: 'blackswan-fomc',
+    manifest: '.factory/trainer-fomc.json',
+    proposedBy: 'fomc-probe',
+    thesis: 'Pre-FOMC announcement drift — SPY + BTC event-calendar spread',
+    gate: dsrGate(4, 4),
+    fixed: { pre_days: 1, transaction_fee: 0.0005 },
+    sweep: { universe: ['spy', 'btc'], walk_forward_window: ['2018', '2019', '2020', '2021', '2022', '2023', '2024'] },
+    arms: [
+      {
+        id: 'probe-fomc-drift', fixed: { signal: 'drift' },
+        title: 'The pre-FOMC announcement drift times SPY and/or BTC net of cost',
+        claim:
+          'An exposure-balanced spread that is LONG the pre-FOMC trading day and SHORT the complement has positive ' +
+          'DSR-deflated oos_sharpe in a MAJORITY of the 7 windows 2018-2024, on SPY (Lucca-Moench\'s home) or BTC ' +
+          '(the 24/7 crypto window).',
+        rationale:
+          'Lucca-Moench (2015) found large US equity returns in the 24h before scheduled FOMC announcements; ' +
+          'Kurov et al. (2021) found it decayed. PRE-REGISTERED EXPECTATION: refutation — the equity drift ' +
+          'disappeared post-publication, and the crypto pre-FOMC window is a fresh, most-likely-null test. Book is ' +
+          'a mutation-proven pure function of the published FOMC calendar (never price); scheduled meetings only.',
+      },
+      {
+        id: 'probe-fomc-drift-inverse', fixed: { signal: 'drift_inverse' },
+        title: 'The INVERSE pre-FOMC spread (short the pre-FOMC day) times SPY/BTC (mirror)',
+        claim: 'The exact negation has positive DSR-deflated oos_sharpe in a majority of the 7 windows 2018-2024.',
+        rationale: 'Algebraic-mirror control. Pre-registering both prevents post-hoc direction cherry-picking.',
+      },
+    ],
+  },
+
+  // --- OVERNIGHT vs INTRADAY return decomposition (Lou-Polk-Skouras 2019) -----------------------------
+  overnight: {
+    type: 'blackswan-overnight',
+    manifest: '.factory/trainer-overnight.json',
+    proposedBy: 'overnight-probe',
+    thesis: 'Overnight-vs-intraday spread — SPY + BTC',
+    gate: dsrGate(4, 4),
+    fixed: { transaction_fee: 0.0005 },
+    sweep: { universe: ['spy', 'btc'], walk_forward_window: ['2018', '2019', '2020', '2021', '2022', '2023', '2024'] },
+    arms: [
+      {
+        id: 'probe-overnight-overnight', fixed: { signal: 'overnight' },
+        title: 'The long-overnight / short-intraday spread clears cost on SPY and/or BTC',
+        claim:
+          'The tradeable long-overnight / short-intraday spread (daily return = overnight − intraday) has positive ' +
+          'DSR-deflated oos_sharpe NET of the two-flips-per-day cost in a MAJORITY of the 7 windows 2018-2024, on ' +
+          'SPY or BTC.',
+        rationale:
+          'Lou-Polk-Skouras (2019): the equity premium is earned overnight. PRE-REGISTERED EXPECTATION: the ' +
+          'overnight premium is real GROSS but the spread is DESTROYED by the mandatory two-flips-per-day cost — ' +
+          'a measurement stylized fact, not a tradeable edge. Alignment (open[t] vs close[t-1]) mutation-proven.',
+      },
+      {
+        id: 'probe-overnight-inverse', fixed: { signal: 'overnight_inverse' },
+        title: 'The INVERSE (long intraday / short overnight) spread (mirror)',
+        claim: 'The exact negation has positive DSR-deflated oos_sharpe net of cost in a majority of the 7 windows 2018-2024.',
+        rationale: 'Algebraic-mirror control. Pre-registering both prevents post-hoc direction cherry-picking.',
+      },
+    ],
+  },
+
   // --- commodity index-roll ("Goldman roll"), single-asset WTI (DISPROVED — recorded) ----------------
   roll: {
     type: 'blackswan-roll',

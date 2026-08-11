@@ -40,6 +40,9 @@ const FAMILY = {
   'blackswan-lowvol-hypothesis': 'Low-volatility / Betting-Against-Beta (Frazzini-Pedersen 2014)',
   'blackswan-seasonal-hypothesis': 'Calendar / seasonal (turn-of-month, sell-in-May, Monday)',
   'blackswan-pairs-hypothesis': 'Pairs / statistical arbitrage (Gatev et al. 2006)',
+  'blackswan-globalfactors-hypothesis': 'Global factor premiums — the multi-asset foil (Baltussen 2021)',
+  'blackswan-fomc-hypothesis': 'Pre-FOMC announcement drift — SPY + BTC (Lucca-Moench 2015)',
+  'blackswan-overnight-hypothesis': 'Overnight vs intraday returns (Lou-Polk-Skouras 2019)',
 }
 const FAMILY_ORDER = Object.values(FAMILY)
 
@@ -118,6 +121,27 @@ const sections = [
       'distance-pairs mean-reversion is a weak, persistent, cost-surviving tilt (≈+0.35 Sharpe, 12/17 windows) ' +
       'that does not clear multiplicity-corrected significance; the second mean-reversion open thread.</li>' +
       '</ul>',
+  },
+  {
+    heading: 'The multi-asset foil (Baltussen 2021) — honestly scoped',
+    html:
+      '<p>Baltussen-Swinkels-van Vliet (2021), "Global Factor Premiums", is the one prior human multi-asset unified ' +
+      'test and reports six style factors (and their diversified combination) as robust. On the free tradeable ' +
+      'panel we could implement four (trend, momentum, value, low-beta; seasonality and carry are covered by the ' +
+      'seasonal and roll probes / data-gated) and their equal-risk combination, over 13 deep-history windows.</p>' +
+      '<p><strong>Baltussen\'s diversified combination does not replicate on the free slice</strong> — it is ' +
+      'null-to-negative (per-window oos_sharpe t = −1.20, positive in only 4/13 windows), and <em>no</em> ' +
+      'construction we tried (unit-gross, equal-vol, or momentum-dropped) yields a significantly positive premium. ' +
+      '<strong>Crucially, this is a panel-composition result, not a cost result</strong>: even at zero ' +
+      'transaction fee the cross-sectional momentum leg inverts (commodity momentum turns to reversal) and drags ' +
+      'the combination negative, and the financials momentum cross-section is degenerate (four ETFs cannot form a ' +
+      'long/short book) — so the free panel structurally cannot reproduce Baltussen\'s within-asset-class, ' +
+      'vol-scaled, six-factor diversification engine. The one positive component is <em>value</em> (5-year ' +
+      'commodity reversal), whose edge traces entirely to commodity long-run mean-reversion — directionally ' +
+      'consistent with limits-to-arbitrage, though itself sub-significant. <strong>We do not claim to refute ' +
+      'Baltussen\'s full multi-asset result</strong> (which needs equity single-stock, FX and term-structure data ' +
+      'outside this panel); we show his robustness fails to replicate on freely-obtainable data, collapsing to a ' +
+      'single low-capacity commodity residual — the same residual the rest of the battery keeps surfacing.</p>',
   },
   {
     heading: 'What this claim is — and is not',

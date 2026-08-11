@@ -580,14 +580,77 @@
         }
       ],
       "cells": 102
+    },
+    {
+      "type": "blackswan-globalfactors-hypothesis",
+      "family": "Global factor premiums — the multi-asset foil (Baltussen 2021)",
+      "probes": [
+        {
+          "id": "probe-globalfactors-inverse",
+          "title": "The INVERSE of the Baltussen factors (and their combination) times the panel (mirror)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 65
+        },
+        {
+          "id": "probe-globalfactors-published",
+          "title": "The Baltussen (2021) global style premiums (and their diversified combination) survive our discipline net of cost",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 65
+        }
+      ],
+      "cells": 130
+    },
+    {
+      "type": "blackswan-fomc-hypothesis",
+      "family": "Pre-FOMC announcement drift — SPY + BTC (Lucca-Moench 2015)",
+      "probes": [
+        {
+          "id": "probe-fomc-drift",
+          "title": "The pre-FOMC announcement drift times SPY and/or BTC net of cost",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 14
+        },
+        {
+          "id": "probe-fomc-drift-inverse",
+          "title": "The INVERSE pre-FOMC spread (short the pre-FOMC day) times SPY/BTC (mirror)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 14
+        }
+      ],
+      "cells": 28
+    },
+    {
+      "type": "blackswan-overnight-hypothesis",
+      "family": "Overnight vs intraday returns (Lou-Polk-Skouras 2019)",
+      "probes": [
+        {
+          "id": "probe-overnight-inverse",
+          "title": "The INVERSE (long intraday / short overnight) spread (mirror)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 14
+        },
+        {
+          "id": "probe-overnight-overnight",
+          "title": "The long-overnight / short-intraday spread clears cost on SPY and/or BTC",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 14
+        }
+      ],
+      "cells": 28
     }
   ],
   "stats": {
-    "probes": 65,
-    "families": 18,
-    "cellsRun": 1818,
+    "probes": 71,
+    "families": 21,
+    "cellsRun": 2004,
     "byStatus": {
-      "disproved": 63,
+      "disproved": 69,
       "inconclusive": 2
     }
   }

@@ -1,0 +1,30 @@
+{
+  "name": "blackswan-overnight",
+  "recordType": "blackswan-overnight",
+  "description": "The OVERNIGHT-vs-INTRADAY return decomposition (Lou-Polk-Skouras 2019; Cliff-Cooper-Gulen): (nearly) all of the equity premium is earned OVERNIGHT (close→open) while the intraday (open→close) component is flat-to-negative. Tested as the tradeable long-overnight / short-intraday SPREAD (daily return = overnight − intraday) on SPY (its equity home) and BTC (24/7 crypto). The catch is COST: capturing the overnight leg is a round-trip EVERY day (buy at close, sell at open; reverse for the intraday short), so the spread pays TWO flips per bar. Uses the on-disk OHLC (price_open + close); the leakage surface is ALIGNMENT — overnight pairs open[t] with close[t-1] (mutation-proven). signal=overnight is the published direction, overnight_inverse the mirror. Decider is DSR-deflated oos_sharpe net of the two-flip cost. DATA: etfs/SPY-1d-*.json + binance/BTCUSDT-1d-*.json (both carry price_open).",
+  "run": ".venv/bin/python -m trainer.overnight --config-json {configPath} --summary-out {summaryOut}",
+  "objective": { "name": "oos_sharpe", "direction": "max" },
+  "hypothesisBenchmark": { "metric": "oos_sharpe", "threshold": 0, "direction": "max" },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "universe": {
+      "type": "choice", "choices": ["spy", "btc"], "default": "spy", "scope": "dataset",
+      "description": "spy = the S&P 500 ETF (the overnight premium's equity home); btc = Bitcoin (24/7; the open/close split is a UTC-midnight convention)."
+    },
+    "signal": {
+      "type": "choice", "choices": ["overnight", "overnight_inverse"], "default": "overnight",
+      "description": "overnight = long the overnight component / short the intraday (the published direction); overnight_inverse = exact negation (mirror control). An unknown value is refused."
+    },
+    "transaction_fee": {
+      "type": "number", "default": 0.0005, "scope": "environment",
+      "description": "Per-flip fee; the spread pays TWO flips per day (~0.2% round trip daily), the term that decides whether the real gross overnight premium survives net."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": ["2018", "2019", "2020", "2021", "2022", "2023", "2024"],
+      "default": "2022", "scope": "dataset",
+      "description": "Which out-of-sample year is ACCOUNTED (2018-2024 so both SPY and BTC have OHLC). A real overnight edge must clear DSR-Sharpe net of cost in a MAJORITY of these 7 years."
+    },
+    "seed": { "type": "number", "default": 0, "description": "Contract conformance only — deterministic, not swept." }
+  }
+}

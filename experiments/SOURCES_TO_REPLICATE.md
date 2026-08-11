@@ -16,9 +16,20 @@ small-breadth commodity-complex mean-reversion, INCONCLUSIVE precisely because l
 bets = low power. The engine is the instrument; **the falsifiable limits-to-arbitrage horse-race is the
 contribution.** This simultaneously (a) TESTS rather than invokes LTA theory, (b) arbitrates the Hou-Xue-Zhang
 ("most anomalies false") vs Jensen-Kelly-Pedersen ("no replication crisis") standoff by showing "no crisis" is
-an artifact of low-turnover, index-level, cost-free, pre-decay construction, and (c) directly, mechanistically
-CONTRADICTS Baltussen-Swinkels-van Vliet (2021) "Global Factor Premiums" once realistic frictions + post-2008
-history are imposed uniformly.
+an artifact of low-turnover, index-level, cost-free, pre-decay construction, and (c) shows that even
+Baltussen-Swinkels-van Vliet (2021) "Global Factor Premiums" — the one prior multi-asset robustness claim —
+FAILS TO REPLICATE on freely-obtainable data, collapsing to the single low-capacity commodity residual.
+
+> **HONESTY CORRECTION (adversarial panel, verified — RESULT IS IN).** The Baltussen result is **SCOPE-LIMITED,
+> not a flat contradiction.** We implement 4 of his 6 factors (commodity-heavy + rates, equal-weight, no equity
+> single-stock cross-section, no FX); his diversified premium fails to replicate (t=−1.20, 4/13, no construction
+> rescues it) — BUT the collapse is **panel composition, NOT cost** (momentum inverts even at zero fee; the
+> financials momentum cross-section is a *degenerate empty book* — 4 ETFs cannot form a k=3 long/short), so the
+> free panel structurally cannot reproduce his vol-scaled within-asset-class engine. The one positive component
+> (value = commodity 5yr reversal, the residual) is itself sub-significant, so the LTA "last thing standing"
+> reading is directional. **Do NOT claim to refute his full multi-asset result** (needs equity single-stock /
+> FX / term-structure data). Lead the paper with the LTA horse-race + engine; Baltussen is a scoped supporting
+> piece. That the adversarial panel *caught* this overclaim is itself a demonstration of the methods contribution.
 
 ## Ranked contributions (lead with the empirical spine; engine is the instrument)
 
@@ -28,7 +39,7 @@ history are imposed uniformly.
    = leakage-controlled, cost-realistic, multiplicity-corrected OOS *survival* (not code/rubric fidelity, not
    in-sample IC); an LLM panel must FAIL to overturn each verdict and name the exact hole; PIT guards proven by
    mutation testing. Deliverable is *earned negative results*.
-3. **[STRONG] Cross-asset arbitration of HXZ-vs-JKP + explained contradiction of Baltussen (2021).**
+3. **[STRONG→MEDIUM] Cross-asset arbitration of HXZ-vs-JKP + scope-limited non-replication of Baltussen (2021)** — his diversified premium fails to replicate on the free tradeable slice (panel-composition, not cost), collapsing to the commodity residual; NOT a refutation of his full vol-scaled multi-asset result (equity single-stock/FX/term-structure data-gated). Downgraded from STRONG by the adversarial panel — lead with the LTA horse-race, not this.
 4. **[MEDIUM] Deep-history OOS power-extension** as a reusable pre-registered primitive that flips
    INCONCLUSIVE→DISPROVED (statistical power as a first-class design lever).
 5. **[MEDIUM] An apples-to-apples, adversarially-verified cross-asset NULL CATALOGUE** (65 probes / 1,818
