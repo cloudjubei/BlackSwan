@@ -1,0 +1,70 @@
+{
+  "name": "blackswan-pairs",
+  "recordType": "blackswan-pairs",
+  "description": "The PAIRS / STATISTICAL-ARBITRAGE probe (Gatev-Goetzmann-Rouwenhorst 2006) — a distinct MECHANISM from the rest of the battery: spread MEAN-REVERSION, not price direction, market-neutral by construction. Over a FORMATION window it normalises each asset of the survivorship-free diversified basket to a cumulative-return index, picks the k closest-moving pairs by sum-of-squared-distance, then in the TRADING window fades each pair's divergence (short the rich leg / long the cheap leg when the normalised spread stretches beyond `entry` formation std-devs) and closes on convergence (spread crossing its formation mean). signal=meanrev is the published rule; meanrev_inverse (chase divergence) is the exact negation (mirror control). The portfolio is the equal-capital average of the k pair books; decider is the DSR-deflated oos_sharpe. Pair selection + spread mean/std are PAST-only (formation window before the test year); the book is one bar behind the spread; dollar-neutral per pair; turnover-costed. Deterministic and model-free. DATA: commodities/<SYM>-1d-*.json + etfs/<SYM>-1d-*.json.",
+  "run": ".venv/bin/python -m trainer.pairs --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "oos_sharpe",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "universe": {
+      "type": "choice",
+      "choices": ["diversified", "commodities", "financials"],
+      "default": "diversified",
+      "scope": "dataset",
+      "description": "The basket pairs are formed within. diversified = 7 commodities + SPY/TLT/IEF/UUP (55 candidate pairs), matching the rest of the anomaly battery."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": ["meanrev", "meanrev_inverse"],
+      "default": "meanrev",
+      "description": "meanrev fades divergence (short rich / long cheap, close on convergence — the published GGR rule); meanrev_inverse chases divergence (the exact negation, mirror control). An unknown value is refused."
+    },
+    "formation_days": {
+      "type": "number",
+      "default": 252,
+      "range": [126, 504],
+      "description": "Trailing bars (ending just before the test year) used to SELECT pairs and estimate each spread's mean/std. 252 ~ 12 months (GGR's formation window). Strictly past-only."
+    },
+    "k": {
+      "type": "number",
+      "default": 5,
+      "range": [1, 15],
+      "description": "How many closest pairs to trade (equal capital). GGR trade the top-5 to top-20 by distance."
+    },
+    "entry": {
+      "type": "number",
+      "default": 2.0,
+      "range": [1.0, 3.0],
+      "description": "Divergence threshold in formation std-devs to OPEN a pair (GGR use 2). Positions close when the spread crosses its formation mean. Must be > 0."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0005,
+      "scope": "environment",
+      "description": "Per-unit-of-turnover cost charged both ways (~0.1% round trip) — realistic for liquid futures/ETFs."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015",
+        "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024"
+      ],
+      "default": "2022",
+      "scope": "dataset",
+      "description": "Which out-of-sample year is ACCOUNTED (pairs form on the prior year). A real stat-arb edge must clear DSR-Sharpe in a MAJORITY of these 17 years."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the rule is fully deterministic, so seeds are not swept."
+    }
+  }
+}

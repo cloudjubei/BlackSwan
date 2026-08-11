@@ -1,0 +1,64 @@
+{
+  "name": "blackswan-seasonal",
+  "recordType": "blackswan-seasonal",
+  "description": "The CALENDAR / SEASONAL anomaly probe — the famous free date-effects: turn-of-the-month (Ariel 1987; Lakonishok-Smidt 1988), sell-in-May / Halloween (Bouman-Jacobsen 2002), and the Monday effect (French 1980). Each is a deterministic date rule traded as an EXPOSURE-BALANCED calendar SPREAD on SPY: LONG the claimed-good window (scaled +0.5/frequency), SHORT its complement (-0.5/frequency), so the time-averaged net exposure is ZERO and the DSR-deflated oos_sharpe measures the seasonal differential net of cost — isolated from the market's drift (an unequal-window naive spread would be net-directional and merely track the year's beta). signal=seasonal is the published rule; seasonal_inverse is the exact negation (mirror control). The book is a PURE FUNCTION OF THE CALENDAR (never price; mutation-proven), turnover-costed. Deterministic and model-free. DATA: etfs/SPY-1d-*.json.",
+  "run": ".venv/bin/python -m trainer.seasonal --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "oos_sharpe",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "universe": {
+      "type": "choice",
+      "choices": ["spy", "equity_rates", "diversified"],
+      "default": "spy",
+      "scope": "dataset",
+      "description": "The asset(s) the calendar rule times. spy = the S&P 500 ETF, the equity index where these anomalies are defined. equity_rates / diversified spread the same calendar position equally across a basket."
+    },
+    "rule": {
+      "type": "choice",
+      "choices": ["turn_of_month", "sell_in_may", "day_of_week"],
+      "default": "turn_of_month",
+      "description": "turn_of_month = long the last trading day of the month + first tom_days of the next, short the rest (Lakonishok-Smidt); sell_in_may = long Nov-Apr, short May-Oct (Bouman-Jacobsen); day_of_week = short Monday, long Tue-Fri (French). An unknown rule is refused."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": ["seasonal", "seasonal_inverse"],
+      "default": "seasonal",
+      "description": "seasonal = the published direction (long the good window); seasonal_inverse = the exact negation (mirror control). Pre-registering both prevents post-hoc direction cherry-picking."
+    },
+    "tom_days": {
+      "type": "number",
+      "default": 3,
+      "range": [1, 5],
+      "description": "For turn_of_month only: how many trading days at the start of each month are in the window (plus the last trading day of the prior month). 3 is the Lakonishok-Smidt window. Ignored by other rules."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0005,
+      "scope": "environment",
+      "description": "Per-unit-of-turnover cost charged both ways (~0.1% round trip). Seasonal switches are few per year, so cost is small — the null is a gross null."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015",
+        "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024"
+      ],
+      "default": "2022",
+      "scope": "dataset",
+      "description": "Which out-of-sample year is ACCOUNTED. A real calendar edge must clear DSR-Sharpe in a MAJORITY of these 17 years, not one."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the rule is fully deterministic, so seeds are not swept."
+    }
+  }
+}

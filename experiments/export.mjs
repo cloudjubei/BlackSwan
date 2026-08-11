@@ -34,6 +34,12 @@ const FAMILY = {
   'blackswan-roll-basket-hypothesis': 'Commodity index roll — pooled energy basket',
   'blackswan-worldmodel-hypothesis': 'Macro world model — gold/silver/copper drivers',
   'blackswan-cot-hypothesis': 'Positioning/flow — CFTC COT (level + Williams index + flow)',
+  'blackswan-cross-cot-hypothesis': 'Positioning — cross-sectional COT (market-neutral)',
+  'blackswan-tsmom-hypothesis': 'Time-series momentum / trend-following (Moskowitz 2012)',
+  'blackswan-xsmom-hypothesis': 'Cross-sectional momentum / reversal (Jegadeesh-Titman 1993)',
+  'blackswan-lowvol-hypothesis': 'Low-volatility / Betting-Against-Beta (Frazzini-Pedersen 2014)',
+  'blackswan-seasonal-hypothesis': 'Calendar / seasonal (turn-of-month, sell-in-May, Monday)',
+  'blackswan-pairs-hypothesis': 'Pairs / statistical arbitrage (Gatev et al. 2006)',
 }
 const FAMILY_ORDER = Object.values(FAMILY)
 
@@ -70,19 +76,60 @@ const sections = [
     html:
       '<p>Across a broad, <strong>pre-registered</strong> battery of signal families, <strong>no strategy shows a ' +
       'cost-surviving, out-of-sample, multiplicity-corrected trading edge in the freely-obtainable data</strong> ' +
-      'over the tested markets (crypto BTC/ETH/SOL; commodity futures GOLD/SILVER/COPPER/WTI + the energy complex) ' +
-      'and period (2018–2026; decisive OOS windows 2020–2025). Every family was tested with leakage-controlled ' +
-      'point-in-time joins (mutation-proven guards), walk-forward out-of-sample windows, per-trade transaction ' +
-      'cost, Deflated-Sharpe / best-of-N multiplicity correction, and <strong>independent adversarial ' +
-      'verification</strong> of every verdict.</p>',
+      'over the tested markets (crypto BTC/ETH/SOL; commodity futures GOLD/SILVER/COPPER/WTI + the energy complex; ' +
+      'and a survivorship-free diversified daily panel of 7 commodities + SPY/TLT/IEF/UUP) and period (crypto ' +
+      '2018–2026; the diversified panel 2006–2026 with 17 out-of-sample windows 2008–2024). Every family was ' +
+      'tested with leakage-controlled point-in-time joins (mutation-proven guards), walk-forward out-of-sample ' +
+      'windows, per-trade transaction cost, Deflated-Sharpe / best-of-N multiplicity correction, and ' +
+      '<strong>independent adversarial verification</strong> of every verdict.</p>' +
+      '<p><strong>The honest exceptions</strong> keep this from being an all-null sweep (and make it more ' +
+      'credible). Two threads are recorded <strong>inconclusive</strong>, and they are the SAME weak ' +
+      'relative-value / <em>mean-reversion</em> effect seen two ways on the commodity-heavy panel: ' +
+      'cross-sectional <em>reversal</em> (long past losers / short past winners; annualised Sharpe ≈ +0.43, ' +
+      'time-unstable — all in 2016–2024, a coinflip 2008–2015) and <em>pairs mean-reversion</em> (fade ' +
+      'divergences; annualised ≈ +0.35, persistent in both sub-periods, cost-surviving to 40 bps). Both are ' +
+      'positive and cost-surviving but sub-significant (per-config t &lt; 2, within best-of-N multiplicity), so ' +
+      'neither is a bankable edge — they are flagged as open threads for a power-and-replication follow-up. A ' +
+      'third, sell-in-May, is a weaker still <em>disproved-marginal</em> tilt (pooled daily t 0.85, carried by ' +
+      '~2 of 17 years).</p>',
+  },
+  {
+    heading: 'Published-anomaly battery (the academic canon)',
+    html:
+      '<p>The paper must confront the classic academic anomalies the literature claims <em>do</em> survive, not ' +
+      'only the signals already known to fail. Tested on the free, survivorship-free diversified panel, 17 OOS ' +
+      'windows 2008–2024, realistic cost:</p>' +
+      '<ul>' +
+      '<li><strong>Time-series momentum / trend-following</strong> (Moskowitz-Ooi-Pedersen 2012 — the flagship, the ' +
+      'CTA industry): <strong>DISPROVED</strong>, adversarially verified. A textbook <em>post-publication decay</em> ' +
+      '(McLean-Pontiff 2016) — pre-2012 annualised Sharpe +0.51 (the edge was real in-sample, and the backtest ' +
+      'reproduces the canonical 2008/2010 trend years, a positive control), post-2012 −0.18; full-sample t≈0. ' +
+      'Gross ≈ net, so it is a gross null, not a cost kill.</li>' +
+      '<li><strong>Cross-sectional momentum</strong> (Jegadeesh-Titman 1993): <strong>DISPROVED — and it inverts</strong>. ' +
+      'The published long-winners/short-losers book is significantly <em>negative</em> (−12%/yr) on the free ' +
+      'commodity-heavy universe; its mirror (reversal) is the inconclusive open thread above.</li>' +
+      '<li><strong>Low-volatility / Betting-Against-Beta</strong> (Frazzini-Pedersen 2014): <strong>DISPROVED</strong> — ' +
+      'long low-beta / short high-beta is a coinflip (t≈0, negative net return) across all formation windows ' +
+      '(both beta- and volatility-ranked).</li>' +
+      '<li><strong>Calendar / seasonal</strong> (turn-of-month, sell-in-May, Monday effect): <strong>DISPROVED</strong> — ' +
+      'the exposure-balanced spreads are null-to-negative; the Monday effect is fully decayed (gross t≈0); ' +
+      'sell-in-May is a weak disproved-marginal tilt (pooled daily t 0.85).</li>' +
+      '<li><strong>Pairs / statistical arbitrage</strong> (Gatev-Goetzmann-Rouwenhorst 2006): <strong>INCONCLUSIVE</strong> — ' +
+      'distance-pairs mean-reversion is a weak, persistent, cost-surviving tilt (≈+0.35 Sharpe, 12/17 windows) ' +
+      'that does not clear multiplicity-corrected significance; the second mean-reversion open thread.</li>' +
+      '</ul>',
   },
   {
     heading: 'What this claim is — and is not',
     html:
-      '<p>It is <em>not</em> "no edge exists anywhere." It <em>is</em>: (a) the pre-registered families below each ' +
-      'fail their declared gate net-of-cost out-of-sample, with the search space disclosed; and (b) for the one ' +
-      'reproduced published claim (Mou 2011, front-running the Goldman roll), a faithful re-implementation under ' +
-      'this discipline does not survive, with the exact methodological hole named.</p>' +
+      '<p>It is <em>not</em> "no edge exists anywhere." It <em>is</em>: (a) the pre-registered families below ' +
+      'fail their declared gate net-of-cost out-of-sample — every one disproved except two honestly-recorded ' +
+      'inconclusives (cross-sectional reversal and pairs mean-reversion — the same weak relative-value effect, ' +
+      'above), with the search space disclosed; and (b) for the reproduced published claims (Mou 2011 ' +
+      'front-running the Goldman roll; and the factor canon — trend-following, cross-sectional momentum, ' +
+      'Betting-Against-Beta, the calendar anomalies, and distance pairs-trading), a faithful re-implementation ' +
+      'under this discipline does not survive, with the exact methodological hole named (post-publication decay, ' +
+      'sign inversion, multiplicity/mirror artifact, or sub-significant relative-value tilt).</p>' +
       '<p><strong>Power caveat.</strong> The Deflated-Sharpe gates at ~252 observations per window reject only ' +
       '<em>large</em> single-window edges — a <em>modest, persistent</em> edge (annualised Sharpe ≈ 0.3–0.8) ' +
       'cannot be excluded. Verdicts therefore rest on directional refutation, hold-underperformance, and ' +

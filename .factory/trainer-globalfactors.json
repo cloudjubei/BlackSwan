@@ -1,0 +1,91 @@
+{
+  "name": "blackswan-globalfactors",
+  "recordType": "blackswan-globalfactors",
+  "description": "The BALTUSSEN, SWINKELS & VAN VLIET (2021) 'Global Factor Premiums' replication — the paper's FOIL. Baltussen is the one prior human multi-asset unified test, reporting six style premiums (trend, momentum, value, carry, seasonality, low-beta) as ROBUST across asset classes over centuries. This reproduces the four feasible on the free survivorship-free panel — trend (time-series sign of the trailing return), momentum (cross-sectional 12m winners-minus-losers), value (cross-sectional LONG-RUN 5yr reversal, the commodity-value signal), low-beta (long low-beta / short high-beta) — plus Baltussen's headline DIVERSIFIED equal-risk combination, then subjects them to our discipline (realistic per-trade cost, Deflated-Sharpe / best-of-N multiplicity, mutation-proven point-in-time guards, deep-history OOS). SCOPE: Baltussen's SEASONALITY is tested by the `seasonal` probe (disproved) and CARRY is data-gated on free data (commodity carry ~ roll yield, tested by the `roll` probe, disproved; equity/FX/bond carry need term-structure / rates / FX not in the free panel). Thin module reusing tsmom/xsection/lowvol build_weights verbatim; the diversified unit-gross average is the only new (causal, mutation-checked) object. signal=published is Baltussen's direction, inverse the mirror control. Decider is DSR-deflated oos_sharpe across a MAJORITY of the 13 deep-history windows. PRE-REGISTERED EXPECTATION: the factors and their diversified combination FAIL net of cost OOS, contradicting Baltussen once frictions + post-2008 history are imposed uniformly. DATA: commodities/<SYM>-1d-*.json + etfs/<SYM>-1d-*.json.",
+  "run": ".venv/bin/python -m trainer.globalfactors --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "oos_sharpe",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "universe": {
+      "type": "choice",
+      "choices": ["diversified", "commodities", "financials"],
+      "default": "diversified",
+      "scope": "dataset",
+      "description": "The multi-asset panel factors are formed on. diversified = 7 commodities + SPY/TLT/IEF/UUP, matching the rest of the battery."
+    },
+    "factor": {
+      "type": "choice",
+      "choices": ["trend", "momentum", "value", "lowbeta", "diversified"],
+      "default": "diversified",
+      "description": "Which Baltussen style factor. trend = TS sign of trailing 12m return; momentum = XS 12m winners-losers; value = XS 5yr (long-run) reversal; lowbeta = long low-beta / short high-beta; diversified = unit-gross equal-risk average of the four (Baltussen's headline claim). An unknown factor is refused."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": ["published", "inverse"],
+      "default": "published",
+      "description": "published = Baltussen's direction; inverse = the exact negation (mirror control). Pre-registering both prevents post-hoc direction cherry-picking."
+    },
+    "lookback": {
+      "type": "number",
+      "default": 252,
+      "range": [63, 252],
+      "description": "Formation window (bars) for trend + momentum. 252 ~ 12 months."
+    },
+    "value_lookback": {
+      "type": "number",
+      "default": 1260,
+      "range": [504, 1512],
+      "description": "Formation window (bars) for the VALUE (long-run reversal) factor. 1260 ~ 5 years (Baltussen/AMP commodity value). Needs deep-train windows so the lookback is always available."
+    },
+    "span": {
+      "type": "number",
+      "default": 252,
+      "range": [63, 252],
+      "description": "Trailing window (bars) for the low-beta factor's past-only beta estimate."
+    },
+    "k": {
+      "type": "number",
+      "default": 3,
+      "description": "How many instruments on each side of a cross-sectional factor (long k / short k)."
+    },
+    "rebalance_days": {
+      "type": "number",
+      "default": 21,
+      "description": "Bars between re-rankings (21 ~ monthly, Baltussen's rebalance)."
+    },
+    "vol_span": {
+      "type": "number",
+      "default": 63,
+      "description": "Trailing window (bars) for the trend factor's inverse-vol sizing."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0005,
+      "scope": "environment",
+      "description": "Per-unit-of-turnover cost charged both ways (~0.1% round trip). The discipline Baltussen's low-turnover index-level premiums did not face."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019",
+        "cf-2020", "cf-2021", "cf-2022", "cf-2023", "cf-2024"
+      ],
+      "default": "2015",
+      "scope": "dataset",
+      "description": "Which out-of-sample year is ACCOUNTED (all train from 2006 so the 5yr value formation is always available). A real factor premium must clear DSR-Sharpe in a MAJORITY of these 13 years."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the factors are fully deterministic, so seeds are not swept."
+    }
+  }
+}

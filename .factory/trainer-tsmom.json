@@ -1,0 +1,95 @@
+{
+  "name": "blackswan-tsmom",
+  "recordType": "blackswan-tsmom",
+  "description": "The TIME-SERIES MOMENTUM / trend-following probe — the flagship of the published-anomaly battery and the most-defended free edge (Moskowitz-Ooi-Pedersen 2012; the whole managed-futures / CTA industry). Unlike the cross-sectional line (\"will A beat B?\") this asks the time-series question (\"is THIS market trending?\") and takes an ABSOLUTE long/short book: each asset in a survivorship-free diversified basket (7 commodities + SPY + TLT + IEF + UUP, daily from 2006) is LONG when its trailing-lookback return is positive and SHORT when negative (trend), or the exact sign-negation (trend_inverse, the mirror control), sized inverse-vol (risk parity) or equal-notional, rebalanced monthly and held between. The whole portfolio is one equity curve; the trend sign is computed from past-only trailing return + past-only vol, applied on the NEXT bar (never on its own bar), turnover-costed. There is no natural buy-and-hold benchmark for a directional trend book, so the decider is the DSR-deflated oos_sharpe across a MAJORITY of the deep-history windows. Deterministic and model-free (seed is contract-only). PRE-REGISTERED EXPECTATION: refutation net of cost OOS (trend following endured a long post-2011 drawdown; public rules decay — McLean-Pontiff 2016); a survivor across a majority of 2008-2024 windows would be the program's first cost-surviving edge. DATA: commodities/<SYM>-1d-*.json + etfs/<SYM>-1d-*.json.",
+  "run": ".venv/bin/python -m trainer.tsmom --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "oos_sharpe",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "universe": {
+      "type": "choice",
+      "choices": [
+        "diversified",
+        "commodities",
+        "financials"
+      ],
+      "default": "diversified",
+      "scope": "dataset",
+      "description": "The survivorship-free trend basket. diversified = GOLD/SILVER/COPPER/WTI/NATGAS/CORN/WHEAT + SPY/TLT/IEF/UUP (commodities + equity + rates + dollar proxy), the diversified futures-like set Moskowitz's test rests on. commodities / financials are the sub-baskets."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": [
+        "trend",
+        "trend_inverse"
+      ],
+      "default": "trend",
+      "description": "trend = long the up-trenders / short the down-trenders (the published rule); trend_inverse = the exact sign negation (mirror control, pre-registered so the winning direction cannot be cherry-picked). An unknown value is refused."
+    },
+    "weight_scheme": {
+      "type": "choice",
+      "choices": [
+        "invvol",
+        "equal"
+      ],
+      "default": "invvol",
+      "description": "invvol sizes each held leg inverse to its past-only trailing vol (Moskowitz risk parity); equal sizes every leg the same notional. Both normalise to unit gross, so the leverage-free curve's Sharpe is unaffected by the choice."
+    },
+    "lookback": {
+      "type": "number",
+      "default": 252,
+      "range": [
+        20,
+        252
+      ],
+      "description": "The trailing formation window (bars) whose SIGN sets each asset's direction. 252 ~ 12 months (the canonical TSMOM horizon); 126 ~ 6m, 63 ~ 3m. A non-positive lookback is refused (it ratios against a bar that has not happened)."
+    },
+    "rebalance_days": {
+      "type": "number",
+      "default": 21,
+      "range": [
+        1,
+        63
+      ],
+      "description": "How often (bars) the book is re-decided; between rebalances it is held. 21 ~ monthly, the canonical TSMOM rebalance."
+    },
+    "vol_span": {
+      "type": "number",
+      "default": 63,
+      "range": [
+        20,
+        126
+      ],
+      "description": "The trailing window (bars) for the past-only volatility estimate used by the invvol scheme. Ignored under equal weighting."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0005,
+      "scope": "environment",
+      "description": "Per-side fee charged on the daily turnover of the trend book (~0.1% round trip per unit of weight change) — realistic for liquid futures/ETFs."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015",
+        "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025"
+      ],
+      "default": "2022",
+      "scope": "dataset",
+      "description": "Which out-of-sample year is ACCOUNTED. A real trend edge must clear DSR-deflated oos_sharpe in a MAJORITY of these 17 regime-diverse years (the GFC, 2011, 2015-16, 2018, 2020), not one lucky period."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the backtest is fully deterministic, so seeds are not swept."
+    }
+  }
+}

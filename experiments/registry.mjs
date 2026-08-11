@@ -13,7 +13,238 @@ const dsrGate = (trials, minWindows = 2) => ({
   minWindows, windowLever: 'walk_forward_window', trials,
 })
 
+// The deep-history OOS window set (train from 2006, one accounted year each) — 17 regime-diverse years
+// 2008-2024 (the GFC, 2011, 2015-16, 2018, 2020). A published anomaly must clear the DSR gate in a MAJORITY
+// of these, not one lucky period; this is the power the tighter DSR confidence interval needs to reject a
+// MODEST persistent edge, not just a large one.
+const DEEP_WINDOWS = ['2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024']
+
 export const PROBES = {
+  // ==================================================================================================
+  // PUBLISHED-ANOMALY BATTERY — the academic/practitioner canon the "no-edge" paper must confront (the
+  // strategies the literature actively claims DO work), tested on the free survivorship-free daily panel.
+  // ==================================================================================================
+
+  // --- TIME-SERIES MOMENTUM / trend-following — the flagship (Moskowitz-Ooi-Pedersen 2012) ------------
+  tsmom: {
+    type: 'blackswan-tsmom',
+    manifest: '.factory/trainer-tsmom.json',
+    proposedBy: 'tsmom-probe',
+    thesis: 'Time-series momentum / trend-following — diversified basket',
+    gate: dsrGate(6, 9),
+    fixed: { universe: 'diversified', weight_scheme: 'invvol', rebalance_days: 21, vol_span: 63, transaction_fee: 0.0005 },
+    sweep: { lookback: [63, 126, 252], walk_forward_window: DEEP_WINDOWS },
+    arms: [
+      {
+        id: 'probe-tsmom-trend', fixed: { signal: 'trend' },
+        title: 'Time-series momentum (long up-trenders / short down-trenders) times a diversified futures basket net of cost',
+        claim:
+          'Taking each asset in a survivorship-free diversified basket (7 commodities + SPY/TLT/IEF/UUP) LONG when ' +
+          'its trailing 3-12m return is positive and SHORT when negative, risk-parity-sized and monthly-rebalanced, ' +
+          'produces positive DSR-deflated oos_sharpe in a MAJORITY of the 17 deep-history windows 2008-2024, net of ' +
+          'a realistic per-side cost.',
+        rationale:
+          'The single most-defended free anomaly — the entire managed-futures / CTA industry and Moskowitz-Ooi-' +
+          'Pedersen (2012), who report a ~0.8 Sharpe across ~58 futures. This is the flagship the "no-edge" paper ' +
+          'must confront. PRE-REGISTERED EXPECTATION: refutation net of cost OOS — trend following endured a long ' +
+          'flat-to-negative stretch post-2011, public rules decay (McLean-Pontiff 2016), and a small 11-asset unit-' +
+          'gross book at realistic cost is marginal. A SURVIVOR (positive DSR-Sharpe in a majority of 17 regime-' +
+          'diverse years, thesis not inverse) would be the program\'s first cost-surviving edge. Sign from past-only ' +
+          'trailing return, vol from past-only window, position applied next bar, price-blind, turnover-costed.',
+      },
+      {
+        id: 'probe-tsmom-trend-inverse', fixed: { signal: 'trend_inverse' },
+        title: 'The INVERSE trend book (short up-trenders / long down-trenders) times the basket (control)',
+        claim: 'The exact sign-negation of the trend book has positive DSR-deflated oos_sharpe in a majority of the 17 windows 2008-2024.',
+        rationale:
+          'Algebraic-mirror control. If trend is null but the inverse wins across windows, trend REVERSES at this ' +
+          'horizon; if both are null, the trend sign carries no cost-surviving directional edge. Pre-registering ' +
+          'both prevents post-hoc direction cherry-picking.',
+      },
+    ],
+  },
+
+  // --- CROSS-SECTIONAL MOMENTUM / REVERSAL — paper-grade (Jegadeesh-Titman 1993) ----------------------
+  // Supersedes the B1-era xsection nulls (hashed keys 6fff…/f23b…), which ranked SURVIVORSHIP-BIASED
+  // megacaps over two windows; this re-tests the same rule on the survivorship-free diversified panel with a
+  // realistic cost and the full 17-window DSR gate, so the cross-sectional refutation is paper-grade.
+  xsmom: {
+    type: 'blackswan-xsmom',
+    manifest: '.factory/trainer-xsmom.json',
+    proposedBy: 'xsmom-probe',
+    thesis: 'Cross-sectional momentum / reversal — survivorship-free diversified basket',
+    gate: dsrGate(6, 9),
+    fixed: { universe: 'diversified', k: 3, rebalance_days: 21, long_only: false, transaction_fee: 0.0005 },
+    sweep: { lookback: [63, 126, 252], walk_forward_window: DEEP_WINDOWS },
+    arms: [
+      {
+        id: 'probe-xsmom-momentum', fixed: { signal: 'momentum' },
+        title: 'Cross-sectional momentum (long past winners / short past losers) times a survivorship-free basket net of cost',
+        claim:
+          'Ranking a survivorship-free diversified basket by trailing 3-12m return and holding a dollar-neutral ' +
+          'LONG-top-3 / SHORT-bottom-3 book (monthly rebalance) has positive DSR-deflated oos_sharpe in a MAJORITY ' +
+          'of the 17 deep-history windows 2008-2024, net of a realistic per-side cost.',
+        rationale:
+          'The founding cross-sectional anomaly (Jegadeesh-Titman 1993), the other half of the momentum literature. ' +
+          'PRE-REGISTERED EXPECTATION: refutation — cross-sectional momentum is beta-neutral so it removed the ' +
+          'single-asset beta artifact, but on a small commodity-heavy basket it becomes a momentum-vs-reversal ' +
+          'regime bet whose winning arm tracks the year, and public momentum decayed post-2000 (crashes 2009/2020). ' +
+          'Upgrades the survivorship-biased B1 xsection null to a survivorship-free, deep-history, DSR-gated test. ' +
+          'Rank from past-only trailing return, book applied next bar, holes never forward-filled, turnover-costed.',
+      },
+      {
+        id: 'probe-xsmom-reversal', fixed: { signal: 'reversal' },
+        title: 'Cross-sectional reversal (long past losers / short past winners) times the basket (mirror)',
+        claim: 'The exact rank-inversion (long the bottom-3 / short the top-3) has positive DSR-deflated oos_sharpe in a majority of the 17 windows 2008-2024.',
+        rationale: 'Algebraic-mirror control. Pre-registering both prevents post-hoc direction cherry-picking, and separates a genuine reversal edge from a momentum one.',
+      },
+    ],
+  },
+
+  // --- LOW-VOLATILITY / BETTING-AGAINST-BETA (Baker-Haugen; Frazzini-Pedersen 2014) -------------------
+  lowvol: {
+    type: 'blackswan-lowvol',
+    manifest: '.factory/trainer-lowvol.json',
+    proposedBy: 'lowvol-probe',
+    thesis: 'Low-volatility / Betting-Against-Beta — survivorship-free diversified basket',
+    gate: dsrGate(12, 9),
+    fixed: { universe: 'diversified', k: 3, rebalance_days: 21, transaction_fee: 0.0005 },
+    // Both rank keys are swept so the recorded evidence matches the claim's title: rank_by='beta' is
+    // Betting-Against-Beta, rank_by='vol' is the low-VOLATILITY anomaly (Baker-Haugen). Persisting both closes
+    // the evidence-trail gap the adversarial verification flagged (the vol leg was previously only live-checked).
+    sweep: { rank_by: ['beta', 'vol'], span: [63, 126, 252], walk_forward_window: DEEP_WINDOWS },
+    arms: [
+      {
+        id: 'probe-lowvol-lowrisk', fixed: { signal: 'lowrisk' },
+        title: 'Betting-Against-Beta (long low-beta / short high-beta) times a survivorship-free basket net of cost',
+        claim:
+          'Ranking a survivorship-free diversified basket by trailing beta to the equal-weight basket and holding a ' +
+          'dollar-neutral LONG-low-beta / SHORT-high-beta book (monthly rebalance) has positive DSR-deflated ' +
+          'oos_sharpe in a MAJORITY of the 17 deep-history windows 2008-2024, net of a realistic per-side cost.',
+        rationale:
+          'The low-risk anomaly (Frazzini-Pedersen 2014 BAB; Baker-Haugen) — a heavily-cited "it survives" claim. ' +
+          'PRE-REGISTERED EXPECTATION: refutation — on a small commodity+rates basket the low-beta/high-beta split ' +
+          'collapses toward a rates-vs-commodities bet whose sign tracks the regime, and public low-vol crowded/' +
+          'decayed. A survivor (positive DSR-Sharpe in a majority of windows, thesis not inverse) would be a first ' +
+          'cost-surviving edge. Score past-only, book applied next bar, holes never forward-filled, turnover-costed.',
+      },
+      {
+        id: 'probe-lowvol-lowrisk-inverse', fixed: { signal: 'lowrisk_inverse' },
+        title: 'The INVERSE (long high-beta / short low-beta) book times the basket (mirror)',
+        claim: 'The exact negation (long high-beta / short low-beta) has positive DSR-deflated oos_sharpe in a majority of the 17 windows 2008-2024.',
+        rationale: 'Algebraic-mirror control. Pre-registering both prevents post-hoc direction cherry-picking.',
+      },
+    ],
+  },
+
+  // --- CALENDAR / SEASONAL anomalies (turn-of-month, sell-in-May, Monday effect) ----------------------
+  seasonal: {
+    type: 'blackswan-seasonal',
+    manifest: '.factory/trainer-seasonal.json',
+    proposedBy: 'seasonal-probe',
+    thesis: 'Calendar / seasonal anomalies — SPY exposure-balanced spread',
+    gate: dsrGate(6, 9),
+    fixed: { universe: 'spy', tom_days: 3, transaction_fee: 0.0005 },
+    sweep: { rule: ['turn_of_month', 'sell_in_may', 'day_of_week'], walk_forward_window: DEEP_WINDOWS },
+    arms: [
+      {
+        id: 'probe-seasonal-seasonal', fixed: { signal: 'seasonal' },
+        title: 'The classic calendar effects (turn-of-month / sell-in-May / Monday) time SPY net of cost',
+        claim:
+          'Trading the exposure-balanced calendar spread on SPY — long the claimed-good window (turn-of-month, ' +
+          'Nov-Apr, or Tue-Fri), short its complement, time-neutral — has positive DSR-deflated oos_sharpe in a ' +
+          'MAJORITY of the 17 deep-history windows 2008-2024, net of cost.',
+        rationale:
+          'The famous free calendar anomalies (Lakonishok-Smidt 1988; Bouman-Jacobsen 2002; French 1980). ' +
+          'PRE-REGISTERED EXPECTATION: refutation — these are decades-old, heavily publicised, and largely ' +
+          'decayed/arbitraged (McLean-Pontiff 2016); the exposure-balanced spread removes the market-drift ' +
+          'confound, so a win must be a genuine seasonal differential. A survivor across a majority of windows ' +
+          '(thesis not inverse) would be a first cost-surviving edge. The book is a pure function of the calendar ' +
+          '(never price; mutation-proven), turnover-costed.',
+      },
+      {
+        id: 'probe-seasonal-inverse', fixed: { signal: 'seasonal_inverse' },
+        title: 'The INVERSE calendar spread (long the bad window / short the good) times SPY (mirror)',
+        claim: 'The exact negation of the calendar spread has positive DSR-deflated oos_sharpe in a majority of the 17 windows 2008-2024.',
+        rationale: 'Algebraic-mirror control. Pre-registering both prevents post-hoc direction cherry-picking.',
+      },
+    ],
+  },
+
+  // --- PAIRS / STATISTICAL ARBITRAGE (distance pairs — Gatev-Goetzmann-Rouwenhorst 2006) --------------
+  pairs: {
+    type: 'blackswan-pairs',
+    manifest: '.factory/trainer-pairs.json',
+    proposedBy: 'pairs-probe',
+    thesis: 'Pairs / statistical arbitrage — diversified basket distance pairs',
+    gate: dsrGate(6, 9),
+    fixed: { universe: 'diversified', formation_days: 252, k: 5, transaction_fee: 0.0005 },
+    sweep: { entry: [1.5, 2.0, 2.5], walk_forward_window: DEEP_WINDOWS },
+    arms: [
+      {
+        id: 'probe-pairs-meanrev', fixed: { signal: 'meanrev' },
+        title: 'Distance pairs trading (fade divergence, close on convergence) times the basket net of cost',
+        claim:
+          'Selecting the 5 closest-moving pairs of a survivorship-free diversified basket on a 12-month formation ' +
+          'window and fading their divergences (short the rich leg / long the cheap leg beyond `entry` formation ' +
+          'std-devs, close on convergence) has positive DSR-deflated oos_sharpe in a MAJORITY of the 17 deep-history ' +
+          'windows 2008-2024, net of cost.',
+        rationale:
+          'The classic distance stat-arb (Gatev-Goetzmann-Rouwenhorst 2006) — a distinct MECHANISM (spread ' +
+          'mean-reversion, market-neutral), not price direction. PRE-REGISTERED EXPECTATION: refutation — GGR\'s ' +
+          'edge decayed sharply post-2002 as it was arbitraged, and a small daily free basket has few genuinely-' +
+          'cointegrated pairs (cross-asset "pairs" like gold-vs-bonds are economically unrelated and diverge ' +
+          'permanently). A survivor across a majority of windows (thesis not inverse) would be a first cost-surviving ' +
+          'edge. Pair selection + spread mean/std past-only, book one bar behind, dollar-neutral, turnover-costed.',
+      },
+      {
+        id: 'probe-pairs-meanrev-inverse', fixed: { signal: 'meanrev_inverse' },
+        title: 'The INVERSE (chase divergence) pairs book times the basket (mirror)',
+        claim: 'The exact negation (chase divergence instead of fading it) has positive DSR-deflated oos_sharpe in a majority of the 17 windows 2008-2024.',
+        rationale: 'Algebraic-mirror control. Pre-registering both prevents post-hoc direction cherry-picking.',
+      },
+    ],
+  },
+
+  // --- BALTUSSEN 2021 "Global Factor Premiums" replication — THE FOIL (the paper's spine) --------------
+  // cf-* windows train from 2006 so the 5yr VALUE reversal always has its formation. Reuses tsmom/xsection/
+  // lowvol build_weights; the diversified equal-risk average is the headline foil (Baltussen's central claim).
+  globalfactors: {
+    type: 'blackswan-globalfactors',
+    manifest: '.factory/trainer-globalfactors.json',
+    proposedBy: 'globalfactors-probe',
+    thesis: 'Global factor premiums (Baltussen 2021) — the multi-asset foil',
+    gate: dsrGate(10, 7),
+    fixed: { universe: 'diversified', lookback: 252, value_lookback: 1260, span: 252, k: 3, rebalance_days: 21, vol_span: 63, transaction_fee: 0.0005 },
+    sweep: { factor: ['trend', 'momentum', 'value', 'lowbeta', 'diversified'], walk_forward_window: ['2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', 'cf-2020', 'cf-2021', 'cf-2022', 'cf-2023', 'cf-2024'] },
+    arms: [
+      {
+        id: 'probe-globalfactors-published', fixed: { signal: 'published' },
+        title: 'The Baltussen (2021) global style premiums (and their diversified combination) survive our discipline net of cost',
+        claim:
+          'Baltussen-Swinkels-van Vliet (2021) report trend / momentum / value / low-beta (and their diversified ' +
+          'equal-risk combination) as ROBUST multi-asset premiums. Reproduced on the free survivorship-free panel ' +
+          'and subjected to realistic per-trade cost + DSR/best-of-N multiplicity + point-in-time guards + ' +
+          'deep-history OOS, at least the DIVERSIFIED combination has positive DSR-deflated oos_sharpe in a MAJORITY ' +
+          'of the 13 windows.',
+        rationale:
+          'THE FOIL — the one prior human multi-asset unified test, and the direct contradiction that is the paper\'s ' +
+          'spine. PRE-REGISTERED EXPECTATION: the factors and their diversified combination FAIL net of cost OOS, ' +
+          'because Baltussen\'s robustness rests on low-turnover, index-level, cost-free construction dominated by ' +
+          'pre-1980 history, whereas our 2012-2024 window sits inside the post-publication crowded-decay regime with ' +
+          'realistic frictions. If the diversified combination survives, Baltussen holds on free data and the paper\'s ' +
+          'contradiction fails — an honest, pre-registered decider. Reuses mutation-proven build_weights; value = 5yr ' +
+          'reversal; diversified = unit-gross equal-risk average, applied next bar, turnover-costed.',
+      },
+      {
+        id: 'probe-globalfactors-inverse', fixed: { signal: 'inverse' },
+        title: 'The INVERSE of the Baltussen factors (and their combination) times the panel (mirror)',
+        claim: 'The exact negation of each factor has positive DSR-deflated oos_sharpe in a majority of the 13 windows.',
+        rationale: 'Algebraic-mirror control. Pre-registering both prevents post-hoc direction cherry-picking.',
+      },
+    ],
+  },
+
   // --- commodity index-roll ("Goldman roll"), single-asset WTI (DISPROVED — recorded) ----------------
   roll: {
     type: 'blackswan-roll',

@@ -43,6 +43,12 @@ UNIVERSES = {
         "GOLD", "SPY", "UUP", "TLT", "IEF", "SHY",
         "NVDA", "MSFT", "AAPL", "GOOGL", "AMZN", "META", "AVGO", "TSLA", "JPM", "WMT",
     ],
+    # The paper-grade universe: SURVIVORSHIP-FREE persistent markets/ETFs with daily bars from 2006 (7
+    # commodities + equity + rates + a dollar proxy). The megacap "stocks" set is today's winners (chosen
+    # after the fact), which biases a cross-sectional momentum test upward; this basket has no such bias, so
+    # a cross-sectional null on it is a real result rather than a survivorship artifact. Matches tsmom's
+    # diversified basket, so the time-series and cross-sectional refutations run on the same panel.
+    "diversified": ["GOLD", "SILVER", "COPPER", "WTI", "NATGAS", "CORN", "WHEAT", "SPY", "TLT", "IEF", "UUP"],
 }
 DEFAULT_UNIVERSE = "macro+stocks"
 

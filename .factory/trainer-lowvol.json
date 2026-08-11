@@ -1,0 +1,74 @@
+{
+  "name": "blackswan-lowvol",
+  "recordType": "blackswan-lowvol",
+  "description": "The LOW-VOLATILITY / BETTING-AGAINST-BETA probe (Baker-Haugen; Frazzini-Pedersen 2014) — one of the most-cited 'it survives' claims: low-risk assets earn higher risk-adjusted returns, so a book LONG the low-risk / SHORT the high-risk names earns alpha. Ranks the survivorship-free diversified panel (7 commodities + SPY/TLT/IEF/UUP, daily from 2006) by a PAST-only risk score — trailing realised volatility (low-vol anomaly) or trailing beta to the equal-weight basket (BAB) — and holds a dollar-neutral long-low / short-high book (lowrisk), or its exact negation (lowrisk_inverse, the mirror control), rebalanced monthly and turnover-costed. Market-neutral, so the decider is the DSR-deflated oos_sharpe across a MAJORITY of the 17 deep-history windows. Score is past-only, book applied next bar, holes never forward-filled. Deterministic and model-free. PRE-REGISTERED EXPECTATION: refutation net of cost OOS. DATA: commodities/<SYM>-1d-*.json + etfs/<SYM>-1d-*.json.",
+  "run": ".venv/bin/python -m trainer.lowvol --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "oos_sharpe",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "universe": {
+      "type": "choice",
+      "choices": ["diversified", "commodities", "financials"],
+      "default": "diversified",
+      "scope": "dataset",
+      "description": "The survivorship-free basket ranked by risk. diversified = 7 commodities + SPY/TLT/IEF/UUP, matching tsmom/xsmom so all anomaly probes share one panel."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": ["lowrisk", "lowrisk_inverse"],
+      "default": "lowrisk",
+      "description": "lowrisk longs the k lowest-risk / shorts the k highest-risk names (the published rule); lowrisk_inverse is the exact negation (mirror control). Dollar-neutral either way. An unknown value is refused."
+    },
+    "rank_by": {
+      "type": "choice",
+      "choices": ["beta", "vol"],
+      "default": "beta",
+      "description": "beta ranks by trailing beta to the equal-weight basket (Betting-Against-Beta); vol ranks by trailing realised volatility (the low-volatility anomaly). Both past-only; the two ranks are collinear on this basket."
+    },
+    "span": {
+      "type": "number",
+      "default": 63,
+      "range": [20, 252],
+      "description": "The trailing window (bars) for the past-only risk score. 63 ~ 3m, 126 ~ 6m, 252 ~ 12m."
+    },
+    "k": {
+      "type": "number",
+      "default": 3,
+      "description": "How many names on each side (long k lowest-risk / short k highest-risk). With an 11-asset basket k=3 leaves 5 flat; a universe with fewer than 2k names declines to trade."
+    },
+    "rebalance_days": {
+      "type": "number",
+      "default": 21,
+      "description": "Bars between re-rankings (21 ~ monthly). Turnover — and therefore cost — scales with this."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0005,
+      "scope": "environment",
+      "description": "Per-unit-of-turnover cost charged both ways (~0.1% round trip) — realistic for liquid futures/ETFs."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015",
+        "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024"
+      ],
+      "default": "2022",
+      "scope": "dataset",
+      "description": "Which out-of-sample year is ACCOUNTED. A real low-risk edge must clear DSR-Sharpe in a MAJORITY of these 17 years, not one."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the screen is fully deterministic, so seeds are not swept."
+    }
+  }
+}

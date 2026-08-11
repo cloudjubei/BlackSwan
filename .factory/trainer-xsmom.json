@@ -1,0 +1,84 @@
+{
+  "name": "blackswan-xsmom",
+  "recordType": "blackswan-xsmom",
+  "description": "The PAPER-GRADE cross-sectional momentum / reversal probe (Jegadeesh-Titman 1993) — the founding cross-sectional anomaly, re-tested to supersede the B1-era xsection nulls which ranked SURVIVORSHIP-BIASED megacaps (today's winners, chosen after the fact) over two windows. This runs the identical deterministic ranking rule (trainer.xsection) on the SURVIVORSHIP-FREE diversified panel (7 commodities + SPY/TLT/IEF/UUP, daily from 2006), dollar-neutral LONG-top-k / SHORT-bottom-k (momentum) or the exact rank inversion (reversal), monthly-rebalanced, turnover-costed at a realistic per-side fee, across the full 17-window deep-history DSR gate. Market-neutral, so there is no single-asset beta and the decider is the DSR-deflated oos_sharpe. Rank from past-only trailing return, book applied next bar, holes never forward-filled. Deterministic and model-free. DATA: commodities/<SYM>-1d-*.json + etfs/<SYM>-1d-*.json.",
+  "run": ".venv/bin/python -m trainer.xsection --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "oos_sharpe",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "universe": {
+      "type": "choice",
+      "choices": [
+        "diversified",
+        "macro",
+        "macro+stocks"
+      ],
+      "default": "diversified",
+      "scope": "dataset",
+      "description": "The PRE-REGISTERED symbol universe ranked against itself. diversified is the SURVIVORSHIP-FREE panel (7 commodities + SPY/TLT/IEF/UUP, daily from 2006), matching tsmom so the time-series and cross-sectional refutations run on the same data. Choosing symbols after seeing results is selection-on-test, so the list is fixed and never tuned."
+    },
+    "lookback": {
+      "type": "number",
+      "default": 126,
+      "range": [
+        1,
+        1000
+      ],
+      "description": "Trailing bars used to rank the universe (the formation window). 126 ~ 6m, 252 ~ 12m (canonical cross-sectional momentum), 63 ~ 3m. Must be >= 1: a non-positive window inverts the ranking into a forward ratio and reads the future, so it is refused."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": [
+        "momentum",
+        "reversal"
+      ],
+      "default": "momentum",
+      "description": "momentum longs the top-k / shorts the bottom-k trailing-return names (the published rule); reversal is the exact rank inversion (mirror control). Dollar-neutral either way. An unknown value is refused."
+    },
+    "k": {
+      "type": "number",
+      "default": 3,
+      "description": "How many symbols on each side (long k / short k). With an 11-asset basket k=3 leaves 5 flat; a universe with fewer than 2k rankable names declines to trade rather than double-book the middle."
+    },
+    "rebalance_days": {
+      "type": "number",
+      "default": 21,
+      "description": "Bars between re-rankings (21 ~ monthly). Turnover — and therefore cost — scales with this."
+    },
+    "long_only": {
+      "type": "boolean",
+      "default": false,
+      "scope": "environment",
+      "description": "Drop the short leg (hold only the top k). The long/short book is NET FLAT by construction; long-only reintroduces market beta, so it is the reference arm, not the thesis."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0005,
+      "scope": "environment",
+      "description": "Per-unit-of-turnover cost charged both ways (~0.1% round trip) — realistic for liquid futures/ETFs."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015",
+        "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024"
+      ],
+      "default": "2022",
+      "scope": "dataset",
+      "description": "Which out-of-sample year is ACCOUNTED. The ranking may look back into the train span for its formation window, but only the test year's P&L is reported. A real cross-sectional edge must clear DSR-Sharpe in a MAJORITY of these 17 years."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only — the screen is fully deterministic, so seeds are not swept."
+    }
+  }
+}

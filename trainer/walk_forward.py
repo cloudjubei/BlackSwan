@@ -46,6 +46,15 @@ _WINDOWS = {
     "2024": (2020, 2024, 2024),
     "2025": (2020, 2025, 2025),
     "2026": (2020, 2026, 2026),
+    # cf-* (commodity-factor) DEEP-TRAIN windows: test 2020-2025 but train from 2006, so a long-formation factor
+    # (e.g. the 5yr VALUE reversal, 1260 bars) always has its full lookback available in the loaded history —
+    # the plain 2020-2024 ids train from 2018/2020 and would starve it. Same accounted test year, deeper warm-up.
+    "cf-2020": (2006, 2020, 2020),
+    "cf-2021": (2006, 2021, 2021),
+    "cf-2022": (2006, 2022, 2022),
+    "cf-2023": (2006, 2023, 2023),
+    "cf-2024": (2006, 2024, 2024),
+    "cf-2025": (2006, 2025, 2025),
     "alt-2024": (2022, 2024, 2024),
     "alt-2025": (2022, 2025, 2025),
     "alt-2026": (2022, 2026, 2026),

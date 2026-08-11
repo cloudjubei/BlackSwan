@@ -457,7 +457,7 @@
     },
     {
       "type": "blackswan-cross-cot-hypothesis",
-      "family": "blackswan-cross-cot-hypothesis",
+      "family": "Positioning — cross-sectional COT (market-neutral)",
       "probes": [
         {
           "id": "probe-cross-cot-contrarian",
@@ -475,14 +475,120 @@
         }
       ],
       "cells": 20
+    },
+    {
+      "type": "blackswan-tsmom-hypothesis",
+      "family": "Time-series momentum / trend-following (Moskowitz 2012)",
+      "probes": [
+        {
+          "id": "probe-tsmom-trend",
+          "title": "Time-series momentum (long up-trenders / short down-trenders) times a diversified futures basket net of cost",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 51
+        },
+        {
+          "id": "probe-tsmom-trend-inverse",
+          "title": "The INVERSE trend book (short up-trenders / long down-trenders) times the basket (control)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 51
+        }
+      ],
+      "cells": 102
+    },
+    {
+      "type": "blackswan-xsmom-hypothesis",
+      "family": "Cross-sectional momentum / reversal (Jegadeesh-Titman 1993)",
+      "probes": [
+        {
+          "id": "probe-xsmom-momentum",
+          "title": "Cross-sectional momentum (long past winners / short past losers) times a survivorship-free basket net of cost",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 51
+        },
+        {
+          "id": "probe-xsmom-reversal",
+          "title": "Cross-sectional reversal (long past losers / short past winners) times the basket (mirror)",
+          "status": "inconclusive",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 51
+        }
+      ],
+      "cells": 102
+    },
+    {
+      "type": "blackswan-lowvol-hypothesis",
+      "family": "Low-volatility / Betting-Against-Beta (Frazzini-Pedersen 2014)",
+      "probes": [
+        {
+          "id": "probe-lowvol-lowrisk",
+          "title": "Betting-Against-Beta (long low-beta / short high-beta) times a survivorship-free basket net of cost",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 102
+        },
+        {
+          "id": "probe-lowvol-lowrisk-inverse",
+          "title": "The INVERSE (long high-beta / short low-beta) book times the basket (mirror)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 102
+        }
+      ],
+      "cells": 204
+    },
+    {
+      "type": "blackswan-seasonal-hypothesis",
+      "family": "Calendar / seasonal (turn-of-month, sell-in-May, Monday)",
+      "probes": [
+        {
+          "id": "probe-seasonal-inverse",
+          "title": "The INVERSE calendar spread (long the bad window / short the good) times SPY (mirror)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 51
+        },
+        {
+          "id": "probe-seasonal-seasonal",
+          "title": "The classic calendar effects (turn-of-month / sell-in-May / Monday) time SPY net of cost",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 51
+        }
+      ],
+      "cells": 102
+    },
+    {
+      "type": "blackswan-pairs-hypothesis",
+      "family": "Pairs / statistical arbitrage (Gatev et al. 2006)",
+      "probes": [
+        {
+          "id": "probe-pairs-meanrev",
+          "title": "Distance pairs trading (fade divergence, close on convergence) times the basket net of cost",
+          "status": "inconclusive",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 51
+        },
+        {
+          "id": "probe-pairs-meanrev-inverse",
+          "title": "The INVERSE (chase divergence) pairs book times the basket (mirror)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 51
+        }
+      ],
+      "cells": 102
     }
   ],
   "stats": {
-    "probes": 55,
-    "families": 13,
-    "cellsRun": 1206,
+    "probes": 65,
+    "families": 18,
+    "cellsRun": 1818,
     "byStatus": {
-      "disproved": 55
+      "disproved": 63,
+      "inconclusive": 2
     }
   }
 }
