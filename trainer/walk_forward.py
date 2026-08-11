@@ -22,6 +22,25 @@ _OPEN_TEST_CAP = 2035
 # full BTC history); alt-* ids train from 2022 for assets whose on-disk history starts there (the
 # altcoin 1m backfill begins 2022-01).
 _WINDOWS = {
+    # deep-history commodity/financial test years (train from 2006, where the extended yfinance price + CFTC COT +
+    # macro all reach): a driver-conditioned or fixed-rule model needs only a short warm-up, so these give the
+    # full 2008-2024 out-of-sample span (17 windows across the GFC, 2011, 2015-16, 2018, 2020) that the tighter
+    # DSR confidence interval needs to reject a MODEST persistent edge, not just a large one.
+    "2008": (2006, 2008, 2008),
+    "2009": (2006, 2009, 2009),
+    "2010": (2006, 2010, 2010),
+    "2011": (2006, 2011, 2011),
+    "2012": (2006, 2012, 2012),
+    "2013": (2006, 2013, 2013),
+    "2014": (2006, 2014, 2014),
+    "2015": (2006, 2015, 2015),
+    "2016": (2006, 2016, 2016),
+    "2017": (2006, 2017, 2017),
+    "2018": (2006, 2018, 2018),
+    "2019": (2006, 2019, 2019),
+    # 2020-21 kept training from 2018 (crypto/attention consumers share these ids); commodities warm fine either way.
+    "2020": (2018, 2020, 2020),
+    "2021": (2018, 2021, 2021),
     "2022": (2020, 2022, 2022),
     "2023": (2020, 2023, 2023),
     "2024": (2020, 2024, 2024),

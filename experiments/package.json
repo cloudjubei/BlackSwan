@@ -1,0 +1,11 @@
+{
+  "name": "blackswan-experiments",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Recorded, reproducible BlackSwan side-experiment probes (pre-registered hypotheses + gates + sweep matrices), run via the modeltrainer engine.",
+  "bin": { "blackswan-experiment": "./cli.mjs" },
+  "scripts": {
+    "list": "node cli.mjs list"
+  }
+}

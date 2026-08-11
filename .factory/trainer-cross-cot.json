@@ -1,0 +1,110 @@
+{
+  "name": "blackswan-cross-cot",
+  "recordType": "blackswan-cross-cot",
+  "description": "The CROSS-SECTIONAL COT probe \u2014 the structurally-different positioning thread (relative value, MARKET-NEUTRAL). Every single-asset positioning probe nulled because its tempting cells were BETA (long a rising commodity); this removes that beta by construction. Each bar it ranks a metals+energy+ags basket (GOLD/SILVER/COPPER/WTI/CORN/WHEAT) by managed-money positioning extremity (the trailing Williams COT index of net/OI) and goes LONG the k least-crowded / SHORT the k most-crowded (cross_contrarian), or the reverse (cross_momentum) \u2014 a dollar-neutral long/short, so the common commodity beta cancels and only a genuine RELATIVE-positioning edge can survive. Reuses cot.py's release-lagged join + trailing COT index; the cross-sectional ranking + the market-neutral portfolio backtest are the new surface. Commodities are aligned on a common daily axis (union of the basket's bar dates) with forward-filled closes; the position decided at day t earns day t+1's return; positions never read price; the COT score is release-lagged + past-only. There is no buy-and-hold benchmark (dollar-neutral), so the decider is the DSR-deflated oos_sharpe of the long/short portfolio. Deterministic and model-free (the seed is contract-only). DATA: cot/<SYM>.json + commodities/<SYM>-1d-*.json for the basket.",
+  "run": ".venv/bin/python -m trainer.cross_cot --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "oos_sharpe",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "basket": {
+      "type": "choice",
+      "choices": [
+        "complex6"
+      ],
+      "default": "complex6",
+      "scope": "dataset",
+      "description": "The commodity basket ranked and traded. complex6 = GOLD, SILVER, COPPER, WTI, CORN, WHEAT (metals + energy + ags), each with free CFTC COT and yfinance price. NATGAS is excluded (its COT commodity_name is dominated by ICE swaps that do not match the NG=F futures price)."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": [
+        "cross_contrarian",
+        "cross_momentum"
+      ],
+      "default": "cross_contrarian",
+      "description": "cross_contrarian goes LONG the least-crowded commodities (lowest COT index) and SHORT the most-crowded (crowded specs unwind); cross_momentum rides the crowd (long most-crowded / short least-crowded). Dollar-neutral either way. An unknown value is refused."
+    },
+    "cross_k": {
+      "type": "number",
+      "default": 2,
+      "range": [
+        1,
+        3
+      ],
+      "description": "How many commodities to hold on each side (long k / short k). With a 6-commodity basket, k=2 leaves 2 flat; larger k widens the book toward the full complex."
+    },
+    "cot_index_window": {
+      "type": "number",
+      "default": 756,
+      "range": [
+        63,
+        1000
+      ],
+      "description": "The trailing window (bars) for the per-commodity Williams COT index used as the cross-sectional ranking score. ~756 = 3yr, regime-adaptive."
+    },
+    "min_history": {
+      "type": "number",
+      "default": 126,
+      "range": [
+        30,
+        504
+      ],
+      "description": "Bars of trailing history required before a commodity's COT index (hence its rank) is defined."
+    },
+    "release_lag_days": {
+      "type": "number",
+      "default": 4,
+      "range": [
+        3,
+        10
+      ],
+      "scope": "dataset",
+      "description": "COT publication lag: a report dated Tuesday D is usable only from D + release_lag_days (the Monday after the Friday release)."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0005,
+      "scope": "environment",
+      "description": "Per-side fee charged on the daily turnover of the long/short book (~0.1% round trip per unit of weight change)."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2008",
+        "2009",
+        "2010",
+        "2011",
+        "2012",
+        "2013",
+        "2014",
+        "2015",
+        "2016",
+        "2017",
+        "2018",
+        "2019",
+        "2020",
+        "2021",
+        "2022",
+        "2023",
+        "2024",
+        "2025"
+      ],
+      "default": "2022",
+      "scope": "dataset",
+      "description": "Which out-of-sample year is ACCOUNTED. A real relative-positioning edge must hold in a MAJORITY of these five regime-diverse years, not one."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only \u2014 the backtest is fully deterministic, so seeds are not swept."
+    }
+  }
+}

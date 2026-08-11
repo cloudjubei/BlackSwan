@@ -349,9 +349,13 @@ def _load_bars(asset, pairs, bar_minutes):
     (bar arrays, not the raw 1m rows) and is exact for day-dividing bar widths."""
     inst = data_catalog.instrument(asset)
     directory = inst.directory if inst else "binance"
+    # The on-disk file interval is the instrument's finest NATIVE interval: crypto is mined at 1m (1h/1d
+    # derived), while commodities / stocks / fx / etfs are mined daily. Hardcoding 1m would make every
+    # non-crypto instrument silently load nothing, so resolve it from the catalog.
+    native = inst.intervals[0] if inst else "1m"
     out = {"timestamp": [], "open": [], "high": [], "low": [], "close": [], "volume": []}
     for (y, m) in pairs:
-        path = f"{directory}/{asset}-1m-{y}-{m}.json"
+        path = f"{directory}/{asset}-{native}-{y}-{m}.json"
         if not os.path.exists(path):
             continue
         bars = resample(_read_rows(path), bar_minutes)

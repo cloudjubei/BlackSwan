@@ -1,0 +1,133 @@
+{
+  "name": "blackswan-cot",
+  "recordType": "blackswan-cot",
+  "description": "The COT probe \u2014 the POSITIONING / FLOW signal class (the one class the program had not tested). CFTC Commitments-of-Traders MANAGED-MONEY net positioning (net = spec long - short, as a fraction of open interest) is an extreme-of-past signal with a real structural story: crowded speculators become FORCED unwinders on a reversal (a nameable counterparty). cot_contrarian FADES a crowded extreme (top-tail net-long -> short), cot_momentum RIDES it. Reuses the shared past-only extreme core (signal_extremes) + the intraday backtest, so every gate/lens reads a COT cell unchanged. The one surface new here is the COT JOIN, which carries the leakage trap pinned in test_cot.py: the COT measured on a Tuesday is PUBLISHED the following Friday, so a bar dated D reads only a report whose (report date + release_lag_days) is at/before D. The extreme is past-only, the position applies to the next bar, positions never read price. Gold's/silver's/copper's secular bull makes return_vs_hold exposure-biased, so signal_expectancy (per-trade edge) is the exposure-neutral decider alongside the DSR-deflated oos_sharpe gate. Deterministic and model-free (the seed is contract-only). DATA: cot/<ASSET>.json from scripts/fetch_cot.py (free CFTC Socrata API).",
+  "run": ".venv/bin/python -m trainer.cot --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "oos_sharpe",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": [
+        "GOLD",
+        "SILVER",
+        "COPPER",
+        "SPY",
+        "IEF",
+        "TLT"
+      ],
+      "default": "GOLD",
+      "scope": "dataset",
+      "description": "Which metal is traded and whose CFTC COT managed-money positioning drives the signal. Each pairs its commodities/<ASSET> price with cot/<ASSET>.json. SPY/IEF/TLT are the cross-asset-class extension (equity / 10y notes / long bonds) using the TFF leveraged-funds cohort; their COT runs 2006-2022."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": [
+        "cot_contrarian",
+        "cot_momentum"
+      ],
+      "default": "cot_contrarian",
+      "description": "cot_contrarian FADES a crowded net-positioning extreme (top-tail spec-long -> short, on the crowded-longs-unwind thesis); cot_momentum RIDES it. A bar fires only when its (release-lagged) net/OI is at/above the cot_pct quantile (or at/below 1-this) of its PAST-ONLY distribution. An unknown value is refused."
+    },
+    "cot_pct": {
+      "type": "number",
+      "default": 0.9,
+      "range": [
+        0.5,
+        0.999
+      ],
+      "description": "The quantile of the TRAILING (expanding, past-only) net-positioning distribution at/above which the reading is a crowded-long extreme (and at/below 1-this a crowded-short extreme). Computed only from readings observed at prior bars."
+    },
+    "hold_bars": {
+      "type": "number",
+      "default": 10,
+      "range": [
+        1,
+        60
+      ],
+      "description": "How many daily bars a position is held after an extreme, then flat (~2 weeks at 10; COT is weekly). The position earns bars t+1..t+hold_bars, and a new extreme inside the hold window is ignored."
+    },
+    "release_lag_days": {
+      "type": "number",
+      "default": 4,
+      "range": [
+        3,
+        10
+      ],
+      "scope": "dataset",
+      "description": "Publication lag: a report dated Tuesday D is usable only from D + release_lag_days. Default 4 covers the Friday release + weekend so the Monday bar uses it; a bar before that never sees the unpublished report. Larger values test robustness to conservative timing."
+    },
+    "cot_index_window": {
+      "type": "number",
+      "default": 0,
+      "range": [
+        0,
+        1000
+      ],
+      "description": "0 = the EXPANDING past-only quantile (anchored to all history \u2014 can be made unreachable by an old positioning mania). > 0 = a TRAILING-window COT INDEX (Williams min-max over the last N bars, e.g. 756 ~ 3yr) that adapts to regime and fires even when the level is nowhere near an all-time extreme."
+    },
+    "min_history": {
+      "type": "number",
+      "default": 30,
+      "range": [
+        2,
+        504
+      ],
+      "description": "Bars of trailing history required before the positioning extreme / COT index is computed (warms the distribution). Larger for the trailing COT index so its min-max normalisation is meaningful."
+    },
+    "cot_flow_lag": {
+      "type": "number",
+      "default": 0,
+      "range": [
+        0,
+        20
+      ],
+      "description": "0 = signal on the positioning LEVEL. > 0 = signal on the FLOW (weekly CHANGE): value[t] - value[t-lag] (~5 bars = 1 week), i.e. WHICH WAY managed money is moving, a distinct signal from how extreme the level is. The extreme/side machinery then runs on the flow series."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0005,
+      "scope": "environment",
+      "description": "Per-side fee, charged on turnover at entry and again at exit (~0.1% round trip)."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2008",
+        "2009",
+        "2010",
+        "2011",
+        "2012",
+        "2013",
+        "2014",
+        "2015",
+        "2016",
+        "2017",
+        "2018",
+        "2019",
+        "2020",
+        "2021",
+        "2022",
+        "2023",
+        "2024",
+        "2025"
+      ],
+      "default": "2022",
+      "scope": "dataset",
+      "description": "Which out-of-sample year is ACCOUNTED. A real positioning edge must hold in a MAJORITY of these five regime-diverse years, not one."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only \u2014 the backtest is fully deterministic, so seeds are not swept."
+    }
+  }
+}

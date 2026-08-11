@@ -27,6 +27,7 @@ PUBLISH_TIME_ET = {
     "T10Y2Y": "16:15",
     "T10Y3M": "16:15",
     "DFII10": "16:15",
+    "T10YIE": "16:15",    # H.15 breakeven, same release as its DGS10/DFII10 siblings
 }
 DEFAULT_PUBLISH_TIME_ET = "08:30"
 DEFAULT_TZ = "America/New_York"

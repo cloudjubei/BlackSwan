@@ -84,6 +84,7 @@ def _selected_instruments(class_id=None, symbol=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--through", help="last month to fetch as YYYY-MM (default: last complete month)")
+    parser.add_argument("--start", help="first month to fetch as YYYY-MM (default: the catalogued START_MONTH)")
     parser.add_argument("--class", dest="class_id", help="restrict to one asset class (stocks/commodities/fx)")
     parser.add_argument("--symbol", help="restrict to one local symbol (e.g. GOLD)")
     parser.add_argument("--dry-run", action="store_true", help="fetch + validate, write nothing")
@@ -93,16 +94,17 @@ def main(argv=None):
         through = (int(year), int(month))
     else:
         through = latest_complete_month()
+    start = tuple(int(x) for x in args.start.split("-")) if args.start else START_MONTH
     os.chdir(_REPO_ROOT)
 
     instruments = _selected_instruments(args.class_id, args.symbol)
     if not instruments:
         print("no matching catalogued yfinance instruments")
         return 1
-    print(f"Backfilling {len(instruments)} instrument(s) {START_MONTH[0]}-{START_MONTH[1]} through {through[0]}-{through[1]}")
+    print(f"Backfilling {len(instruments)} instrument(s) {start[0]}-{start[1]} through {through[0]}-{through[1]}")
     summaries = []
     for inst in instruments:
-        summary = backfill_yf_symbol(inst.symbol, inst.source_symbol, inst.directory, START_MONTH, through, dry_run=args.dry_run)
+        summary = backfill_yf_symbol(inst.symbol, inst.source_symbol, inst.directory, start, through, dry_run=args.dry_run)
         summaries.append(summary)
         span = f"{summary['written'][0][0]}-{summary['written'][0][1]} .. {summary['written'][-1][0]}-{summary['written'][-1][1]}" if summary["written"] else "-"
         print(f"  {inst.symbol:<8} [{inst.source_symbol:<9}] {len(summary['written'])} written, {summary['skipped']} skipped, {span}")

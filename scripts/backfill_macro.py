@@ -39,7 +39,10 @@ _VINTAGE_SERIES = {"UNRATE", "PAYEMS", "CPIAUCNS", "CPIAUCSL", "PCEPILFE", "ICSA
 # reference date + a small publish lag. Leak-safe precisely BECAUSE the value is never revised. DFF (daily
 # effective fed funds) is published the NEXT day; the H.15 yields and the FOMC target print same-day (the
 # intraday publish time is applied later by trainer.pit_fusion), so their lag is 0.
-_ASOF_LAG_DAYS = {"DFF": 1}
+# Daily rate/index series the Fed publishes with a lag (the value for a reference day is not public until the
+# NEXT business day) — stamp the release one day forward so a same-day join is not a look-ahead. DFF (fed funds
+# effective) and DTWEXBGS (H.10 broad dollar index) both publish next-business-day.
+_ASOF_LAG_DAYS = {"DFF": 1, "DTWEXBGS": 1}
 
 
 def observations_url(series_id, api_key):

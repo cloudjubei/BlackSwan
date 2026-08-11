@@ -1,0 +1,96 @@
+{
+  "name": "blackswan-worldmodel",
+  "recordType": "blackswan-worldmodel",
+  "description": "The WORLD-MODEL probe \u2014 a driver-conditioned directional timing model (the B4 'world model' line, generalised beyond crypto). Instead of reading price, it reads an asset's economically-motivated FUNDAMENTAL DRIVERS point-in-time and takes a long/short/flat position from their past-only trend \u2014 the disciplined version of 'model what moves this asset and predict it'. The seed case is GOLD with its three canonical macro drivers: the 10y real rate (DFII10 \u2014 gold rises when it FALLS), the broad dollar (DTWEXBGS \u2014 gold rises when it FALLS), and the 10y inflation breakeven (DGS10-DFII10 \u2014 gold rises when it RISES). The driver set is declared per asset (DRIVER_SETS), so any commodity can get its own world model without engine changes. worldmodel is the thesis; worldmodel_inverse is the mirror control that must FAIL if the drivers carry real directional content. Gold has a strong secular uptrend, so return_vs_hold is exposure-biased \u2014 the honest decider is the model's own DSR-deflated oos_sharpe, with sharpe_vs_hold reported alongside. Macro joined POINT-IN-TIME via pit_fusion (the leakage guard); the side decided at day t sets the position for day t+1; positions never read price. Guards mutation-proven in test_worldmodel.py: past-only driver trend, the breakeven spread reads two DISTINCT series, all-drivers-defined composite, next-bar causality. Deterministic and model-free (the seed is contract-only).",
+  "run": ".venv/bin/python -m trainer.worldmodel --config-json {configPath} --summary-out {summaryOut}",
+  "objective": {
+    "name": "oos_sharpe",
+    "direction": "max"
+  },
+  "hypothesisBenchmark": {
+    "metric": "oos_sharpe",
+    "threshold": 0,
+    "direction": "max"
+  },
+  "pipelineVersion": "1.0",
+  "levers": {
+    "asset": {
+      "type": "choice",
+      "choices": [
+        "GOLD",
+        "SILVER",
+        "COPPER"
+      ],
+      "default": "GOLD",
+      "scope": "dataset",
+      "description": "Which asset is traded and whose drivers condition the position. GOLD/SILVER use the precious-metal monetary drivers; COPPER uses a financial-conditions set (its real China/inventory drivers are not in the mined macro set). Each asset pairs with its declared driver_set."
+    },
+    "signal": {
+      "type": "choice",
+      "choices": [
+        "worldmodel",
+        "worldmodel_inverse"
+      ],
+      "default": "worldmodel",
+      "description": "worldmodel takes the driver-implied side (long when the majority of drivers are bullish, short when bearish, flat on a tie); worldmodel_inverse flips the sign \u2014 the control that must FAIL if the drivers carry real directional content. An unknown value is refused."
+    },
+    "driver_set": {
+      "type": "choice",
+      "choices": [
+        "gold_macro3",
+        "gold_macro3b",
+        "silver_macro3",
+        "copper_macro3"
+      ],
+      "default": "gold_macro3b",
+      "scope": "dataset",
+      "description": "The declared fundamental drivers. gold_macro3 = real rate (DFII10\u2193) + USD (DTWEXBGS\u2193) + breakeven (DGS10-DFII10\u2191) \u2014 DFII10 double-counted, kept only to reproduce the first probe. gold_macro3b / silver_macro3 = the DE-COLLINEARISED precious-metal set (breakeven from the standalone T10YIE, DFII10 once). copper_macro3 = a financial-conditions set (USD\u2193 + real rate\u2193 + growth curve T10Y2Y\u2191), deliberately incomplete (misses China demand / LME inventories)."
+    },
+    "lookback": {
+      "type": "number",
+      "default": 63,
+      "range": [
+        5,
+        252
+      ],
+      "description": "Daily bars behind the past-only trend comparison for each driver (a driver votes bullish when its scalar has moved in the bullish direction over this window). 21/63/126 ~ 1/3/6 months."
+    },
+    "transaction_fee": {
+      "type": "number",
+      "default": 0.0005,
+      "scope": "environment",
+      "description": "Per-side fee, charged on turnover when the composite side switches (~0.1% round trip). The world model is low-turnover (macro regimes are persistent), so cost is not the enemy \u2014 the signal's skill is."
+    },
+    "walk_forward_window": {
+      "type": "choice",
+      "choices": [
+        "2008",
+        "2009",
+        "2010",
+        "2011",
+        "2012",
+        "2013",
+        "2014",
+        "2015",
+        "2016",
+        "2017",
+        "2018",
+        "2019",
+        "2020",
+        "2021",
+        "2022",
+        "2023",
+        "2024",
+        "2025"
+      ],
+      "default": "2022",
+      "scope": "dataset",
+      "description": "Which out-of-sample year is ACCOUNTED (train is the expanding window before it, warming the trend + as-of macro). 2022 (aggressive Fed hiking / rising real rates / strong USD \u2014 a gold headwind) and 2024 (gold record highs, decoupled from its macro drivers) are the decisive pair: a real world model must time gold in BOTH."
+    },
+    "seed": {
+      "type": "number",
+      "default": 0,
+      "description": "Present for contract conformance only \u2014 the backtest is fully deterministic, so seeds are not swept."
+    }
+  }
+}

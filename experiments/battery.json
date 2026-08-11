@@ -1,0 +1,488 @@
+{
+  "families": [
+    {
+      "type": "blackswan-intraday-hypothesis",
+      "family": "Price — intraday decision-frequency (crypto)",
+      "probes": [
+        {
+          "id": "probe-breakout-momentum",
+          "title": "Intraday VOLATILITY-BREAKOUT MOMENTUM clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 24
+        },
+        {
+          "id": "probe-regime-conditional",
+          "title": "CONDITIONAL intraday trading in a recognizable high-vol regime clears the cost floor",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 12
+        }
+      ],
+      "cells": 36
+    },
+    {
+      "type": "blackswan-riskparity-hypothesis",
+      "family": "Price — cross-class risk-parity / vol-target (crypto)",
+      "probes": [
+        {
+          "id": "probe-a-riskparity",
+          "title": "A vol-scaled CROSS-CLASS risk-parity basket beats buy-and-hold the equal-weight basket, net of cost",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 16
+        }
+      ],
+      "cells": 16
+    },
+    {
+      "type": "blackswan-funding-hypothesis",
+      "family": "Positioning — perp funding rate (crypto)",
+      "probes": [
+        {
+          "id": "probe-funding-contrarian",
+          "title": "FADING a perp-funding extreme (contrarian) clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 36
+        },
+        {
+          "id": "probe-funding-momentum",
+          "title": "RIDING a perp-funding extreme (momentum) clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 36
+        }
+      ],
+      "cells": 72
+    },
+    {
+      "type": "blackswan-orderflow-hypothesis",
+      "family": "Microstructure — taker order-flow imbalance (crypto)",
+      "probes": [
+        {
+          "id": "probe-flow-contrarian",
+          "title": "FADING a taker-imbalance extreme (order-flow contrarian) clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 48
+        },
+        {
+          "id": "probe-flow-momentum",
+          "title": "RIDING a taker-imbalance extreme (order-flow momentum) clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 48
+        }
+      ],
+      "cells": 96
+    },
+    {
+      "type": "blackswan-events-hypothesis",
+      "family": "Scheduled events — macro releases (crypto)",
+      "probes": [
+        {
+          "id": "probe-event-drift",
+          "title": "Post-macro-release DRIFT (ride the reaction) clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 108
+        },
+        {
+          "id": "probe-event-fade",
+          "title": "Post-macro-release FADE (fade the reaction) clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 108
+        }
+      ],
+      "cells": 216
+    },
+    {
+      "type": "blackswan-liquidation-hypothesis",
+      "family": "Mechanical — liquidation cascades (crypto)",
+      "probes": [
+        {
+          "id": "probe-cascade-momentum",
+          "title": "RIDING a detected liquidation cascade (continuation) clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 48
+        },
+        {
+          "id": "probe-cascade-reversion",
+          "title": "FADING a detected liquidation cascade (mechanical overshoot reverts) clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 48
+        }
+      ],
+      "cells": 96
+    },
+    {
+      "type": "blackswan-regime-hypothesis",
+      "family": "Macro regime market-timing overlay (crypto)",
+      "probes": [
+        {
+          "id": "probe-regime-inverse",
+          "title": "The INVERSE macro-regime overlay (hold risk-off) beats buy-and-hold on risk-adjusted return",
+          "status": "disproved",
+          "gate": "majority-beats-hold(sharpe_vs_hold)",
+          "cells": 48
+        },
+        {
+          "id": "probe-regime-overlay",
+          "title": "A macro-regime overlay (hold risk-on, cash risk-off) beats buy-and-hold on RISK-ADJUSTED return",
+          "status": "disproved",
+          "gate": "majority-beats-hold(sharpe_vs_hold)",
+          "cells": 48
+        }
+      ],
+      "cells": 96
+    },
+    {
+      "type": "blackswan-attention-hypothesis",
+      "family": "Attention — Wikipedia pageviews (crypto)",
+      "probes": [
+        {
+          "id": "probe-attention-momentum",
+          "title": "RIDING a Wikipedia-attention surge (momentum) clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 48
+        },
+        {
+          "id": "probe-attention-reversion",
+          "title": "FADING a Wikipedia-attention surge (reversion) clears the cost floor on crypto",
+          "status": "disproved",
+          "gate": "majority-beats-hold(return_vs_hold_pct)",
+          "cells": 48
+        }
+      ],
+      "cells": 96
+    },
+    {
+      "type": "blackswan-roll-hypothesis",
+      "family": "Commodity index roll — WTI (Mou 2011 reproduce-and-refute)",
+      "probes": [
+        {
+          "id": "probe-roll-fade",
+          "title": "Fading the GSCI roll (long the M1-M2 spread into it) clears cost on WTI",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 18
+        },
+        {
+          "id": "probe-roll-frontrun",
+          "title": "Front-running the GSCI roll (short the M1-M2 spread into it) clears cost on WTI",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 18
+        }
+      ],
+      "cells": 36
+    },
+    {
+      "type": "blackswan-roll-basket-hypothesis",
+      "family": "Commodity index roll — pooled energy basket",
+      "probes": [
+        {
+          "id": "probe-roll-basket-fade",
+          "title": "Fading the GSCI roll across the POOLED energy basket clears DSR-deflated Sharpe",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 18
+        },
+        {
+          "id": "probe-roll-basket-frontrun",
+          "title": "Front-running the GSCI roll across the POOLED energy basket clears DSR-deflated Sharpe",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 18
+        }
+      ],
+      "cells": 36
+    },
+    {
+      "type": "blackswan-worldmodel-hypothesis",
+      "family": "Macro world model — gold/silver/copper drivers",
+      "probes": [
+        {
+          "id": "probe-copper-worldmodel",
+          "title": "A financial-conditions macro model times COPPER across 2020-24",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 15
+        },
+        {
+          "id": "probe-copper-worldmodel-inverse",
+          "title": "The INVERSE copper financial-conditions model (control)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 15
+        },
+        {
+          "id": "probe-gold-realrate",
+          "title": "The real-rate-ALONE gold timer (long when DFII10 falls) times gold across 2020-24",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 15
+        },
+        {
+          "id": "probe-gold-realrate-inverse",
+          "title": "The INVERSE real-rate gold timer (control)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 15
+        },
+        {
+          "id": "probe-gold-worldmodel",
+          "title": "The canonical gold macro world model TIMES gold (positive DSR-deflated Sharpe across regimes)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 9
+        },
+        {
+          "id": "probe-gold-worldmodel-fair",
+          "title": "The FAIR (de-collinearised) gold macro world model times gold across 2020-24",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 15
+        },
+        {
+          "id": "probe-gold-worldmodel-fair-inverse",
+          "title": "The INVERSE fair gold world model times gold (control)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 15
+        },
+        {
+          "id": "probe-gold-worldmodel-inverse",
+          "title": "The INVERSE gold macro world model times gold (control)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 9
+        },
+        {
+          "id": "probe-silver-worldmodel",
+          "title": "The precious-metal macro world model times SILVER across 2020-24",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 15
+        },
+        {
+          "id": "probe-silver-worldmodel-inverse",
+          "title": "The INVERSE silver world model (control)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 15
+        }
+      ],
+      "cells": 138
+    },
+    {
+      "type": "blackswan-cot-hypothesis",
+      "family": "Positioning/flow — CFTC COT (level + Williams index + flow)",
+      "probes": [
+        {
+          "id": "probe-cot-copper-contrarian",
+          "title": "Fading a crowded COT managed-money extreme times COPPER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cot-copper-momentum",
+          "title": "Riding a crowded COT managed-money extreme times COPPER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotfin-ief-contrarian",
+          "title": "Fading a crowded leveraged-funds COT-index extreme times IEF (10y Treasury notes)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 12
+        },
+        {
+          "id": "probe-cotfin-ief-momentum",
+          "title": "Riding a crowded leveraged-funds COT-index extreme times IEF (10y Treasury notes)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 12
+        },
+        {
+          "id": "probe-cotfin-spy-contrarian",
+          "title": "Fading a crowded leveraged-funds COT-index extreme times SPY (equity (E-mini S&P 500))",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 12
+        },
+        {
+          "id": "probe-cotfin-spy-momentum",
+          "title": "Riding a crowded leveraged-funds COT-index extreme times SPY (equity (E-mini S&P 500))",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 12
+        },
+        {
+          "id": "probe-cotfin-tlt-contrarian",
+          "title": "Fading a crowded leveraged-funds COT-index extreme times TLT (long Treasury bonds)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 12
+        },
+        {
+          "id": "probe-cotfin-tlt-momentum",
+          "title": "Riding a crowded leveraged-funds COT-index extreme times TLT (long Treasury bonds)",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 12
+        },
+        {
+          "id": "probe-cotflow-copper-contrarian",
+          "title": "Fading the COT FLOW (late buyers) times COPPER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotflow-copper-momentum",
+          "title": "Riding the COT FLOW (managed money buying hard) times COPPER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotflow-gold-contrarian",
+          "title": "Fading the COT FLOW (late buyers) times GOLD",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotflow-gold-momentum",
+          "title": "Riding the COT FLOW (managed money buying hard) times GOLD",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotflow-silver-contrarian",
+          "title": "Fading the COT FLOW (late buyers) times SILVER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotflow-silver-momentum",
+          "title": "Riding the COT FLOW (managed money buying hard) times SILVER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cot-gold-contrarian",
+          "title": "Fading a crowded COT managed-money extreme times GOLD",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cot-gold-momentum",
+          "title": "Riding a crowded COT managed-money extreme times GOLD",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotidx-copper-contrarian",
+          "title": "Fading a trailing-3yr COT-INDEX extreme times COPPER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotidx-copper-momentum",
+          "title": "Riding a trailing-3yr COT-INDEX extreme times COPPER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotidx-gold-contrarian",
+          "title": "Fading a trailing-3yr COT-INDEX extreme times GOLD",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotidx-gold-momentum",
+          "title": "Riding a trailing-3yr COT-INDEX extreme times GOLD",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotidx-silver-contrarian",
+          "title": "Fading a trailing-3yr COT-INDEX extreme times SILVER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cotidx-silver-momentum",
+          "title": "Riding a trailing-3yr COT-INDEX extreme times SILVER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cot-silver-contrarian",
+          "title": "Fading a crowded COT managed-money extreme times SILVER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cot-silver-momentum",
+          "title": "Riding a crowded COT managed-money extreme times SILVER",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        }
+      ],
+      "cells": 252
+    },
+    {
+      "type": "blackswan-cross-cot-hypothesis",
+      "family": "blackswan-cross-cot-hypothesis",
+      "probes": [
+        {
+          "id": "probe-cross-cot-contrarian",
+          "title": "A market-neutral cross-sectional COT long/short (long least-crowded, short most-crowded) times the commodity complex",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        },
+        {
+          "id": "probe-cross-cot-momentum",
+          "title": "A market-neutral cross-sectional COT long/short (long most-crowded, short least-crowded) times the commodity complex",
+          "status": "disproved",
+          "gate": "deflated-sharpe(oos_sharpe)",
+          "cells": 10
+        }
+      ],
+      "cells": 20
+    }
+  ],
+  "stats": {
+    "probes": 55,
+    "families": 13,
+    "cellsRun": 1206,
+    "byStatus": {
+      "disproved": 55
+    }
+  }
+}
