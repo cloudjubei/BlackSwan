@@ -1,0 +1,25 @@
+panel: 8 assets ['GOLD', 'SILVER', 'COPPER', 'WTI', 'SPY', 'TLT', 'IEF', 'UUP']  5183 bars 2006-01-03..2026-07-31
+
+====================================================================================
+STANDALONE strategies (net of 5bps, per-year Sharpe over 2012-2023)
+====================================================================================
+strategy       annSharpe_net   t_win  turnover/yr cost_drag/yr
+momentum                0.01    0.02        10.50        0.53%
+value_5yr              -0.01   -0.05         4.13        0.21%
+st_reversal             0.01    0.03        33.89        1.69%
+lowvol                 -0.08   -0.31         2.77        0.14%
+trend                  -0.06   -0.25         3.33        0.17%
+
+====================================================================================
+COMBINED book (equal-weight positions -> trades NET across strategies)
+====================================================================================
+  combined GROSS (no cost)        : annSharpe -0.01  t -0.04
+  combined NET (netted turnover)  : annSharpe -0.07  t -0.22   turnover/yr 8.51  drag 0.43%/yr
+  combined NET (UN-netted cost)   : annSharpe -0.08  t -0.26   turnover/yr 10.92  drag 0.55%/yr
+  netting turnover reduction      : 10.92 -> 8.51  (22% lower)
+
+  best STANDALONE t_win           : +0.03
+  COMBINED net t_win              : -0.22
+  VERDICT: combination does NOT clear t>3 either
+
+wrote netting_results.json

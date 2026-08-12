@@ -1,0 +1,260 @@
+{
+  "global_factors": [
+    {
+      "factor": "momentum",
+      "n_classes": 5,
+      "classes": "bond,commodity,crypto,equity,fx",
+      "multiclass_from": "2002-07",
+      "eras": {
+        "pre2010": {
+          "sharpe_ann": 0.45641796284592384,
+          "sr_adj_ann": 0.45641796284592384,
+          "verdict": "survivor",
+          "lo_ann": 0.21323579604530826,
+          "hi_ann": 0.6996001296465395,
+          "mde_ann": 0.35911582346930115,
+          "p_one": 0.0010104151755079196,
+          "n_obs": 12084,
+          "sr_star_ann": 0.0
+        },
+        "post2010": {
+          "sharpe_ann": 0.21100953804619424,
+          "sr_adj_ann": 0.21100953804619424,
+          "verdict": "inconclusive",
+          "lo_ann": -0.12699331900536007,
+          "hi_ann": 0.5490123950977485,
+          "mde_ann": 0.5308412131487718,
+          "p_one": 0.15224445671223336,
+          "n_obs": 5532,
+          "sr_star_ann": 0.0
+        },
+        "post2015": {
+          "sharpe_ann": 0.23020019032292346,
+          "sr_adj_ann": 0.23020019032292346,
+          "verdict": "inconclusive",
+          "lo_ann": -0.1561971565464997,
+          "hi_ann": 0.6165975371923467,
+          "mde_ann": 0.6062577601636305,
+          "p_one": 0.16355825039753202,
+          "n_obs": 4242,
+          "sr_star_ann": 0.0
+        }
+      },
+      "sharpe_ann": 0.3898394385806192,
+      "sr_adj_ann": 0.3898394385806192,
+      "verdict": "survivor",
+      "lo_ann": 0.19132635025308323,
+      "hi_ann": 0.5883525269081551,
+      "mde_ann": 0.29741906285533076,
+      "p_one": 0.0006186072281863712,
+      "n_obs": 17616,
+      "sr_star_ann": 0.0
+    },
+    {
+      "factor": "value",
+      "n_classes": 5,
+      "classes": "bond,commodity,crypto,equity,fx",
+      "multiclass_from": "2002-07",
+      "eras": {
+        "pre2010": {
+          "sharpe_ann": -0.15200550116566622,
+          "sr_adj_ann": -0.15200550116566622,
+          "verdict": "powered-null",
+          "lo_ann": -0.3875493025950621,
+          "hi_ann": 0.08353830026372969,
+          "mde_ann": 0.35911582346930115,
+          "p_one": 0.8557657936997974,
+          "n_obs": 12084,
+          "sr_star_ann": 0.0
+        },
+        "post2010": {
+          "sharpe_ann": -0.4163873781002459,
+          "sr_adj_ann": -0.4163873781002459,
+          "verdict": "powered-null",
+          "lo_ann": -0.7785972275354317,
+          "hi_ann": -0.05417752866506,
+          "mde_ann": 0.5308412131487718,
+          "p_one": 0.9706799888255647,
+          "n_obs": 5532,
+          "sr_star_ann": 0.0
+        },
+        "post2015": {
+          "sharpe_ann": -0.5202795703806301,
+          "sr_adj_ann": -0.5202795703806301,
+          "verdict": "powered-null",
+          "lo_ann": -0.9390236832648281,
+          "hi_ann": -0.1015354574964321,
+          "mde_ann": 0.6062577601636305,
+          "p_one": 0.97950797786308,
+          "n_obs": 4242,
+          "sr_star_ann": 0.0
+        }
+      },
+      "sharpe_ann": -0.22667296572612491,
+      "sr_adj_ann": -0.22667296572612491,
+      "verdict": "powered-null",
+      "lo_ann": -0.4228868113829555,
+      "hi_ann": -0.030459120069294344,
+      "mde_ann": 0.29741906285533076,
+      "p_one": 0.9712959926653261,
+      "n_obs": 17616,
+      "sr_star_ann": 0.0
+    },
+    {
+      "factor": "st_reversal",
+      "n_classes": 5,
+      "classes": "bond,commodity,crypto,equity,fx",
+      "multiclass_from": "2002-07",
+      "eras": {
+        "pre2010": {
+          "sharpe_ann": -0.1284452854765666,
+          "sr_adj_ann": -0.1284452854765666,
+          "verdict": "powered-null",
+          "lo_ann": -0.35708769516917865,
+          "hi_ann": 0.10019712421604539,
+          "mde_ann": 0.35911582346930115,
+          "p_one": 0.822266072445751,
+          "n_obs": 12084,
+          "sr_star_ann": 0.0
+        },
+        "post2010": {
+          "sharpe_ann": -0.3465402278200043,
+          "sr_adj_ann": -0.3465402278200043,
+          "verdict": "powered-null",
+          "lo_ann": -0.6798204546847452,
+          "hi_ann": -0.01326000095526355,
+          "mde_ann": 0.5308412131487718,
+          "p_one": 0.9563944554341477,
+          "n_obs": 5532,
+          "sr_star_ann": 0.0
+        },
+        "post2015": {
+          "sharpe_ann": -0.41839449955296476,
+          "sr_adj_ann": -0.41839449955296476,
+          "verdict": "powered-null",
+          "lo_ann": -0.8112193267622069,
+          "hi_ann": -0.02556967234372258,
+          "mde_ann": 0.6062577601636305,
+          "p_one": 0.9601062259956802,
+          "n_obs": 4242,
+          "sr_star_ann": 0.0
+        }
+      },
+      "sharpe_ann": -0.17677998834856293,
+      "sr_adj_ann": -0.17677998834856293,
+      "verdict": "powered-null",
+      "lo_ann": -0.3656853139720528,
+      "hi_ann": 0.01212533727492694,
+      "mde_ann": 0.29741906285533076,
+      "p_one": 0.9381313868405179,
+      "n_obs": 17616,
+      "sr_star_ann": 0.0
+    },
+    {
+      "factor": "lowvol",
+      "n_classes": 5,
+      "classes": "bond,commodity,crypto,equity,fx",
+      "multiclass_from": "2002-07",
+      "eras": {
+        "pre2010": {
+          "sharpe_ann": -0.67622968819548,
+          "sr_adj_ann": -0.67622968819548,
+          "verdict": "powered-null",
+          "lo_ann": -0.9082716659133243,
+          "hi_ann": -0.44418771047763583,
+          "mde_ann": 0.35911582346930115,
+          "p_one": 0.9999991806169437,
+          "n_obs": 12084,
+          "sr_star_ann": 0.0
+        },
+        "post2010": {
+          "sharpe_ann": -0.13604866804229931,
+          "sr_adj_ann": -0.13604866804229931,
+          "verdict": "powered-null",
+          "lo_ann": -0.476614840011435,
+          "hi_ann": 0.20451750392683643,
+          "mde_ann": 0.5308412131487718,
+          "p_one": 0.744436133925515,
+          "n_obs": 5532,
+          "sr_star_ann": 0.0
+        },
+        "post2015": {
+          "sharpe_ann": -0.058501367714572115,
+          "sr_adj_ann": -0.058501367714572115,
+          "verdict": "powered-null",
+          "lo_ann": -0.4477650327312175,
+          "hi_ann": 0.3307622973020733,
+          "mde_ann": 0.6062577601636305,
+          "p_one": 0.5976234849746562,
+          "n_obs": 4242,
+          "sr_star_ann": 0.0
+        }
+      },
+      "sharpe_ann": -0.5419251464928277,
+      "sr_adj_ann": -0.5419251464928277,
+      "verdict": "powered-null",
+      "lo_ann": -0.733498618289789,
+      "hi_ann": -0.3503516746958666,
+      "mde_ann": 0.29741906285533076,
+      "p_one": 0.9999983641404513,
+      "n_obs": 17616,
+      "sr_star_ann": 0.0
+    },
+    {
+      "factor": "trend",
+      "n_classes": 5,
+      "classes": "bond,commodity,crypto,equity,fx",
+      "multiclass_from": "2002-07",
+      "eras": {
+        "pre2010": {
+          "sharpe_ann": 0.4137044950034215,
+          "sr_adj_ann": 0.4137044950034215,
+          "verdict": "survivor",
+          "lo_ann": 0.16168269956407405,
+          "hi_ann": 0.6657262904427689,
+          "mde_ann": 0.35911582346930115,
+          "p_one": 0.003465961232414048,
+          "n_obs": 12084,
+          "sr_star_ann": 0.0
+        },
+        "post2010": {
+          "sharpe_ann": 0.3132556692587621,
+          "sr_adj_ann": 0.3132556692587621,
+          "verdict": "inconclusive",
+          "lo_ann": -0.043935994255451895,
+          "hi_ann": 0.670447332772976,
+          "mde_ann": 0.5308412131487718,
+          "p_one": 0.07457644418205217,
+          "n_obs": 5532,
+          "sr_star_ann": 0.0
+        },
+        "post2015": {
+          "sharpe_ann": 0.4518347600309552,
+          "sr_adj_ann": 0.4518347600309552,
+          "verdict": "survivor",
+          "lo_ann": 0.03791406033957255,
+          "hi_ann": 0.8657554597223378,
+          "mde_ann": 0.6062577601636305,
+          "p_one": 0.036285608187339224,
+          "n_obs": 4242,
+          "sr_star_ann": 0.0
+        }
+      },
+      "sharpe_ann": 0.38422610405227753,
+      "sr_adj_ann": 0.38422610405227753,
+      "verdict": "survivor",
+      "lo_ann": 0.17683877822751373,
+      "hi_ann": 0.5916134298770412,
+      "mde_ann": 0.29741906285533076,
+      "p_one": 0.0011540855872719088,
+      "n_obs": 17616,
+      "sr_star_ann": 0.0
+    }
+  ],
+  "bh_survivors": 2,
+  "by_survivors": 2,
+  "counts": {
+    "survivor": 2,
+    "powered-null": 3
+  }
+}

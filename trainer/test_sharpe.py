@@ -375,3 +375,113 @@ def test_dsr_is_undefined_below_two_observations():
     assert dsr_from_stats(0.5, 0.0, 3.0, 0, n_trials=NULL_TRIALS, trial_sr_std=0.2) == 0.0
     assert deflated_sharpe_ratio([0.01], n_trials=NULL_TRIALS, trial_sr_std=0.2) == 0.0
     assert min_track_record_length([0.01]) == math.inf
+
+
+# --- powered-null primitives (Sharpe SE/CI, MDE, power, FDR, per-cell verdict) -------------------------------
+from scipy.stats import norm  # noqa: E402
+
+from trainer.sharpe import (  # noqa: E402
+    sharpe_standard_error,
+    sharpe_confidence_interval,
+    minimum_detectable_sharpe,
+    sharpe_power,
+    benjamini_hochberg,
+    powered_null_verdict,
+    newey_west_inflation,
+    sharpe_standard_error_hac,
+    benjamini_yekutieli,
+)
+
+
+def test_newey_west_inflation_known_values():
+    assert newey_west_inflation([0.0, 0.0, 0.0], 3) == pytest.approx(1.0)
+    # rho_1 = 0.5, q = 1: eta = 1 + 2*(1 - 1/2)*0.5 = 1.5
+    assert newey_west_inflation([0.5], 1) == pytest.approx(1.5)
+    # q < 1 -> no adjustment; strong negative autocorr floors the factor, never inverts it
+    assert newey_west_inflation([0.9], 0) == 1.0
+    assert newey_west_inflation([-1.0], 1) == pytest.approx(1e-6)
+
+
+def test_sharpe_standard_error_hac_matches_iid_on_white_noise_and_grows_under_autocorr():
+    rng = np.random.default_rng(0)
+    white = rng.standard_normal(4000) + 0.03
+    st = sharpe_stats(white)
+    se_iid = sharpe_standard_error(st["sharpe"], st["skew"], st["kurtosis"], st["n_obs"])
+    # white noise: HAC ~ iid (small-sample autocorr only)
+    assert sharpe_standard_error_hac(white) == pytest.approx(se_iid, rel=0.15)
+    # a smoothed (positively autocorrelated) series: HAC SE strictly larger than iid
+    smooth = np.convolve(white, np.ones(5) / 5, mode="same")
+    st2 = sharpe_stats(smooth)
+    se_iid2 = sharpe_standard_error(st2["sharpe"], st2["skew"], st2["kurtosis"], st2["n_obs"])
+    assert sharpe_standard_error_hac(smooth) > se_iid2
+
+
+def test_benjamini_yekutieli_is_more_conservative_than_bh():
+    p = [0.001, 0.02, 0.5, 0.6]
+    bh = benjamini_hochberg(p, q=0.05)
+    by = benjamini_yekutieli(p, q=0.05)
+    assert sum(by) <= sum(bh)  # BY rejects no more than BH
+    # m=4 -> H_m = 1+1/2+1/3+1/4 = 2.0833; BY threshold at k=1 is 0.05/2.0833/4 = 0.006
+    assert by[0] is True and by == [True, False, False, False]
+
+
+def test_sharpe_standard_error_normal_is_lo_variance():
+    # normal (skew 0, non-excess kurt 3): SE(SR) = sqrt((1 + 0.5*SR^2)/(n-1))
+    assert sharpe_standard_error(0.1, 0.0, 3.0, 101) == pytest.approx(
+        math.sqrt((1 + 0.5 * 0.1 ** 2) / 100), rel=1e-12
+    )
+
+
+def test_sharpe_standard_error_undefined_is_inf():
+    assert sharpe_standard_error(0.1, 0.0, 3.0, 1) == math.inf
+    # a skew/kurt combination that drives the PSR denominator non-positive
+    assert sharpe_standard_error(5.0, 3.0, 3.0, 100) == math.inf
+
+
+def test_sharpe_confidence_interval_symmetric_two_sided():
+    lo, hi = sharpe_confidence_interval(0.2, 0.0, 3.0, 401, alpha=0.05)
+    se = sharpe_standard_error(0.2, 0.0, 3.0, 401)
+    z = float(norm.ppf(0.975))
+    assert lo == pytest.approx(0.2 - z * se, rel=1e-9)
+    assert hi == pytest.approx(0.2 + z * se, rel=1e-9)
+
+
+def test_power_at_the_mde_equals_the_target():
+    n, alpha, power = 500, 0.05, 0.8
+    mde = minimum_detectable_sharpe(n, alpha=alpha, power=power)
+    assert sharpe_power(mde, n, alpha=alpha) == pytest.approx(power, abs=2e-3)
+
+
+def test_mde_shrinks_with_sample_size():
+    assert minimum_detectable_sharpe(2000) < minimum_detectable_sharpe(200)
+
+
+def test_sharpe_power_is_monotone_in_effect():
+    assert sharpe_power(0.20, 300) > sharpe_power(0.05, 300)
+    assert sharpe_power(0.0, 300) == pytest.approx(0.05, abs=1e-9)  # power at the null == alpha
+
+
+def test_benjamini_hochberg_step_up_and_order_invariance():
+    assert benjamini_hochberg([0.001, 0.04, 0.5, 0.5], q=0.05) == [True, False, False, False]
+    # step-up pulls in the earlier (larger) p once a later one clears; order must not matter
+    assert benjamini_hochberg([0.03, 0.012], q=0.05) == [True, True]
+    assert benjamini_hochberg([0.9, 0.8], q=0.05) == [False, False]
+    assert benjamini_hochberg([], q=0.05) == []
+
+
+def test_powered_null_verdict_disproves_a_tight_zero():
+    v = powered_null_verdict(0.0, 0.0, 3.0, 100000, sr_econ=0.05, alpha=0.05)
+    assert v["verdict"] == "powered-null"
+    assert v["upper_bound"] < 0.05
+
+
+def test_powered_null_verdict_inconclusive_when_underpowered():
+    v = powered_null_verdict(0.0, 0.0, 3.0, 30, sr_econ=0.05, alpha=0.05)
+    assert v["verdict"] == "inconclusive"
+    assert v["upper_bound"] > 0.05
+
+
+def test_powered_null_verdict_flags_a_survivor():
+    v = powered_null_verdict(0.3, 0.0, 3.0, 500, sr_econ=0.05, alpha=0.05)
+    assert v["verdict"] == "survivor"
+    assert v["lower_bound"] > 0.0

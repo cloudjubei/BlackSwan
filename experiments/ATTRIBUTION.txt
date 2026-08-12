@@ -1,0 +1,93 @@
+loaded 2976 cells across 24 families
+computing observable friction (Corwin-Schultz spread + dollar-ADV) per asset ...
+  TLT      bond      spread     0.0bps  ADV $     756.1M  n=5176
+  IEF      bond      spread     0.0bps  ADV $     145.3M  n=5176
+  SHY      bond      spread     0.0bps  ADV $     248.1M  n=2156
+  GOLD     commodity spread     0.3bps  ADV $       nanM  n=5175
+  SILVER   commodity spread     0.0bps  ADV $       nanM  n=5176
+  COPPER   commodity spread     0.2bps  ADV $       nanM  n=5178
+  WTI      commodity spread    18.9bps  ADV $      24.1M  n=5155
+  BTCUSDT  crypto    spread    43.2bps  ADV $    1224.3M  n=3240
+  ETHUSDT  crypto    spread    45.0bps  ADV $     987.3M  n=1642
+  SOLUSDT  crypto    spread    65.3bps  ADV $     307.3M  n=1642
+  ADAUSDT  crypto    spread    52.8bps  ADV $      55.5M  n=1642
+  AAPL     equity    spread     0.9bps  ADV $    9997.8M  n=2134
+  NVDA     equity    spread     0.5bps  ADV $    8977.0M  n=2134
+  SPY      equity    spread     0.6bps  ADV $   19759.3M  n=5176
+  UUP      fx        spread     0.0bps  ADV $      24.5M  n=2134
+
+======================================================================================================================
+RIGOR WATERFALL  (Sharpe destroyed at each ordered rung; net = capacity-adjusted deflated Sharpe)
+======================================================================================================================
+family         cls          n   head    oos    net    dsr    CAP |    -sel  -cost  -mult   -cap      t  surv
+riskparity     multi       32   0.04   0.04   0.04   0.03   0.03 |    0.01   0.00   0.01   0.01   1.01  .
+voltarget      crypto     324   0.04   0.04   0.03   0.03   0.02 |    0.00   0.01   0.00   0.01   1.99  .
+regime         crypto      96   0.05   0.02   0.05   0.02   0.02 |    0.03   0.00   0.03   0.00   0.74  .
+cross-cot      crypto      20   0.02  -0.00   0.02  -0.00  -0.00 |    0.02   0.00   0.02   0.00  -0.07  .
+worldmodel     crypto     138   0.05  -0.01   0.05  -0.01  -0.01 |    0.06   0.00   0.06   0.00  -0.32  .
+cot            commodity  252   0.01  -0.00   0.01  -0.00  -0.01 |    0.02   0.00   0.01   0.01  -0.68  .
+pairs          multi      102   0.03  -0.00   0.03  -0.01  -0.01 |    0.03   0.00   0.03   0.01  -0.93  .
+lowvol         multi      204   0.01  -0.00   0.01  -0.00  -0.02 |    0.01   0.00   0.01   0.01  -1.02  .
+globalfactors  multi      130   0.03  -0.00   0.03  -0.00  -0.02 |    0.03   0.00   0.03   0.01  -0.90  .
+tsmom          multi      102   0.00  -0.00   0.00  -0.00  -0.02 |    0.01   0.00   0.01   0.01  -1.08  .
+overnight      equity      28   0.02  -0.07   0.02  -0.05  -0.05 |    0.09   0.00   0.06   0.00  -2.24  .
+xsmom          multi      102   0.03  -0.00   0.03  -0.01  -0.05 |    0.03   0.00   0.04   0.04  -3.17  .
+xsection       multi      192   0.07   0.01   0.07  -0.00  -0.07 |    0.06   0.00   0.07   0.07  -2.74  .
+roll           commodity   36   0.10  -0.13   0.10  -0.13  -0.13 |    0.22   0.00   0.23   0.00  -1.75  .
+attention      crypto      96   0.02  -0.02   0.02  -0.02  -0.14 |    0.04   0.00   0.05   0.11  -6.32  .
+events         crypto     216   0.00  -0.01   0.00  -0.01  -0.17 |    0.01   0.00   0.02   0.15 -60.60  .
+roll-basket    commodity   36  -0.01  -0.17  -0.01  -0.21  -0.21 |    0.16   0.00   0.20   0.00  -2.77  .
+seasonal       multi      102   0.02  -0.02   0.02  -0.02  -0.22 |    0.04   0.00   0.04   0.20 -14.22  .
+run            crypto     380   0.04   0.03   0.00  -0.02  -0.23 |    0.01   0.04   0.02   0.21 -20.89  .
+liquidation    crypto      96   0.00  -0.01   0.00  -0.01  -0.24 |    0.01   0.00   0.01   0.23 -85.36  .
+funding        crypto      72   0.01  -0.03   0.01  -0.03  -0.50 |    0.04   0.00   0.04   0.46 -40.16  .
+intraday       crypto      96  -0.00  -0.02  -0.00  -0.02  -1.34 |    0.02   0.00   0.02   1.32-484.50  .
+orderflow      crypto      96  -0.01  -0.06  -0.01  -0.08  -1.59 |    0.05   0.00   0.07   1.51-288.26  .
+fomc           equity      28  -0.01  -0.03  -0.01  -0.03  -2.34 |    0.01   0.00   0.01   2.32-101.41  .
+
+======================================================================
+(A) FAILURE FINGERPRINT — mean Sharpe destroyed per rung, by asset class
+======================================================================
+class      n_fam    -sel   -cost   -mult    -cap   dominant rung
+crypto        11    0.03    0.00    0.03    0.36   d_cap
+equity         2    0.05    0.00    0.04    1.16   d_cap
+commodity      3    0.13    0.00    0.15    0.00   d_mult
+multi          8    0.03    0.00    0.03    0.05   d_cap
+
+======================================================================
+(B) FRICTION FRONTIER — net Sharpe vs observable friction index (log), low->high
+======================================================================
+  frict            9  net  +0.03  pairs           
+  frict            9  net  +0.04  riskparity      
+  frict           20  net  +0.00  tsmom           
+  frict           21  net  +0.01  lowvol          
+  frict           22  net  +0.03  globalfactors   
+  frict           27  net  +0.01  cot             
+  frict           61  net  +0.03  voltarget       
+  frict           62  net  +0.03  xsmom           
+  frict          109  net  +0.07  xsection        #
+  frict          301  net  +0.02  seasonal        
+  frict          668  net  +0.02  attention       
+  frict          915  net  +0.00  events          
+  frict         1269  net  +0.00  run             
+  frict         1370  net  +0.00  liquidation     
+  frict         2785  net  +0.01  funding         
+  frict         4168  net  -0.01  fomc            
+  frict         7896  net  -0.00  intraday        
+  frict         9053  net  -0.01  orderflow       
+
+======================================================================
+(C) MAKE-OR-BREAK — does friction reorder survival BEYOND turnover?
+======================================================================
+{
+  "n_families": 18,
+  "r2_turnover_only": 0.2911839442143387,
+  "r2_turnover_plus_friction": 0.3475822207280933,
+  "partial_r2": 0.05639827651375462,
+  "F_added": 0.6051152315880516,
+  "df1": 2,
+  "df2": 14,
+  "friction_beats_turnover": true
+}
+
+wrote results.json

@@ -1,0 +1,27 @@
+{
+  "n_runs": 15,
+  "confusion": {
+    "leakage": {
+      "recall": 1.0,
+      "false_alarm": 0.0
+    },
+    "is_as_oos": {
+      "recall": 0.6666666666666666,
+      "false_alarm": 0.0
+    },
+    "trial_undercount": {
+      "recall": 0.4,
+      "false_alarm": 0.0
+    },
+    "cost_omission": {
+      "recall": 1.0,
+      "false_alarm": 0.0
+    },
+    "survivorship": {
+      "recall": 0.0,
+      "false_alarm": 0.0
+    }
+  },
+  "macro_recall": 0.6133333333333333,
+  "macro_false_alarm": 0.0
+}

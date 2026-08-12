@@ -1,0 +1,97 @@
+{
+  "taker_bps": 5.5,
+  "n_bars": 77756,
+  "years": 8.876255707762557,
+  "signals": [
+    {
+      "label": "reversal 1h (hold 1h)",
+      "n": 77755,
+      "turnover_per_bar": 1.070721230515973,
+      "sharpe_ann": -5.788427782810698,
+      "lo": -6.300366188549883,
+      "hi": -5.276489377071512,
+      "mde": 0.8346042580728398,
+      "verdict": "powered-null"
+    },
+    {
+      "label": "reversal 3h (hold 1h)",
+      "n": 77755,
+      "turnover_per_bar": 0.5879031843201811,
+      "sharpe_ann": -2.870819004375871,
+      "lo": -3.370933628699427,
+      "hi": -2.3707043800523144,
+      "mde": 0.8346042580728398,
+      "verdict": "powered-null"
+    },
+    {
+      "label": "reversal 6h (hold 1h)",
+      "n": 77755,
+      "turnover_per_bar": 0.42284839755131437,
+      "sharpe_ann": -2.3240491727052928,
+      "lo": -2.8178080090612285,
+      "hi": -1.830290336349357,
+      "mde": 0.8346042580728398,
+      "verdict": "powered-null"
+    },
+    {
+      "label": "reversal 12h (hold 1h)",
+      "n": 77755,
+      "turnover_per_bar": 0.2951154894799115,
+      "sharpe_ann": -1.9612972011588645,
+      "lo": -2.4802228544990412,
+      "hi": -1.442371547818688,
+      "mde": 0.8346042580728398,
+      "verdict": "powered-null"
+    },
+    {
+      "label": "momentum 24h (hold 1h)",
+      "n": 77755,
+      "turnover_per_bar": 0.20159216009053962,
+      "sharpe_ann": -1.0374924992072163,
+      "lo": -1.5612766213652713,
+      "hi": -0.5137083770491612,
+      "mde": 0.8346042580728398,
+      "verdict": "powered-null"
+    },
+    {
+      "label": "momentum 72h (hold 1h)",
+      "n": 77755,
+      "turnover_per_bar": 0.10403055712742425,
+      "sharpe_ann": 0.13161701747603183,
+      "lo": -0.4003264944631305,
+      "hi": 0.6635605294151942,
+      "mde": 0.8346042580728398,
+      "verdict": "inconclusive"
+    },
+    {
+      "label": "momentum 168h (hold 1h)",
+      "n": 77755,
+      "turnover_per_bar": 0.067634651988271,
+      "sharpe_ann": 0.13334885738611443,
+      "lo": -0.38478630908611205,
+      "hi": 0.6514840238583409,
+      "mde": 0.8346042580728398,
+      "verdict": "inconclusive"
+    },
+    {
+      "label": "intraday-mom (1st half->2nd)",
+      "n": 77755,
+      "turnover_per_bar": 0.08327331652862802,
+      "sharpe_ann": 0.21139515073960885,
+      "lo": -0.3042575463423476,
+      "hi": 0.7270478478215652,
+      "mde": 0.8346042580728398,
+      "verdict": "inconclusive"
+    },
+    {
+      "label": "hour-of-day L22/S23 (IS-picked)",
+      "n": 77755,
+      "turnover_per_bar": 0.16666237975204487,
+      "sharpe_ann": -4.221229715168714,
+      "lo": -4.767086866717197,
+      "hi": -3.675372563620231,
+      "mde": 0.8346042580728398,
+      "verdict": "powered-null"
+    }
+  ]
+}

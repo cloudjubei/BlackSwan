@@ -1,0 +1,381 @@
+[
+  {
+    "id": "bt-bonelli-landier-capacity-2017",
+    "type": "blackswan-battery-thesis",
+    "claim": "Bonelli-Landier's three decay determinants (liquidity, slow signal-decay, frictionless Sharpe) are exactly the axes of our OBSERVABLE free-data friction index, and predict cross-asset survival.",
+    "title": "The Capacity of Trading Strategies — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "bonelli-landier-capacity-2017"
+    ],
+    "predicts": "An observable-friction index built from their determinants (spread/ADV liquidity x signal-decay x turnover x breadth) is monotonically related to net survival across the battery, AND — the make-or-break test — adds explanatory power BEYOND turnover alone (partial-R^2 > 0). If friction collapses to turnover, the frontier degrades to NMV's known turnover sort.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "Supplies the theoretical performance-to-scale object with the exact liquidity/decay/frictionless-Sharpe axes; our contribution renders it as a measured cross-asset cross-sectional survival boundary on free data and tests friction != turnover.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-chen-velikov-zeroing-in-2023",
+    "type": "blackswan-battery-thesis",
+    "claim": "The zeroing-in collapse generalizes cross-asset on FREE data via the ordered rigor waterfall (OOS -> cost -> multiplicity -> capacity).",
+    "title": "Zeroing In on the Expected Returns of Anomalies — battery test",
+    "source": "paper",
+    "status": "backed",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:28:10.544Z",
+      "status": "backed",
+      "harness": "attribution-v1",
+      "measured": "DIRECTIONALLY CONFIRMED: net survival ~0 across the free-data cross-asset battery (zero survivors), generalizing the zeroing-in collapse beyond US equities. CAVEAT: our headline is already OOS-honest (~0), so the collapse is shallow vs their 68->4 bps in-sample cascade; the destroyer here is low starting alpha + capacity, not (as CV) spreads."
+    },
+    "paperIds": [
+      "chen-velikov-zeroing-in-2023"
+    ],
+    "predicts": "Pooled net Deflated Sharpe across the free-data cross-asset battery is indistinguishable from zero after the four rungs — mirroring the ~4 bps terminal cascade rung — across equities/bonds/FX/commodities/crypto, not just US equities.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "The waterfall reproduces their cascade but (a) cross-asset, (b) single-engine, (c) with the four ordered rungs and a capacity rung they omit. This is the closest prior art; our differentiator is scope + the ordered decomposition.",
+    "updatedAt": "2026-08-11T16:28:10.544Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-chen-zimmermann-open-source-2022",
+    "type": "blackswan-battery-thesis",
+    "claim": "Chen-Zimmermann's optimistic \"98% reproduce\" is a GROSS in-sample statement that the waterfall guts.",
+    "title": "chen-zimmermann-open-source-2022 — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "chen-zimmermann-open-source-2022"
+    ],
+    "predicts": "Signals that reproduce gross in-sample on free data (their pole) lose ~all significance at the net + multiplicity + capacity rungs — reproduction fidelity and net survival are different questions, and our oracle is the latter.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "Distinguishes reproduction (their contribution) from survival (ours); the prediction is the gap between the two is nearly the whole gross alpha.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-chordia-goyal-saretto-phacking-2020",
+    "type": "blackswan-battery-thesis",
+    "claim": "The multiple-testing collapse reproduces cross-asset under our best-of-N / Deflated-Sharpe gate.",
+    "title": "p-Hacking: Evidence from Two Million Trading Strategies — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "chordia-goyal-saretto-phacking-2020"
+    ],
+    "predicts": "The count of battery families passing the multiplicity-corrected gate is <= what the false-discovery rate predicts under the global null given the total number of specifications tested across the battery.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "Frames our DSR/best-of-N as the cross-asset analogue of their MHT collapse; the survivor count is bounded by chance.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-demiguel-multitude-firm-characteristics-costs-2020",
+    "type": "blackswan-battery-thesis",
+    "claim": "The netting rescue is the strongest counter to our null: a cost-aware COMBINATION of battery anomalies may survive even when every standalone anomaly dies.",
+    "title": "A Transaction-Cost Perspective on the Multitude of Firm Characteristics — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "demiguel-multitude-firm-characteristics-costs-2020"
+    ],
+    "predicts": "A net-of-cost combined book across the battery (trades netted across families) has materially better net Deflated Sharpe than the average standalone family — but STILL fails the multiplicity-corrected survival gate on free data. If it survives, our headline null is falsified and this becomes the finding.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "We must run the netted-combination test explicitly; it is the adversarial best case for anomaly survival and the referee's first objection.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-detzel-novy-marx-velikov-model-comparison-costs-2023",
+    "type": "blackswan-battery-thesis",
+    "claim": "Costs RE-ORDER conclusions cross-asset — the positive structural \"failure-fingerprint\" result.",
+    "title": "Model Comparison with Transaction Costs — battery test",
+    "source": "paper",
+    "status": "inconclusive",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:28:10.544Z",
+      "status": "inconclusive",
+      "harness": "attribution-v1",
+      "measured": "FINGERPRINT present but MODEST + constant-sensitive: commodity families are selection/multiplicity-dominated (d_sel~0.13, d_mult~0.15) while crypto/equity are capacity-dominated (d_cap~0.36/1.16). Directionally supports \"the failure mechanism differs by asset class\" but depends on the impact constant and is underpowered at ~4 asset classes."
+    },
+    "paperIds": [
+      "detzel-novy-marx-velikov-model-comparison-costs-2023"
+    ],
+    "predicts": "The RANK of which rigor rung destroys the most alpha differs systematically by asset class: cost/friction-dominated in high-friction commodities and crypto; multiplicity/decay-dominated in mature, heavily-arbitraged equities. The failure MECHANISM fingerprints the market's arbitrage maturity.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "Detzel-NMV establish \"costs re-order\" for models; we extend \"the ordering of destruction is itself informative\" across asset classes. Descriptive at ~5 asset classes (not a powered test).",
+    "updatedAt": "2026-08-11T16:28:10.544Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-frazzini-israel-moskowitz-trading-costs-2018",
+    "type": "blackswan-battery-thesis",
+    "claim": "The free-data observable-friction index is a usable proxy for the FIM impact function's cross-sectional ORDERING (not its levels).",
+    "title": "Trading Costs — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "frazzini-israel-moskowitz-trading-costs-2018"
+    ],
+    "predicts": "The friction index rank-correlates positively with the FIM square-root-impact ordering on overlapping liquid equity/futures names; where they diverge we down-weight. This validation defuses the \"you cannot measure impact on free data\" objection.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "Directly answers the single most attackable element of the frontier (agent-3 caveat #2): we measure OBSERVABLE friction and validate its ordering against the proprietary impact benchmark.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-frazzini-israel-moskowitz-trading-costs-anomalies-2015",
+    "type": "blackswan-battery-thesis",
+    "claim": "FIM's \"survives at scale\" verdict is scope-limited to proprietary-execution, deep-liquidity equity implementations.",
+    "title": "Trading Costs of Asset Pricing Anomalies — battery test",
+    "source": "paper",
+    "status": "backed",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:28:10.544Z",
+      "status": "backed",
+      "harness": "attribution-v1",
+      "measured": "CONFIRMED on free data: the high-capacity / low-friction multi-asset factor families (riskparity, tsmom, globalfactors, lowvol) fail t>3 despite sitting at the low-friction corner — high capacity does NOT rescue survival on retail-accessible data. FIM \"survives at scale\" is scope-limited to proprietary-execution equity."
+    },
+    "paperIds": [
+      "frazzini-israel-moskowitz-trading-costs-anomalies-2015"
+    ],
+    "predicts": "The free-data, retail-accessible analogues of size/value/momentum land at the HIGH-capacity / low-friction corner of our frontier yet STILL fail net survival — because the surviving alpha lives in the low-capacity names the free-data universe structurally excludes. High capacity does not rescue survival on retail data.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "Places FIM as the optimistic pole our friction frontier arbitrates: the frontier predicts survival only in the LOW-capacity corner, the opposite of where FIM says the big factors live.",
+    "updatedAt": "2026-08-11T16:28:10.544Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-harvey-liu-backtesting-2015",
+    "type": "blackswan-battery-thesis",
+    "claim": "The Harvey-Liu haircut is the multiplicity rung of the waterfall and agrees with the Deflated Sharpe on the survivor set.",
+    "title": "Backtesting — battery test",
+    "source": "paper",
+    "status": "inconclusive",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:28:10.544Z",
+      "status": "inconclusive",
+      "harness": "attribution-v1",
+      "measured": "The multiplicity gate leaves zero survivors, BUT with the honest trial count (distinct configs) the DSR/haircut rung is MINOR — the zoo dies from low free-data gross alpha + capacity, not primarily from multiplicity. Multiplicity confirms, but is not the mechanism here."
+    },
+    "paperIds": [
+      "harvey-liu-backtesting-2015"
+    ],
+    "predicts": "Families passing nominal t>2 FAIL the haircut threshold once the true trial count (all specs across the battery) is used; haircut and Deflated Sharpe select the same (near-empty) survivor set.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "Operationalizes the multiplicity rung; cross-checks the DSR gate.",
+    "updatedAt": "2026-08-11T16:28:10.544Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-hou-xue-zhang-replicating-anomalies-2020",
+    "type": "blackswan-battery-thesis",
+    "claim": "HXZ's \"most anomalies fail with proper method\" holds cross-asset and tightens under costs.",
+    "title": "hou-xue-zhang-replicating-anomalies-2020 — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "hou-xue-zhang-replicating-anomalies-2020"
+    ],
+    "predicts": "On the free-data cross-asset battery the failure rate meets or exceeds HXZ's 65% (t>1.96) / 82% (t>2.78) once the cost + capacity rungs are added — the equity-only pessimistic pole generalizes.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "HXZ is the \"most false\" pole; our waterfall shows their conclusion is if anything conservative once costs/capacity/cross-asset enter.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-jensen-kelly-malamud-pedersen-implementable-frontier-2024",
+    "type": "blackswan-battery-thesis",
+    "claim": "Their cost-bent portfolio frontier and our cross-sectional friction-survival boundary are complementary renderings of the same limit — but ours is a distinct object.",
+    "title": "Machine Learning and the Implementable Efficient Frontier — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "jensen-kelly-malamud-pedersen-implementable-frontier-2024"
+    ],
+    "predicts": "Plotting each battery anomaly at (observable friction / implied capacity, net Deflated Sharpe) yields a monotone survival BOUNDARY (a fitted quantile envelope, not an eyeballed scatter); unlike their portfolio frontier it is per-anomaly, cross-sectional, and cross-asset.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "The nearest geometric prior art; we must state precisely why the object differs (cross-sectional survival boundary vs MV frontier) to claim the frontier as novel.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-jensen-kelly-pedersen-replication-crisis-2023",
+    "type": "blackswan-battery-thesis",
+    "claim": "JKP's \"no replication crisis\" is an artifact of cost-free, index-level, pre-capacity construction.",
+    "title": "jensen-kelly-pedersen-replication-crisis-2023 — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "jensen-kelly-pedersen-replication-crisis-2023"
+    ],
+    "predicts": "JKP's ~82% replication rate collapses toward the HXZ pole once the fixed cost + multiplicity + capacity rungs are imposed on the same signals cross-asset — the optimism does not survive the waterfall.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "Our design arbitrates the HXZ-vs-JKP standoff; the prediction is that \"no crisis\" is a discipline artifact, not a market fact.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-mclean-pontiff-decay-2016",
+    "type": "blackswan-battery-thesis",
+    "claim": "McLean-Pontiff post-publication decay is the DECAY rung and generalizes cross-asset.",
+    "title": "mclean-pontiff-decay-2016 — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "mclean-pontiff-decay-2016"
+    ],
+    "predicts": "Battery families show OOS/post-publication shrinkage on the order of MP's 26% (OOS) / 58% (post-pub) as a distinct rung of the waterfall, cross-asset — decay is a first-class destroyer alongside cost, not a substitute.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "MP owns decay; we place it as one ordered rung and confirm it is separable from the cost rung in the attribution.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-menkveld-nonstandard-errors-2024",
+    "type": "blackswan-battery-thesis",
+    "claim": "Our single-engine, single-cost-model design is the controlled INVERSE of Non-Standard Errors: hold the evidence-generating process to ~zero so surviving dispersion is attributable to the anomaly and asset, not the analyst.",
+    "title": "Nonstandard Errors — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "menkveld-nonstandard-errors-2024"
+    ],
+    "predicts": "Within a single anomaly, the specification-curve spread across defensible analyst choices is LARGE (confirming Menkveld) BUT its center is statistically indistinguishable from zero net alpha — dispersion is analyst noise around a null, not disagreement about a real effect.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "The spec-grid measures per-anomaly dispersion; the harness reports median (honest) vs max (cherry-picked) net DSR and the two-sided distance of the spec-curve center from zero.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-novy-marx-velikov-taxonomy-costs-2016",
+    "type": "blackswan-battery-thesis",
+    "claim": "NMV's inverse turnover-survival relation is the seed of the friction frontier — but friction adds signal beyond turnover.",
+    "title": "novy-marx-velikov-taxonomy-costs-2016 — battery test",
+    "source": "paper",
+    "status": "inconclusive",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:28:10.544Z",
+      "status": "inconclusive",
+      "harness": "attribution-v1",
+      "measured": "PARTIAL: a weak turnover-survival relation is present (turnover alone R2~0.29 on net Sharpe) but the observable friction index does NOT significantly reorder survival beyond turnover (partial-R2 5.6%, F=0.61, p~0.56). At N=18 families the frontier is underpowered to distinguish from NMV's turnover sort — the make-or-break objection is NOT overcome on current evidence."
+    },
+    "paperIds": [
+      "novy-marx-velikov-taxonomy-costs-2016"
+    ],
+    "predicts": "Net survival is monotone in the observable-friction index cross-asset (extending NMV's turnover buckets to a continuous boundary), AND the friction index reorders survival relative to a pure turnover sort (partial-R^2 of spread/ADV/breadth beyond turnover > 0).",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "NMV supplies the mechanism and the make-or-break objection (frontier != turnover repackaged); our contribution is the continuous cross-asset boundary that beats the turnover sort.",
+    "updatedAt": "2026-08-11T16:28:10.544Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-simonsohn-specification-curve-2020",
+    "type": "blackswan-battery-thesis",
+    "claim": "Specification-curve joint inference applied to each anomaly rejects the naive single-spec point estimate in favor of the honest curve median.",
+    "title": "Specification Curve Analysis — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "simonsohn-specification-curve-2020"
+    ],
+    "predicts": "The whole-curve permutation test FAILS to reject the global null of no net effect for all but the lowest-capacity corner; the spec-curve MEDIAN net DSR (not the cherry-picked max) is ~0 for ~all families.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "The imported method IS leg-1 of the harness (the fragility surface). The prediction is that honest joint inference nulls the zoo.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  },
+  {
+    "id": "bt-vanbinsbergen-factor-multiverse-2022",
+    "type": "blackswan-battery-thesis",
+    "claim": "A secular-trend confound inflates apparent anomaly alpha cross-asset, and the true survivor is trend-orthogonal (market-neutral).",
+    "title": "The Factor Multiverse: The Role of Interest Rates in Factor Return Measurement — battery test",
+    "source": "paper",
+    "status": "untested",
+    "harness": "attribution",
+    "evidence": {
+      "at": "2026-08-11T16:12:18.900Z",
+      "status": "untested",
+      "measured": null
+    },
+    "paperIds": [
+      "vanbinsbergen-factor-multiverse-2022"
+    ],
+    "predicts": "Benchmarking the battery's directional books against the dominant secular trend in each asset class (the multi-decade rate move for rate-sensitive books; the equity/crypto bull drift) shrinks residual alpha toward zero; the survivor is the market-neutral commodity value residual, consistent with our characterization.",
+    "createdAt": "2026-08-11T16:12:18.900Z",
+    "rationale": "Their duration-matched adjustment motivates a per-asset-class secular-trend control in the waterfall; the residual must be trend-orthogonal to count.",
+    "updatedAt": "2026-08-11T16:12:18.900Z",
+    "thesisTarget": "battery"
+  }
+]

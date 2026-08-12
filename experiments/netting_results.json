@@ -1,0 +1,53 @@
+{
+  "fee": 0.0005,
+  "assets": [
+    "GOLD",
+    "SILVER",
+    "COPPER",
+    "WTI",
+    "SPY",
+    "TLT",
+    "IEF",
+    "UUP"
+  ],
+  "standalone": {
+    "momentum": {
+      "annSharpe_net": 0.006666033615028233,
+      "t_win": 0.022947082523418802,
+      "turnover_yr": 10.502025853752652
+    },
+    "value_5yr": {
+      "annSharpe_net": -0.008909112881938424,
+      "t_win": -0.04776712424292886,
+      "turnover_yr": 4.132741655411924
+    },
+    "st_reversal": {
+      "annSharpe_net": 0.0055052640117836515,
+      "t_win": 0.02643628504782675,
+      "turnover_yr": 33.88848157437777
+    },
+    "lowvol": {
+      "annSharpe_net": -0.08281363520973792,
+      "t_win": -0.3050524375938681,
+      "turnover_yr": 2.7713679336291723
+    },
+    "trend": {
+      "annSharpe_net": -0.06207377030480243,
+      "t_win": -0.25437532840094135,
+      "turnover_yr": 3.325294231140266
+    }
+  },
+  "combined": {
+    "gross_annSharpe": -0.011592961895143064,
+    "gross_t": -0.03743245251535642,
+    "net_annSharpe": -0.0687320921507036,
+    "net_t": -0.22330124222016018,
+    "turnover_yr": 8.512405942504342,
+    "net_unnetted_annSharpe": -0.08161680677432524,
+    "net_unnetted_t": -0.2645820378215749,
+    "mean_standalone_turnover": 10.923982249662357,
+    "netting_turnover_reduction_pct": 22.075981560960088
+  },
+  "best_standalone_t": 0.02643628504782675,
+  "verdict": "combination does NOT clear t>3 either"
+}

@@ -207,9 +207,18 @@ expression of the same residual). On commodities-only across 13 windows:
   real-direction, market-neutral, cost-surviving to moderate costs, but sub-multiplicity-significant and ~half
   anti-momentum. *Exactly the small, hard-to-arbitrage residual limits-to-arbitrage predicts is the last thing
   standing — but a documented factor (AMP 2013), not a novel or bankable edge.*
-- **The one remaining test is data-gated.** Proving the residual is *not* a known carry/basis risk premium
-  (Boons-Prado basis-momentum; Bakshi-Gao-Rossi average/basis/momentum) needs 2nd-nearby **term-structure**
-  data not in the free panel — the outstanding replication.
+- **Is it a carry/basis premium? No — now closed for the full basket (free).** The one previously data-gated
+  test is done, without paid data: a 7-commodity carry factor combining **raw** EIA energy basis with a **free
+  fund-NAV roll proxy** for grains/copper/metals (carry ≈ trailing realised roll = r(fund) − r(front), from
+  CORN/WEAT/CPER/GLD/SLV via yfinance). Over 2012–2023 the **carry factor is null-to-negative** (t_win −1.20),
+  and the **value residual is NOT carry**: positive alpha over carry (t +1.24), negatively correlated (−0.31),
+  cross-sectional value-rank vs carry-rank Spearman **−0.23/−0.29** (value longs the *contango* names). So the
+  residual is a distinct value/mean-reversion effect, *not* a repackaged carry/basis premium — answering
+  Boons-Prado / Bakshi-Gao-Rossi for the whole basket. It remains, however, **not distinct from anti-momentum**
+  (alpha collapses to t 0.28 once momentum is controlled) — the "survivor" is essentially the mirror of the
+  (null) commodity momentum factor. *Caveat:* grains/copper/metals carry is a fund-NAV **proxy** (raw only for
+  energy); a full-window raw-M2 confirmation needs per-expiry data (Barchart free-but-rate-limited, or ~$30/$149
+  one-time) — but the proxy and the raw energy test agree.
 
 ---
 
