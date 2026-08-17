@@ -485,3 +485,39 @@ def test_powered_null_verdict_flags_a_survivor():
     v = powered_null_verdict(0.3, 0.0, 3.0, 500, sr_econ=0.05, alpha=0.05)
     assert v["verdict"] == "survivor"
     assert v["lower_bound"] > 0.0
+
+
+# --- HAC-corrected PSR (Lo-2002 serial-correlation adjustment the standard PSR omits) ---
+
+def _ar1(n, phi, sigma, seed):
+    rng = np.random.default_rng(seed)
+    e = rng.standard_normal(n) * sigma
+    x = np.empty(n)
+    x[0] = e[0]
+    for i in range(1, n):
+        x[i] = phi * x[i - 1] + e[i]
+    return x
+
+
+def test_psr_hac_matches_iid_when_no_autocorrelation():
+    from trainer.sharpe import probabilistic_sharpe_ratio_hac
+    x = _ar1(4000, 0.0, 0.01, 1) + 0.001   # iid with positive drift
+    assert probabilistic_sharpe_ratio_hac(x) == pytest.approx(probabilistic_sharpe_ratio(x), abs=0.03)
+
+
+def test_psr_hac_is_more_conservative_under_positive_autocorrelation():
+    from trainer.sharpe import probabilistic_sharpe_ratio_hac
+    x = _ar1(3000, 0.5, 0.01, 2) + 0.0015   # positively autocorrelated, positive drift
+    assert probabilistic_sharpe_ratio_hac(x) < probabilistic_sharpe_ratio(x)
+
+
+def test_psr_hac_degenerate_inputs():
+    from trainer.sharpe import probabilistic_sharpe_ratio_hac
+    assert probabilistic_sharpe_ratio_hac([0.01]) == 0.0
+    assert 0.0 <= probabilistic_sharpe_ratio_hac([0.01, -0.01, 0.01, -0.01]) <= 1.0
+
+
+def test_psr_hac_bounded_probability():
+    from trainer.sharpe import probabilistic_sharpe_ratio_hac
+    p = probabilistic_sharpe_ratio_hac(_ar1(2000, 0.3, 0.01, 3) + 0.002)
+    assert 0.0 <= p <= 1.0

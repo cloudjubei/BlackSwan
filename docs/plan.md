@@ -258,3 +258,86 @@ edge plausibility (is there really uncaptured alpha / a real theorem?) x accessi
 prove the theorem affordably?) x novelty (is it unclaimed / does it beat the named adversary on the axis that
 matters — usually NET-OF-COST?). The deep-research workflow ranks every candidate on these and returns the top
 data bet(s) + top method bet(s) + first experiments.
+
+---
+
+## REFEREE DIRECTION — Finding #1 (the first RECORDABLE result of the whole hunt)
+After the landmark hunt was exhausted (5/5 candidates dissolved under verification), the direction pivoted to
+BUILD THE REFEREE (the apparatus as product). Deep-research v3 (refutation-focused) found no textbook-toppling
+bombshell landable on free data, but surfaced an overclaim-proof referee target executed here:
+
+**Funding-rate directional-signal refutation** (`scripts/fetch_cex_funding.py`, `experiments/funding_directional_refutation.py`;
+447 Binance USDT-perps x 6.6y daily). **"Fade extreme funding" is NOT a directional price edge — the apparent
+profit is mechanical, delta-neutral funding CARRY, not price prediction.** Price-leg net Sharpe −0.36/+0.05/+0.31
+(null); cross-sectional funding→next-day IC t=0.29; the best net-of-cost price construction (negative-funding tail
+quantile) DIES under honest breadth (DSR 0.912) + a liquidity gate; the "continuation after high funding" is
+market BETA (market-neutral demean collapses it, t 3.56→0.86). We explicitly do NOT refute the real carry premium.
+- **6th adversarial verification → recordable=true, mid-caliber CONFIRMATION (not a discovery).** It caught three
+  framing overreaches (the blanket null was a symmetric factor's two legs cancelling; the "continuation" was beta
+  + overlap-inflated t; discovery→confirmation) — all fixed. The decomposition MECHANICS were verified correct
+  (additive identity to 7e-18; no look-ahead). The overclaim-proof carry-vs-price decomposition is why the core
+  survived where 5 prior candidates did not.
+- Prior art: "funding = carry, not direction" is practitioner canon + Babayev–Aliyev 2026; the fresh contribution
+  is the rigor/breadth/decomposition, not the direction. Scope: daily/broad panel; the 8h native single-asset
+  contrarian is out of scope.
+
+**This is the referee direction working as intended:** a clean, powered, multiplicity-controlled, honest
+adjudication that refutes a widely-watched folklore without touching the real premium. Next referee candidates:
+Liu-Tsyvinski-Wu crypto size factor (more fame, modest CoinGecko rebuild); PSR/PBO methods-calibration
+(apparatus-hardening). Avenue-3 long-term-investing guide remains the last item per plan.
+
+### REFEREE — Finding #2 (apparatus-hardening) + a data-gate
+**Finding #2 (done): PSR/MinTRL is anti-conservative under serial dependence.** The Probabilistic Sharpe Ratio
+adjusts for skew/kurtosis but omits the Lo-2002 autocorrelation correction. Added `probabilistic_sharpe_ratio_hac`
+(`trainer/sharpe.py`, TDD) and mirrored to modeltrainer `deflatedSharpe.ts` (golden-pinned). Monte-Carlo
+(`experiments/psr_serial_dependence_calibration.py`, H0 true Sharpe=0, AR(1)): the standard PSR's false-positive
+rate of PSR>0.95 climbs from 5.5% to **24.5% at φ=0.7** (nominal 5%); HAC-PSR recovers it. Honest scope: raw daily
+returns are near-iid so the effect is small there, but it bites for autocorrelated PnL (smoothed/illiquid marks,
+intraday/high-freq, overlapping overlays). **Incremental, not novel** — a known correction applied to a
+widely-used tool that omits it — a practice-change deliverable + a shipped fix that hardens the referee itself.
+
+**LTW crypto size factor (Liu-Tsyvinski-Wu 2022 JF) = DATA-GATED, not attempted.** CoinGecko's free tier is now
+hard-limited to the past 365 days (full history is paid), and CMC/Messari historical are paid — so the 2014-2018
+survivorship-corrected microcap cap/volume universe LTW requires is **not obtainable on free data.** We will not
+fake an LTW refutation on a proxy universe (that would be a 7th overclaim); the honest verdict is that this
+target is data-gated, matching the deep-research ~45%-feasibility risk.
+
+### DEEP-RESEARCH v4 — "is there REALLY no other bombshell at all?" → VERDICT HOLDS A FOURTH TIME
+Ran `find-bombshell-v4` (8 blindspot scouts + brutal adjudicator, 203 web searches) deliberately hunting the lanes
+v1-v3 structurally skipped: prediction markets, DeFi/AMM-LP economics, the LLM-for-finance hype lane, the 2025-26
+scoop window, non-return econophysics laws, the fresh free-data frontier, and a self-audit adversary. **No clean
+textbook-toppling free-data bombshell exists** — every scout "bombshell" degraded to referee / subfield-landmark
+caliber under the team's own pattern-matches.
+
+- **Killed (adjudicated):** LLM lanes are settled — **Levy (JAR 2026) owns the GPT-4-earnings refutation**
+  (look-ahead bias; in-window S&P recall <1%, collapses post-cutoff); ChatGPT news→returns is defended three
+  independent ways (ChronoBERT / time-capsule post-cutoff t=4.25 / Chen-Kelly-Xiu net-of-cost). Prediction-market
+  microstructure is fully owned by dedicated 2024-26 papers, including **the Fed itself** (FEDS 2026-010: Kalshi
+  beats Bloomberg consensus on CPI — a positive result, no refutation angle). AMM LP-loss/LVR/MEV all owned (MEV is
+  small and *declining*). "Square-root impact broken in crypto" is a reconstruction artifact (Sato-Kanazawa). The
+  agentic-alpha "Sharpe-3" wave is self-hardening (AlphaBench, Agora's sealed holdout reporting negative cross-seed
+  mean, Profit Mirage).
+- **The one verified-fresh opportunity (I read the load-bearing sources myself):** an **SEC amended-Rule-605
+  broker-level public-data replication of Schwarz-Barber-Huang-Jorion-Odean, "The Actual Retail Price of Equity
+  Trades" (JF 2025).** Verified: their 85,000 simultaneous market orders found cross-broker round-trip dispersion of
+  **0.07%-0.46%**, and **PFOF does *not* explain it** — it required a covert live experiment because no public data
+  could show it. Verified: amended Rule 605 extends to broker-dealers with **100,000+ customer accounts**, effective
+  **1 Aug 2026**, first monthly reports **due end-Sept 2026**, carrying effective spread + realized spread by horizon
+  + price improvement + six new stats. So a public-data external replication becomes possible *for the first time*:
+  genuinely un-owned (**timing-gated**, not access-gated), structurally overclaim-resistant (exact accounting
+  identity quoted = effective + PI), squarely in the powered-null + net-of-cost wheelhouse. **Honest ceiling =
+  policy-central subfield-landmark replication, NOT a new law**; kill-risk = the dispersion is fully absorbed by the
+  new size/marketability/notional buckets. Can start now (pre-build the wholesaler ranking on 20yr free old-format
+  market-center Rule 605, pre-register, then run the broker-level DiD once Sept-2026 reports accrue).
+- **Two open categories the return-centric passes never entered** (open as *categories*, low-probability as
+  landmarks): (a) **non-return demand-elasticity on free EDGAR holdings** (Gabaix-Koijen $5-multiplier fragility; a
+  positive decay result is representable) — but owned by the sharpest econometricians alive and every recent
+  extension supports inelasticity (incl. AFA-2026 "Dissecting the Aggregate Market Elasticity", which I checked is a
+  GE-*modeling* inelasticity explanation, not an empirical-fragility refutation — so the empirical wedge isn't fully
+  closed, but the ceiling is a fragility referee note); (b) **causal natural-experiments** — the US **T+1
+  settlement shock (28 May 2024)** DiD on FTD / liquidity / ETF-NAV, clean free-data identification but
+  market-structure-referee caliber.
+
+**Bottom line across four independent deep-research passes:** free-data *alpha* is genuinely picked-over for a small
+team; what remains landable is referee / law / replication work — exactly the "build the referee" direction. The
+honest ceiling is now confirmed, not merely suspected. Avenue-3 long-term-investing guide remains the last item.

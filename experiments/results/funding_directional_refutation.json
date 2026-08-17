@@ -1,0 +1,20 @@
+{
+ "n_perps": 447,
+ "n_days": 2425,
+ "n_liquid": 54,
+ "folklore_ic": 0.0008466774579676833,
+ "folklore_ic_t": 0.28748024789892657,
+ "liquid_ic": -0.007218307092999137,
+ "liquid_ic_t": -1.5776775803395604,
+ "n_constructions": 18,
+ "best_construction": {
+  "c": "q20/lb60/h5",
+  "sharpe": 1.4219139661330218,
+  "p": 0.0011568462418728442,
+  "n": 2195
+ },
+ "bh_reject": 4,
+ "by_reject": 2,
+ "best_dsr_honest": 0.9119177907074008,
+ "framing": "confirmation-not-discovery; carry-not-direction; scoped to daily/broad-panel"
+}

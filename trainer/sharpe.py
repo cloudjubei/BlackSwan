@@ -263,6 +263,24 @@ def sharpe_standard_error_hac(returns, q=None):
     return float(se_iid * math.sqrt(eta))
 
 
+def probabilistic_sharpe_ratio_hac(returns, sr_benchmark=0.0, q=None):
+    """PSR computed with the Lo-2002 serial-correlation-robust (HAC) Sharpe SE instead of the i.i.d. SE the
+    standard PSR uses. The Bailey-Lopez de Prado PSR adjusts for skew/kurtosis (Mertens) but OMITS the
+    autocorrelation correction, so for serially-dependent PnL (smoothed / illiquid / higher-frequency) it
+    understates the Sharpe SE and is ANTI-CONSERVATIVE (fires too early). This variant deflates by
+    sqrt(Newey-West inflation): PSR_hac = Phi( (SR - SR*) / se_hac ). 0.0 when the SE is undefined (n < 3 or a
+    non-positive/degenerate denominator)."""
+    r = np.asarray(returns, dtype=float)
+    r = r[np.isfinite(r)]
+    if r.size < 3:
+        return 0.0
+    st = sharpe_stats(r)
+    se = sharpe_standard_error_hac(r, q=q)
+    if not np.isfinite(se) or se <= 0:
+        return 0.0
+    return float(norm.cdf((st["sharpe"] - float(sr_benchmark)) / se))
+
+
 def benjamini_yekutieli(pvalues, q=0.05):
     """Benjamini-Yekutieli FDR under ARBITRARY dependence: Benjamini-Hochberg with q scaled by 1/H_m, where
     H_m = sum_{i=1..m} 1/i. Strictly more conservative than BH; the honest bound when tests are dependent."""
