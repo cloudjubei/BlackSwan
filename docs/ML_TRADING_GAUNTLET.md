@@ -73,6 +73,27 @@ orthogonal-vs-same-feature boundary cannot be demonstrated without a primary tha
 is −0.755 cross-seed. AgonAlpha (2608.11250) Sharpe 3.48 is reachable by an undeflated search on a short evaluation
 and the paper discloses neither the trial count, evaluation length, nor a deflated Sharpe — unverifiable as reported.
 
+## Postscript — pushing #1 to publishable (and why it doesn't clear the bar)
+
+`experiments/dispersion_law.py` turned #1's two-cross-section observation into a continuum: 90 random long-only
+15-perp baskets, **Spearman(cross-sectional vol dispersion, min-var-minus-1/N net Sharpe) = +0.70 (p < 1e-4)**,
+tercile advantage rising +0.21 → +0.42 → +0.98 with HAC-significant share 17% → 30% → 70%, NCO − LW-GMV ≈ −0.02.
+The relationship is real in-sample. But a prior-art gate (verified against primary sources) shows it is a **modest
+refinement, not a discovery**, and must not be written up as a law:
+
+- The *question and method* — a cross-sectional volatility statistic conditioning mean-variance-vs-1/N — are owned by
+  **Horses for Courses (Platanakis-Sutcliffe-Ye, EJOR 2020)**, which keys on idiosyncratic-vol *level*.
+- The *sign* is near-mechanical (Choueifaty: equal vols ⇒ min-var = 1/N, so "min-var beats 1/N as vols disperse" is
+  definitional gross of estimation error).
+- The *mechanism* (low-vol tilt, not covariance cleverness) is owned by Scherer 2011 / Clarke-de Silva-Thorley; the
+  *NCO-clustering-null* by Trucios 2026 and "Beyond De Prado and Cotton" 2026; *covariance-beats-1/N-net-of-cost* by
+  Kirby-Ostdiek 2012 / Curran 2020.
+- Decisively, the crypto premise is **era-dependent and contested**: **Brauneis-Mestel 2018** found the *opposite* on
+  2015–2017 crypto (1/N beat >75% of mean-variance portfolios on Sharpe/CEQ net-of-cost). My 2022–2026 window merely
+  favored the low-vol tilt — an era effect, not a robust law.
+
+**Verdict: #1 is not a publishable novel finding.** Recording it as one would have been an overclaim; the gate caught it.
+
 ## The real deliverable
 
 The gauntlet is **honest in both directions** — it kills false alpha (reversal, momentum decay, mining cost artifact)

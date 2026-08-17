@@ -341,3 +341,82 @@ caliber under the team's own pattern-matches.
 **Bottom line across four independent deep-research passes:** free-data *alpha* is genuinely picked-over for a small
 team; what remains landable is referee / law / replication work — exactly the "build the referee" direction. The
 honest ceiling is now confirmed, not merely suspected. Avenue-3 long-term-investing guide remains the last item.
+
+---
+
+## DEEP-RESEARCH v5 + THE ML-TRADING HONESTY GAUNTLET — the broadened question, answered and BUILT
+
+The question, broadened from the original BlackSwan brief: **is there ANY ML *training* that genuinely works in a
+trading setting and is landable for a small team on free data — and if not directly applicable, is the
+return-prediction literature *refutable*?** Ran `ml-in-trading-boundary` (8 scouts + adjudicator, 188 web searches).
+
+### The verdict on the two questions
+- **Q1 — ML that works:** Yes, but confined to **high-MI / well-posed targets** (realized volatility, covariance,
+  execution, deep hedging) — every one *reduces risk or improves a forecast*, **none makes net-of-cost directional
+  money**, and each cell is already owned (Ledoit-Wolf, RMT denoising, Bühler deep hedging, HAR-beats-DL on free
+  crypto vol) or instrument-gated (needs an options book / paid microstructure). **No free-data money-printer.**
+- **Q2 — refutation:** "Trading is broken" is *false* (factors replicate — Jensen-Kelly-Pedersen; execution/vol/
+  hedging ML genuinely works). But a **scoped refutation** of return-*timing* ML — net-of-cost + deflated-for-search
+  + post-cutoff — is landable at mid-caliber-referee. Much is already refuted (Avramov-Cheng-Metzker RFS 2023;
+  McLean-Pontiff; Profit Mirage); open targets are the 2024-26 wave.
+- **The unifying "information vs search-multiplicity boundary" is ALREADY PUBLISHED** (verified myself): **Financial
+  Epiplexity (Noguer i Alonso, arXiv 2607.02695)** bounds Sharpe/IC/breadth by structural bits; **Catt (arXiv
+  2603.27074)** proves the MI forecastability ceiling. **Do not claim the boundary as novel theory** — the single
+  most valuable finding of the pass (prevents a 6th overclaim). The one seam the theory hands over: it declines to
+  operationalize the bits→Sharpe ceiling for neural/RL classes; our apparatus can calibrate it empirically.
+
+### The apparatus (BUILT, TDD, in `trainer/`; results doc `docs/ML_TRADING_GAUNTLET.md`)
+A unified "SPIVA / Replicating-Anomalies for ML-trading" gauntlet: **`trading_costs.py`** (canonical net-of-cost),
+**`random_formula_null.py`** (the centrepiece — matched-complexity random reverse-Polish formulas → dollar-neutral
+lagged book → net-of-cost Sharpe → empirical null; a mined alpha only counts if it beats random formulas of its own
+complexity), **`ml_trading_gauntlet.py`** (`run_gauntlet` = economic-HAC + Deflated-Sharpe + BY-FDR + random-null
+gate + post-cutoff-OOS gate, ANDed). Mirrored to modeltrainer (`tradingCosts.ts`, `randomFormulaNull.ts`,
+golden-pinned). **113 Python + 56 TS tests green. Positive control** (`experiments/gauntlet_positive_control.py`, 40
+perps × 2,164 days): MI(vol)=0.89 vs MI(return)=0.017 nats = **52× ratio**; cross-sectional reversal +0.46 gross →
+−0.31 net, SURVIVES=False. The boundary, demonstrated.
+
+### The five claims run through it (honest, mixed, NONE a landmark — as pre-registered)
+- **#6 crypto XS momentum** (`crypto_overclaim_gauntlet.py`): net of taker+slippage+**funding**, SURVIVES=False
+  everywhere; the liquid half is positive in-sample (+0.69, beats null p=0.013) but **fails post-cutoff (−0.02)**.
+  *Refutation stands* (decay kill).
+- **#3 formulaic-alpha-mining zoo** (`alpha_mining_gauntlet.py`): best-of-K random formulas find weak persistent
+  *gross* structure (+0.48 OOS) but +1.67 Sharpe of turnover cost destroys it; **0/400 survive** (400 formulas = 7
+  effective trials). *Refutation stands* — gross-real, net cost artifact.
+- **#5 self-graded agentic headlines** (`agentic_headline_deflation.py`, sources verified): Agora (2606.29194) +1.87
+  on a single 91-day seed = **t=1.12, p=0.13 — insignificant**; AgonAlpha (2608.11250) Sharpe 3.48 **unverifiable as
+  reported** (no trials / eval-length / deflation). Apparatus-hardening, incremental.
+- **#2 meta-labeling** (`metalabeling_gauntlet.py`): **inconclusive** — the TSMOM primary decays OOS (+0.55 IS →
+  −0.24 OOS) and the meta-model is non-discriminating (sizing std 0.02); can't demonstrate the orthogonal-vs-same-
+  feature boundary without a primary that retains OOS edge. Deferred.
+- **#1 NCO / min-variance-vs-1/N** (`nco_gauntlet.py`, `nco_robustness.py`, `dispersion_law.py`): the pre-registered
+  refutation **FAILED honestly** → a real in-sample relationship instead. Long-only min-variance robustly beats 1/N
+  net-of-cost in high-dispersion crypto (not low-dispersion cross-asset); **the dispersion continuum**: 90 random
+  baskets, Spearman(vol dispersion, min-var−1/N net Sharpe) = **+0.70 (p<1e-4)**, tercile advantage +0.21→+0.98,
+  HAC-significant share 17%→70%; NCO clustering confirmed null. **BUT the novelty gate (`dispersion-law-novelty`,
+  verified against primary sources) = modest-refinement, NOT publishable:** the question+method are owned
+  (**Horses-for-Courses, Platanakis-Sutcliffe-Ye EJOR 2020**, keys on idio-vol *level*); the sign is near-mechanical
+  (Choueifaty identity); the mechanism (Scherer 2011) and NCO-null (Trucios 2026) are owned; and the crypto premise
+  is **era-dependent and contradicted** — **Brauneis-Mestel 2018** found the *opposite* on 2015-17 crypto (1/N beat
+  >75% of MV on Sharpe net-of-cost). My 2022-26 window merely favored the low-vol tilt. **#1 not recorded as a
+  finding.**
+
+### META-RESULT — the real deliverable
+The gauntlet is **honest in both directions**: it kills false *alpha* (reversal, momentum decay, mining cost
+artifact) AND false *refutations* (NCO's pre-registered kill fired → recorded the opposite honest finding, not the
+refutation we set out to make). Verify-before-record caught mis-framed verdicts twice mid-run (alpha-mining "IS→OOS
+persistence" was cost-persistence not alpha; meta-labeling was degenerate not a boundary) and **six would-be
+overclaims across the mission**, the last being the #1 dispersion "law".
+
+## HONEST FINAL STANDING (five deep-research passes + a full build-and-test program)
+- **No free-data landmark. No money-printer.** The ceiling is *referee / law / replication* work — confirmed, not
+  assumed, a fifth time.
+- **Banked, defensible deliverables:** (1) the **powered-null + gauntlet apparatus** (`sharpe.py`, `effective_trials.py`,
+  `certification.py`, `mutual_information.py`, `complexity_ladder.py`, `trading_costs.py`, `random_formula_null.py`,
+  `ml_trading_gauntlet.py`, all mirrored to modeltrainer, golden-pinned); (2) **Referee Finding #1** (crypto funding =
+  carry, not directional prediction); (3) **Referee Finding #2** (PSR/MinTRL anti-conservative under serial
+  dependence — HAC-PSR fix shipped both repos); (4) the **five gauntleted refutations/nulls** above (mid-caliber, on
+  data in hand).
+- **The one genuinely-fresh un-owned opportunity** remains the **SEC amended-Rule-605 broker-level replication of
+  Schwarz et al. (JF 2025)** — timing-gated to Sept-2026 (see v4).
+- Everything else — every alpha candidate, every "law", including #1 — resolved honestly to *real-but-owned /
+  contested / mechanical*. That discipline (verify-before-record, catch-the-overclaim) is itself the durable asset.
