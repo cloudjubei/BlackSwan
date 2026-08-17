@@ -1,0 +1,21 @@
+{
+ "n_days": 16259,
+ "zoo_size": 2031,
+ "look_good_is": 244,
+ "rescue_raw_certified": 0,
+ "rescue_eff_certified": 25,
+ "rescue_effective_trials": 3.5855058362977164,
+ "oos_nominal_sig": 104,
+ "null_expectation": 101.55000000000001,
+ "n_certified": 0,
+ "effective_trials": 3.5007579055740305,
+ "selection_raw_sharpe": 0.24911214779950183,
+ "selection_residual_sharpe": -0.1305403679379546,
+ "sr_star_ann": 0.7581721501150662,
+ "calib_injected": {
+  "0.8": false,
+  "1.5": true,
+  "2.5": true
+ },
+ "calib_permutation_certified": 0
+}

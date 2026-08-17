@@ -1,0 +1,98 @@
+{
+ "BTC": {
+  "oi_notional_usd": 2555424269,
+  "daily_bars": 1190,
+  "daily_from": "2023-05-12",
+  "daily_to": "2026-08-13",
+  "funding_pts": 27968,
+  "funding_years": 3.26
+ },
+ "ETH": {
+  "oi_notional_usd": 1592491780,
+  "daily_bars": 1190,
+  "daily_from": "2023-05-12",
+  "daily_to": "2026-08-13",
+  "funding_pts": 27968,
+  "funding_years": 3.26
+ },
+ "HYPE": {
+  "oi_notional_usd": 1209369614,
+  "daily_bars": 617,
+  "daily_from": "2024-12-05",
+  "daily_to": "2026-08-13",
+  "funding_pts": 14776,
+  "funding_years": 1.69
+ },
+ "SOL": {
+  "oi_notional_usd": 380619978,
+  "daily_bars": 1190,
+  "daily_from": "2023-05-12",
+  "daily_to": "2026-08-13",
+  "funding_pts": 27968,
+  "funding_years": 3.26
+ },
+ "ZEC": {
+  "oi_notional_usd": 206436228,
+  "daily_bars": 1190,
+  "daily_from": "2023-05-12",
+  "daily_to": "2026-08-13",
+  "funding_pts": 7548,
+  "funding_years": 0.86
+ },
+ "XRP": {
+  "oi_notional_usd": 105798555,
+  "daily_bars": 1190,
+  "daily_from": "2023-05-12",
+  "daily_to": "2026-08-13",
+  "funding_pts": 27647,
+  "funding_years": 3.16
+ },
+ "PUMP": {
+  "oi_notional_usd": 98326047,
+  "daily_bars": 400,
+  "daily_from": "2025-07-10",
+  "daily_to": "2026-08-13",
+  "funding_pts": 9574,
+  "funding_years": 1.09
+ },
+ "LIT": {
+  "oi_notional_usd": 87394135,
+  "daily_bars": 235,
+  "daily_from": "2025-12-22",
+  "daily_to": "2026-08-13",
+  "funding_pts": 5602,
+  "funding_years": 0.64
+ },
+ "XMR": {
+  "oi_notional_usd": 58368049,
+  "daily_bars": 1190,
+  "daily_from": "2023-05-12",
+  "daily_to": "2026-08-13",
+  "funding_pts": 5033,
+  "funding_years": 0.57
+ },
+ "AAVE": {
+  "oi_notional_usd": 57721470,
+  "daily_bars": 1190,
+  "daily_from": "2023-05-12",
+  "daily_to": "2026-08-13",
+  "funding_pts": 26928,
+  "funding_years": 3.07
+ },
+ "NEAR": {
+  "oi_notional_usd": 45015774,
+  "daily_bars": 1190,
+  "daily_from": "2023-05-12",
+  "daily_to": "2026-08-13",
+  "funding_pts": 24368,
+  "funding_years": 2.78
+ },
+ "LINK": {
+  "oi_notional_usd": 37207455,
+  "daily_bars": 1190,
+  "daily_from": "2023-05-12",
+  "daily_to": "2026-08-13",
+  "funding_pts": 27949,
+  "funding_years": 3.24
+ }
+}

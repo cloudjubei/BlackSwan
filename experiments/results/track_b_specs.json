@@ -1,0 +1,475 @@
+{
+ "strategies": [
+  {
+   "name": "Faber 10-month trend filter",
+   "type": "ma_crossover",
+   "params": {
+    "fast": 2,
+    "slow": 200
+   },
+   "direction": "long_only",
+   "rationale": "Price-vs-200-day (~10-month) trend, the canonical Faber (2007) GTAA regime filter. A broad US equity index spends most of its time in persistent bull regimes punctuated by a few sustained bear markets; staying invested above the long MA and flat below harvests the equity risk premium while sidestepping the largest drawdowns (2000-02, 2008, 2020). Edge is drawdown control and volatility reduction, not pure timing alpha, so risk-adjusted return improves modestly over buy-and-hold.",
+   "expected_annual_sharpe": 0.55,
+   "persona": "trend"
+  },
+  {
+   "name": "Golden/Death cross regime with crisis convexity",
+   "type": "ma_crossover",
+   "params": {
+    "fast": 50,
+    "slow": 200
+   },
+   "direction": "long_short",
+   "rationale": "50/200 crossover is the most widely watched equity regime signal; the death cross tends to fire before the worst of sustained bear markets. Traded long-short, the short leg is a tail hedge that pays in 2008/2020 rather than an alpha engine. Shorting fights the equity premium during whipsaw bull corrections, so raw Sharpe is honestly a notch below the long-only version, but the crisis convexity is genuine and diversifying.",
+   "expected_annual_sharpe": 0.42,
+   "persona": "trend"
+  },
+  {
+   "name": "Intermediate trend workhorse 20/100",
+   "type": "ma_crossover",
+   "params": {
+    "fast": 20,
+    "slow": 100
+   },
+   "direction": "long_only",
+   "rationale": "A ~1-month vs ~5-month crossover sits at the trend horizon where equity-index autocorrelation is empirically strongest and stable. Faster than the Faber filter so it re-enters uptrends sooner after corrections, slower than daily noise so turnover and whipsaw stay contained at 1bp costs. A robust middle-of-the-road trend workhorse.",
+   "expected_annual_sharpe": 0.45,
+   "persona": "trend"
+  },
+  {
+   "name": "12-month time-series momentum",
+   "type": "momentum",
+   "params": {
+    "lookback": 252
+   },
+   "direction": "long_only",
+   "rationale": "Trailing 12-month return sign is the Moskowitz-Ooi-Pedersen TSMOM signal, one of the most out-of-sample-validated anomalies across asset classes and decades. On a US equity index it captures persistent drift and regime persistence; long-only avoids the drag of shorting a positive-drift asset while keeping the protective exit in prolonged downtrends.",
+   "expected_annual_sharpe": 0.5,
+   "persona": "trend"
+  },
+  {
+   "name": "6-month momentum",
+   "type": "momentum",
+   "params": {
+    "lookback": 126
+   },
+   "direction": "long_only",
+   "rationale": "Six-month trailing return balances momentum persistence against the lag of the 12-month signal, historically a sweet spot in the intermediate-horizon momentum literature. Reacts faster to regime turns than 252d while still filtering short-term noise. Diversifies the trend book across horizon.",
+   "expected_annual_sharpe": 0.47,
+   "persona": "trend"
+  },
+  {
+   "name": "Vol-targeted 12-month momentum",
+   "type": "vol_target_momentum",
+   "params": {
+    "lookback": 252,
+    "vol_window": 60
+   },
+   "direction": "long_only",
+   "rationale": "12-month momentum sign scaled by inverse realized volatility. Equity volatility clusters and is negatively correlated with returns, so inverse-vol scaling automatically trims exposure into turbulent, drawdown-prone regimes and levers up in calm trends. Vol targeting historically lifts momentum Sharpe by roughly 10-20% and stabilizes the risk profile. My highest-conviction construction.",
+   "expected_annual_sharpe": 0.58,
+   "persona": "trend"
+  },
+  {
+   "name": "Fast vol-targeted momentum, long-short",
+   "type": "vol_target_momentum",
+   "params": {
+    "lookback": 126,
+    "vol_window": 20
+   },
+   "direction": "long_short",
+   "rationale": "Shorter 6-month signal with a responsive 20-day vol estimate, traded long-short. The short leg plus inverse-vol scaling concentrates exposure exactly when it should be cut, producing crisis-alpha convexity. Faster signal means more whipsaw and the short side drags in choppy bulls, so honest expected Sharpe is moderate, but it diversifies the slower trend signals.",
+   "expected_annual_sharpe": 0.45,
+   "persona": "trend"
+  },
+  {
+   "name": "Donchian 100-day breakout",
+   "type": "breakout",
+   "params": {
+    "window": 100
+   },
+   "direction": "long_only",
+   "rationale": "Classic Turtle-style channel breakout: go long on a new 100-day high. New highs on an equity index signal regime continuation and fresh trend legs; long-only skips the whipsaw-prone downside breaks that fight the equity premium. A price-native trend entry that is uncorrelated in timing with the MA and return-based signals.",
+   "expected_annual_sharpe": 0.42,
+   "persona": "trend"
+  },
+  {
+   "name": "Slow Donchian 200-day breakout",
+   "type": "breakout",
+   "params": {
+    "window": 200
+   },
+   "direction": "long_only",
+   "rationale": "A very-long-horizon 200-day channel acts as a coarse regime filter: participate only when the index makes genuinely new long-term highs. Few trades, low turnover, robust to noise, and captures the fat right tail of secular bull runs. The slow cousin of the 100-day breakout, trading responsiveness for durability.",
+   "expected_annual_sharpe": 0.45,
+   "persona": "trend"
+  },
+  {
+   "name": "3-month momentum",
+   "type": "momentum",
+   "params": {
+    "lookback": 63
+   },
+   "direction": "long_only",
+   "rationale": "Quarter-long trailing return captures shorter-term trend persistence and post-earnings/news drift, re-entering quickly after shallow pullbacks. Honestly the thinnest of the set: higher turnover and more whipsaw make it the most cost- and noise-sensitive, so I hold modest conviction, but it usefully diversifies horizon at the fast end of the trend spectrum.",
+   "expected_annual_sharpe": 0.35,
+   "persona": "trend"
+  },
+  {
+   "name": "RSI2 deep-oversold dip buy (long-only)",
+   "type": "rsi",
+   "params": {
+    "period": 2,
+    "low": 10,
+    "high": 90
+   },
+   "direction": "long_only",
+   "rationale": "Connors RSI-2 buy-the-dip. Sharp 2-day drops in a broad index are dominated by liquidity-demanding sellers (de-risking, margin calls, stop cascades); providing liquidity into that panic earns the short-horizon reversal / overreaction premium. Post-2000 S&P daily return autocorrelation is negative, giving this structural support. Long-only because the index's upward drift makes fading strength a chronic loser. This is my highest-conviction mean-reversion signal.",
+   "expected_annual_sharpe": 0.5,
+   "persona": "meanrev"
+  },
+  {
+   "name": "RSI2 moderate-oversold dip buy (long-only)",
+   "type": "rsi",
+   "params": {
+    "period": 2,
+    "low": 20,
+    "high": 80
+   },
+   "direction": "long_only",
+   "rationale": "Same liquidity-provision mechanism as the deep RSI-2 buy, but a higher entry threshold fires on the more frequent shallow dips. Smaller edge per trade, but far more observations means better statistical robustness and less reliance on a handful of crisis days. Long-only to avoid drift drag.",
+   "expected_annual_sharpe": 0.42,
+   "persona": "meanrev"
+  },
+  {
+   "name": "RSI3 oversold bounce (long-only)",
+   "type": "rsi",
+   "params": {
+    "period": 3,
+    "low": 15,
+    "high": 85
+   },
+   "direction": "long_only",
+   "rationale": "A 3-period oscillator smooths single-day noise relative to RSI-2, reducing one-day whipsaw while still capturing 2-3 day overreaction. Same index short-term-reversal logic; distinct entry dynamics give diversification against the pure 2-day variants.",
+   "expected_annual_sharpe": 0.45,
+   "persona": "meanrev"
+  },
+  {
+   "name": "RSI5 symmetric fade (long/short)",
+   "type": "rsi",
+   "params": {
+    "period": 5,
+    "low": 25,
+    "high": 75
+   },
+   "direction": "long_short",
+   "rationale": "Fades both oversold and overbought extremes over roughly a week to harvest reversion symmetrically. The short-the-strength leg captures genuine short-term overextension but surrenders the equity drift, so I expect a materially lower Sharpe than the long-only variants. Included as an honest test of two-sided reversion, not as a top pick.",
+   "expected_annual_sharpe": 0.28,
+   "persona": "meanrev"
+  },
+  {
+   "name": "Bollinger 20/2 lower-band buy (long-only)",
+   "type": "bollinger",
+   "params": {
+    "window": 20,
+    "k": 2
+   },
+   "direction": "long_only",
+   "rationale": "Canonical band touch. A close below the 20-day, 2-sigma lower band is a volatility-normalized ~2-sigma dislocation from the monthly mean, which historically mean-reverts on indices. The volatility scaling adapts the threshold to regime, unlike a fixed percentage drop. Long-only harvests the bounce without paying drift on shorts.",
+   "expected_annual_sharpe": 0.42,
+   "persona": "meanrev"
+  },
+  {
+   "name": "Bollinger 10/1.5 fast-band buy (long-only)",
+   "type": "bollinger",
+   "params": {
+    "window": 10,
+    "k": 1.5
+   },
+   "direction": "long_only",
+   "rationale": "A tighter, faster band trades the frequent shallow intraweek dislocations rather than rare extremes. Higher turnover and smaller per-trade edge, but many more trades. Same volatility-normalized oversold-bounce logic on a shorter memory.",
+   "expected_annual_sharpe": 0.33,
+   "persona": "meanrev"
+  },
+  {
+   "name": "Bollinger 15/2.5 extreme-touch fade (long/short)",
+   "type": "bollinger",
+   "params": {
+    "window": 15,
+    "k": 2.5
+   },
+   "direction": "long_short",
+   "rationale": "Only wide ~2.5-sigma touches trigger, isolating rarer, higher-conviction dislocations on both sides. The two-sided design tests whether extreme overbought touches also revert; the short leg gives up drift, capping the Sharpe. A selective, low-frequency reversion play.",
+   "expected_annual_sharpe": 0.28,
+   "persona": "meanrev"
+  },
+  {
+   "name": "Bollinger 50/2 correction dip buy (long-only)",
+   "type": "bollinger",
+   "params": {
+    "window": 50,
+    "k": 2
+   },
+   "direction": "long_only",
+   "rationale": "A ~2-month lookback flags dislocations from the longer mean, catching deeper, more persistent oversold conditions (shallow corrections) rather than daily noise. Captures the multi-week oversold-bounce as institutional rebalancing and buy-the-dip flows restore the index. Long-only.",
+   "expected_annual_sharpe": 0.35,
+   "persona": "meanrev"
+  },
+  {
+   "name": "3-day short-term reversal (long/short)",
+   "type": "reversal",
+   "params": {
+    "lookback": 3
+   },
+   "direction": "long_short",
+   "rationale": "Direct implementation of the classic short-term reversal factor (Lehmann 1990; Lo-MacKinlay 1990): buy 3-day losers, sell 3-day winners on overreaction. A 3-day window materially lowers turnover versus a 1-day reversal while retaining the signal, so it survives realistic costs better. The always-in short leg drags Sharpe but keeps constant exposure to the reversal premium.",
+   "expected_annual_sharpe": 0.27,
+   "persona": "meanrev"
+  },
+  {
+   "name": "5-day weekly reversal (long/short)",
+   "type": "reversal",
+   "params": {
+    "lookback": 5
+   },
+   "direction": "long_short",
+   "rationale": "Weekly-horizon reversal: overreaction accumulated over five sessions tends to unwind. Lower turnover than the 1-3 day versions makes it the most cost-robust reversal variant here, at the cost of a weaker raw signal. Honest, tradeable, and diversifying against the oscillator-based dip buys.",
+   "expected_annual_sharpe": 0.3,
+   "persona": "meanrev"
+  },
+  {
+   "name": "Vol-managed 12M momentum (fast vol)",
+   "type": "vol_target_momentum",
+   "params": {
+    "lookback": 252,
+    "vol_window": 20
+   },
+   "direction": "long_only",
+   "rationale": "Canonical time-series momentum (Moskowitz-Ooi-Pedersen 2012): the sign of the trailing ~12-month return is the most robust single trend signal across assets and decades. Sizing inversely to 20-day realized vol implements the Moreira-Muir (2017) / Barroso-Santa-Clara (2015) volatility-management result: high-vol states cluster in bear markets and carry low forward return, so de-risking into rising vol raises Sharpe and sharply cuts the momentum-crash left tail. A 20-day vol window reacts fast enough to trim exposure entering turmoil. Long-only, so it holds cash rather than shorting the equity risk premium. Highest-conviction line.",
+   "expected_annual_sharpe": 0.55,
+   "persona": "vol"
+  },
+  {
+   "name": "Vol-managed 12M momentum (stable vol)",
+   "type": "vol_target_momentum",
+   "params": {
+    "lookback": 252,
+    "vol_window": 60
+   },
+   "direction": "long_only",
+   "rationale": "Same 12-month trend sign, but a 60-day vol estimator is far less jumpy than a 20-day one, so position size drifts smoothly and turnover (hence transaction cost and whipsaw) falls materially. The trade-off is slower de-risking at the very onset of a crash. Held alongside the fast-vol version because the true optimal vol horizon is unknown and averaging the two diversifies estimation error.",
+   "expected_annual_sharpe": 0.53,
+   "persona": "vol"
+  },
+  {
+   "name": "Vol-managed 6M momentum",
+   "type": "vol_target_momentum",
+   "params": {
+    "lookback": 126,
+    "vol_window": 20
+   },
+   "direction": "long_only",
+   "rationale": "A 6-month lookback recognizes regime shifts sooner than the 12-month rule, exiting downtrends earlier, while inverse-vol scaling still controls momentum-crash risk. The cost is more whipsaw in choppy ranges. Intermediate horizon diversifies the 252-day signals; genuine but slightly lower conviction than the 12-month core.",
+   "expected_annual_sharpe": 0.5,
+   "persona": "vol"
+  },
+  {
+   "name": "Vol-managed 3M momentum",
+   "type": "vol_target_momentum",
+   "params": {
+    "lookback": 63,
+    "vol_window": 20
+   },
+   "direction": "long_only",
+   "rationale": "Short-horizon trend for the fastest defensive exits, vol-scaled to suppress the added noise. A 3-month signal is largely noise on an index and turns over frequently, so net-of-cost edge is thin; included mainly as a fast-reacting complement to the slower momentum sleeves, and honest expectation is modest.",
+   "expected_annual_sharpe": 0.42,
+   "persona": "vol"
+  },
+  {
+   "name": "Golden-cross defensive filter (50/200)",
+   "type": "ma_crossover",
+   "params": {
+    "fast": 50,
+    "slow": 200
+   },
+   "direction": "long_only",
+   "rationale": "The 50/200-day cross is the most-watched equity regime filter: long above, cash below. It captures the persistence of multi-month bull/bear regimes and has historically sidestepped the worst of 2000-02 and 2008. Edge is genuine trend persistence plus a degree of self-reinforcement from how widely it is followed. Very low turnover, so costs are negligible; value is chiefly drawdown reduction rather than higher raw return.",
+   "expected_annual_sharpe": 0.5,
+   "persona": "vol"
+  },
+  {
+   "name": "Faber 200-day timing",
+   "type": "ma_crossover",
+   "params": {
+    "fast": 2,
+    "slow": 200
+   },
+   "direction": "long_only",
+   "rationale": "Approximates Faber's (2007) price-versus-200-day (10-month) rule, with fast=2 standing in for spot price. One of the most out-of-sample-robust timing rules known, working across asset classes and long histories with minimal parameters. Primary contribution is truncating deep drawdowns; expected return is close to buy-and-hold but realized risk is much lower, lifting Sharpe.",
+   "expected_annual_sharpe": 0.5,
+   "persona": "vol"
+  },
+  {
+   "name": "Absolute time-series momentum 12M",
+   "type": "momentum",
+   "params": {
+    "lookback": 252
+   },
+   "direction": "long_short",
+   "rationale": "Textbook TSMOM: long when the trailing year is positive, short when negative. On a single up-drifting equity index the short leg is a structural drag and gets whipsawed by bear-market rallies, so I do NOT expect a higher Sharpe than the long-only versions. Stand behind it as a crisis-alpha / low-correlation diversifier that pays off in protracted declines, not a stand-alone Sharpe maximizer \u2014 an honest tail hedge, priced as such.",
+   "expected_annual_sharpe": 0.45,
+   "persona": "vol"
+  },
+  {
+   "name": "Absolute momentum 6M defensive",
+   "type": "momentum",
+   "params": {
+    "lookback": 126
+   },
+   "direction": "long_only",
+   "rationale": "A 6-month absolute-momentum gate to cash: simpler than the vol-managed sleeve and quicker than the 12-month rule at leaving downtrends. It forgoes vol scaling, so it keeps the full momentum-crash risk on entry/exit turns, but the raw trend filter itself is robust. A clean, low-parameter defensive rule at an intermediate horizon.",
+   "expected_annual_sharpe": 0.45,
+   "persona": "vol"
+  },
+  {
+   "name": "Donchian 1-year breakout",
+   "type": "breakout",
+   "params": {
+    "window": 252
+   },
+   "direction": "long_short",
+   "rationale": "Turtle-style channel breakout: a new 1-year high confirms an uptrend, a new 1-year low a downtrend. The long window filters short-term noise and captures durable trends. On an equity index the short side underperforms because of the upward drift and sharp V-shaped recoveries off lows, so honest net Sharpe is modest; kept for trend-capture diversification and distinct entry logic versus the moving-average rules.",
+   "expected_annual_sharpe": 0.4,
+   "persona": "vol"
+  },
+  {
+   "name": "Intermediate cross (20/100)",
+   "type": "ma_crossover",
+   "params": {
+    "fast": 20,
+    "slow": 100
+   },
+   "direction": "long_only",
+   "rationale": "A faster trend filter than 50/200: it enters and exits regimes earlier and tracks intermediate swings, at the cost of more whipsaws in sideways markets. Run to diversify the horizon of the defensive-timing sleeve \u2014 decorrelating the entry/exit timing from the slow 200-day rules reduces the chance that a single unlucky crossover point drives results.",
+   "expected_annual_sharpe": 0.45,
+   "persona": "vol"
+  },
+  {
+   "name": "Golden Cross Trend Filter (50/200)",
+   "type": "ma_crossover",
+   "params": {
+    "fast": 50,
+    "slow": 200
+   },
+   "direction": "long_only",
+   "rationale": "The classic 50/200-day SMA crossover captures the well-documented persistence of equity index trends and, crucially, sidesteps sustained bear markets (2000-02, 2008, 2022) by moving to cash. Long-only respects the equity risk premium: it participates in the drift while cutting left-tail exposure. Turnover is very low, so transaction costs are negligible. Its edge is risk reduction (lower drawdown/vol) more than excess return, which modestly lifts Sharpe over buy-and-hold.",
+   "expected_annual_sharpe": 0.45,
+   "persona": "contrarian"
+  },
+  {
+   "name": "Fast Dual-MA Whipsaw Probe (10/60)",
+   "type": "ma_crossover",
+   "params": {
+    "fast": 10,
+    "slow": 60
+   },
+   "direction": "long_short",
+   "rationale": "An exploratory faster crossover that also goes short on downtrends. Faster MAs react sooner to reversals but generate frequent whipsaws in choppy, range-bound indices, and the short leg actively bets against the upward drift. Included as a lower-conviction point an automated search would sample: it tests whether quicker trend detection pays enough to offset whipsaw and negative-carry shorting. I expect it to underperform the slow long-only filter.",
+   "expected_annual_sharpe": 0.25,
+   "persona": "contrarian"
+  },
+  {
+   "name": "12-Month Time-Series Momentum",
+   "type": "momentum",
+   "params": {
+    "lookback": 250
+   },
+   "direction": "long_only",
+   "rationale": "Time-series momentum (Moskowitz-Ooi-Pedersen): a positive trailing ~12-month return predicts continued positive returns, an effect robust across asset classes and decades driven by underreaction to news and slow-moving capital. At ~250 trading days the signal is slow and stable, keeping turnover and costs low. Long-only to harvest the drift while stepping aside during protracted downtrends.",
+   "expected_annual_sharpe": 0.45,
+   "persona": "contrarian"
+  },
+  {
+   "name": "2-Month Momentum Both-Sides Probe",
+   "type": "momentum",
+   "params": {
+    "lookback": 40
+   },
+   "direction": "long_short",
+   "rationale": "A shorter ~2-month horizon straddling the zone where slower momentum fades into short-term reversal, run long-short. This is a deliberately uncertain sample: 40 days is fast enough to catch intermediate swings but noisy, and the short leg fights index drift. It probes whether an automated search finds edge in the intermediate horizon; I hold low conviction and expect it well below the slow long-only version.",
+   "expected_annual_sharpe": 0.22,
+   "persona": "contrarian"
+  },
+  {
+   "name": "Vol-Managed 6-Month Momentum",
+   "type": "vol_target_momentum",
+   "params": {
+    "lookback": 120,
+    "vol_window": 20
+   },
+   "direction": "long_only",
+   "rationale": "Combines the strongest two levers available: a ~6-month momentum sign scaled by inverse realized volatility. Moreira-Muir show vol-managed equity exposure raises Sharpe because volatility spikes (crises) are not compensated by proportionally higher returns, so de-risking when the 20-day vol is high avoids the worst crash clusters while momentum keeps direction correct. Long-only to compound the risk premium. My highest-conviction strategy in this set.",
+   "expected_annual_sharpe": 0.55,
+   "persona": "contrarian"
+  },
+  {
+   "name": "Slow Vol-Scaled Trend Both-Sides",
+   "type": "vol_target_momentum",
+   "params": {
+    "lookback": 250,
+    "vol_window": 60
+   },
+   "direction": "long_short",
+   "rationale": "A slower 12-month momentum sign with a smoother 60-day vol estimate, run long-short. The long vol-scaling still helps risk-adjusted return, but a slow 60-day vol window de-risks sluggishly into fast crashes, and the short leg concedes drift. An exploratory blend of the vol-target and long-short axes; decent but honestly capped below the responsive long-only variant.",
+   "expected_annual_sharpe": 0.38,
+   "persona": "contrarian"
+  },
+  {
+   "name": "3-Day Short-Term Reversal",
+   "type": "reversal",
+   "params": {
+    "lookback": 3
+   },
+   "direction": "long_short",
+   "rationale": "Broad equity indices exhibit robust short-horizon mean reversion: 1-5 day moves partly reverse as liquidity providers demand compensation for absorbing order-flow imbalances and overreaction corrects. Fading the trailing 3-day move (short after up, long after down) exploits this. Gross Sharpe is high, but daily turnover is heavy, so I discount substantially for transaction costs and slippage. Net edge survives but is materially reduced.",
+   "expected_annual_sharpe": 0.35,
+   "persona": "contrarian"
+  },
+  {
+   "name": "Connors RSI(2) Dip-Buy",
+   "type": "rsi",
+   "params": {
+    "period": 2,
+    "low": 10,
+    "high": 90
+   },
+   "direction": "long_only",
+   "rationale": "A 2-period RSI is an extreme short-term oversold/overbought oscillator; RSI(2)<10 flags a sharp multi-day flush that, in an upward-drifting index, tends to snap back (the Connors mean-reversion system). Long-only: I buy deep oversold dips and avoid shorting overbought strength, which in an uptrending index is where naive RSI systems bleed. Real but partly backtest-mined, so I keep the expectation modest and cost-aware.",
+   "expected_annual_sharpe": 0.4,
+   "persona": "contrarian"
+  },
+  {
+   "name": "20-Day Bollinger Mean-Reversion Dip-Buy",
+   "type": "bollinger",
+   "params": {
+    "window": 20,
+    "k": 2
+   },
+   "direction": "long_only",
+   "rationale": "Standard 20-day, 2-sigma Bollinger bands: price piercing the lower band marks a statistically stretched short-term selloff that mean-reverts toward the moving average, the same daily reversal effect from a volatility-normalized angle (bands widen in high vol, demanding a larger move to trigger). Long-only avoids fighting the drift by shorting upper-band touches during trends. Correlated with the RSI dip-buy, so diversification benefit is limited.",
+   "expected_annual_sharpe": 0.35,
+   "persona": "contrarian"
+  },
+  {
+   "name": "100-Day Donchian Breakout",
+   "type": "breakout",
+   "params": {
+    "window": 100
+   },
+   "direction": "long_only",
+   "rationale": "A 100-day Donchian channel is slow trend-following: going long on new ~5-month highs rides established uptrends and, because indices spend most of their history near highs, keeps the position long through the drift while the short-of-new-lows exit pulls out during sustained declines. Long-only to avoid whipsaw shorts. Conceptually close to the momentum/MA rules (a trend family member), with edge from crash avoidance more than timing precision.",
+   "expected_annual_sharpe": 0.4,
+   "persona": "contrarian"
+  }
+ ]
+}

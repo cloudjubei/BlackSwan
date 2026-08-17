@@ -1,0 +1,19 @@
+{
+ "n_proposed": 40,
+ "n_executable": 40,
+ "effective_trials": 4.804735195259614,
+ "mean_expected_sharpe": 0.41974999999999996,
+ "mean_is_sharpe": 0.37742209235470237,
+ "mean_oos_sharpe": 0.43736332763308206,
+ "mean_oos_beta_neutral": 0.19186492216815987,
+ "n_certified": 2,
+ "n_nominal_sig": 26,
+ "llm_bn_mean": 0.19186492216815987,
+ "same_type_random_bn_mean": 0.1549609344356215,
+ "llm_vs_same_type_t": 1.1862635429208308,
+ "era_beta_neutral": {
+  "<=2005": -0.032281777892290364,
+  "2005-2015": 0.2836710238571946,
+  ">=2015": 0.06306808398900274
+ }
+}

@@ -38,26 +38,30 @@ SR_ECON_ANN = 0.5
 RNG = np.random.default_rng(12345)
 
 
-def hac_verdict(series, sr_econ_ann=SR_ECON_ANN, n_configs=1, trial_sr_std=0.0, alpha=0.05, power=0.8):
+def hac_verdict(series, sr_econ_ann=SR_ECON_ANN, n_configs=1, trial_sr_std=0.0, alpha=0.05, power=0.8,
+                periods_per_year=252.0):
     """Per-cell powered verdict with a HAC SE and within-cell best-of-N deflation, in per-obs units, reported
-    annualized. survivor = one-sided lower bound > 0; powered-null = upper < SR_econ; else inconclusive."""
+    annualized. survivor = one-sided lower bound > 0; powered-null = upper < SR_econ; else inconclusive.
+    `periods_per_year` sets the observation frequency (252 daily default; 8760 for hourly) so both the SR_econ
+    per-obs threshold and the annualized display track the true sampling frequency."""
+    ann = math.sqrt(periods_per_year)
     r = np.asarray(series, dtype=float)
     r = r[np.isfinite(r)]
     st = sharpe_stats(r)
     se = sharpe_standard_error_hac(r)
     sr_star = expected_max_sharpe(n_configs, trial_sr_std) if n_configs >= 2 else 0.0
     sr_adj = st["sharpe"] - sr_star                       # deflate the point estimate for the within-cell sweep
-    sr_econ = sr_econ_ann / ANN
+    sr_econ = sr_econ_ann / ann
     mde = minimum_detectable_sharpe(st["n_obs"], alpha, power)
     if not np.isfinite(se) or se <= 0:
-        return dict(sharpe_ann=st["sharpe"] * ANN, sr_adj_ann=sr_adj * ANN, verdict="inconclusive",
-                    lo_ann=-math.inf, hi_ann=math.inf, mde_ann=mde * ANN, p_one=1.0, n_obs=st["n_obs"], sr_star_ann=sr_star * ANN)
+        return dict(sharpe_ann=st["sharpe"] * ann, sr_adj_ann=sr_adj * ann, verdict="inconclusive",
+                    lo_ann=-math.inf, hi_ann=math.inf, mde_ann=mde * ann, p_one=1.0, n_obs=st["n_obs"], sr_star_ann=sr_star * ann)
     za = float(norm.ppf(1 - alpha))
     lo, hi = sr_adj - za * se, sr_adj + za * se
     verdict = "survivor" if lo > 0 else ("powered-null" if hi < sr_econ else "inconclusive")
     p_one = float(norm.sf(sr_adj / se))
-    return dict(sharpe_ann=st["sharpe"] * ANN, sr_adj_ann=sr_adj * ANN, verdict=verdict, lo_ann=lo * ANN,
-                hi_ann=hi * ANN, mde_ann=mde * ANN, p_one=p_one, n_obs=st["n_obs"], sr_star_ann=sr_star * ANN)
+    return dict(sharpe_ann=st["sharpe"] * ann, sr_adj_ann=sr_adj * ann, verdict=verdict, lo_ann=lo * ann,
+                hi_ann=hi * ann, mde_ann=mde * ann, p_one=p_one, n_obs=st["n_obs"], sr_star_ann=sr_star * ann)
 
 
 def cells_with_series():
